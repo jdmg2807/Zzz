@@ -38,9 +38,9 @@ object AutoImport {
         return try {
             ZipFile(file).use { zf ->
                 val names = ArrayList<String>(2048)
-                for (entry in zf.entries()) {
-                    if (names.size >= 6000) break
-                    names.add(entry.name.lowercase())
+                val iterator = zf.entries()
+                while (iterator.hasMoreElements() && names.size < 6000) {
+                    names.add(iterator.nextElement().name.lowercase())
                 }
                 classifyEntries(names)
             }

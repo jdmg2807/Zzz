@@ -298,27 +298,36 @@ object McWorldImporter {
         val regions = regionDir.listFiles { f -> f.isFile && f.name.startsWith("r.") && f.name.endsWith(".mca") }
             ?.sortedBy { it.name } ?: return null
         for (file in regions) {
-            try {
-                java.io.RandomAccessFile(file, "r").use { raf ->
-                    if (raf.length() < 8192) continue
-                    val header = ByteArray(4096)
-                    raf.seek(0)
-                    raf.readFully(header)
-                    for (i in 0 until 1024) {
-                        val offset = ((header[i * 4].toInt() and 0xff) shl 16) or
-                            ((header[i * 4 + 1].toInt() and 0xff) shl 8) or
-                            (header[i * 4 + 2].toInt() and 0xff)
-                        if (offset == 0) continue
-                        val parts = file.name.removePrefix("r.").removeSuffix(".mca").split('.')
-                        val rx = parts.getOrNull(0)?.toIntOrNull() ?: 0
-                        val rz = parts.getOrNull(1)?.toIntOrNull() ?: 0
-                        val cx = rx * 32 + (i % 32)
-                        val cz = rz * 32 + (i / 32)
-                        return intArrayOf(cx * 16 + 8, cz * 16 + 8)
-                    }
-                }
-            } catch (_: Throwable) {
+            val centre = firstChunkInRegion(file)
+            if (centre != null) return centre
+        }
+        return null
+    }
+
+    /** First non-empty chunk slot of one .mca file, as world coordinates. */
+    private fun firstChunkInRegion(file: File): IntArray? {
+        val header = try {
+            java.io.RandomAccessFile(file, "r").use { raf ->
+                if (raf.length() < 8192) return null
+                val buf = ByteArray(4096)
+                raf.seek(0)
+                raf.readFully(buf)
+                buf
             }
+        } catch (t: Throwable) {
+            return null
+        }
+        val parts = file.name.removePrefix("r.").removeSuffix(".mca").split('.')
+        val rx = parts.getOrNull(0)?.toIntOrNull() ?: 0
+        val rz = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        for (i in 0 until 1024) {
+            val offset = ((header[i * 4].toInt() and 0xff) shl 16) or
+                ((header[i * 4 + 1].toInt() and 0xff) shl 8) or
+                (header[i * 4 + 2].toInt() and 0xff)
+            if (offset == 0) continue
+            val cx = rx * 32 + (i % 32)
+            val cz = rz * 32 + (i / 32)
+            return intArrayOf(cx * 16 + 8, cz * 16 + 8)
         }
         return null
     }
