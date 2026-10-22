@@ -77,6 +77,16 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Anotar errores de compilación
+        if: failure()
+        run: |
+          echo "Errores detectados:"
+          grep -E "^e: |^w: .*error|FAILURE: Build|What went wrong|^> Task .*FAILED|Execution failed|Caused by" build.log \
+            | head -10 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+          grep -E "^e: " build.log | head -10
+
       - name: Reunir artefactos
         if: success()
         run: |
