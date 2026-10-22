@@ -89,6 +89,7 @@ object TileGen {
         "chest_front" to 0xa4712e, "furnace_top" to 0x7d7d7d, "furnace_side" to 0x7d7d7d,
         "furnace_front" to 0x767676, "furnace_front_on" to 0x8a6a4a,
         "anvil_top" to 0x3a3a3f, "anvil_side" to 0x33333a,
+        "lava" to 0xd4500f, "item_generic" to 0xd8d0c0,
         "deepslate_bricks" to 0x3f4045, "mud_bricks" to 0x89685a, "quartz_block" to 0xe8e3d8,
         "lever" to 0x8a7a5a, "redstone_torch_on" to 0xff5a3a, "redstone_torch_off" to 0x6a2a1a,
         "repeater" to 0x9a9a9a, "repeater_on" to 0xb04a3a, "comparator" to 0x9a9a9a,

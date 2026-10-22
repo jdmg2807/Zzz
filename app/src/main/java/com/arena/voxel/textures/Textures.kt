@@ -65,8 +65,8 @@ object Textures {
         "chest_top", "chest_side", "chest_front",
         "furnace_top", "furnace_side", "furnace_front", "furnace_front_on",
         "anvil_top", "anvil_side",
-        // v1.9.0: lava for the deep caves
-        "lava"
+        // v1.9.0: lava for the deep caves, chip for dropped non-block items
+        "lava", "item_generic"
     )
 
     /** Tiles rendered once per biome. */

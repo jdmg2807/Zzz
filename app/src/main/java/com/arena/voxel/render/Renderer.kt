@@ -67,6 +67,7 @@ class Renderer : GLSurfaceView.Renderer {
     private var hostileTimer = 8f
     private var containerTimer = 0f
     private val mobMeshes = arrayOfNulls<ChunkMesh>(Mobs.TYPES.size)
+    private val itemMeshes = HashMap<String, ChunkMesh>()
     private val mobTiles = HashMap<Int, Int>()
     private val visibleMobs = ArrayList<Mob>()
     private var lastNanos = 0L
@@ -630,7 +631,11 @@ class Renderer : GLSurfaceView.Renderer {
         if (w.set(hit.x, hit.y, hit.z, 0)) {
             if (!Game.creative) {
                 if (id != "air" && com.arena.voxel.items.Items.exists(id)) {
-                    Game.give(id, 1)
+                    // Java spawns an ItemEntity that the player then walks over.
+                    com.arena.voxel.world.ItemEntities.spawn(
+                        id, 1,
+                        hit.x + 0.5, hit.y + 0.35, hit.z + 0.5
+                    )
                 }
             }
             ModLoader.blockBroken(hit.x, hit.y, hit.z, id)
@@ -732,6 +737,7 @@ class Renderer : GLSurfaceView.Renderer {
 
         streamChunks(w)
         updateMobs(w, dt, p)
+        com.arena.voxel.world.ItemEntities.update(dt, w, p)
 
         // ------------------------------------------------------------------ camera
         val aspect = width.toFloat() / height.toFloat()
@@ -845,6 +851,23 @@ class Renderer : GLSurfaceView.Renderer {
                     Mat4.translation(mob.x.toFloat(), (mob.y + bob).toFloat(), mob.z.toFloat()),
                     Mat4.multiply(
                         Mat4.rotationY(mob.yaw),
+                        Mat4.scale(1f / 16f, 1f / 16f, 1f / 16f)
+                    )
+                )
+                mobProg.setMat4("uMVP", Mat4.multiply(vp, model))
+                mesh.draw()
+            }
+        }
+
+        // ------------------------------------------------------------------ dropped items
+        if (mobProg != null) {
+            for (e in com.arena.voxel.world.ItemEntities.all()) {
+                val mesh = itemMesh(e.id) ?: continue
+                val bob = (kotlin.math.sin((e.age * 0.15f).toDouble()) * 0.04f).toFloat()
+                val model = Mat4.multiply(
+                    Mat4.translation(e.x.toFloat(), (e.y + 0.12 + bob).toFloat(), e.z.toFloat()),
+                    Mat4.multiply(
+                        Mat4.rotationY(e.spin),
                         Mat4.scale(1f / 16f, 1f / 16f, 1f / 16f)
                     )
                 )
@@ -1017,6 +1040,27 @@ class Renderer : GLSurfaceView.Renderer {
     }
 
     private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
+
+    /** One 4x4x4-pixel cube per item id, textured with the block's side tile. */
+    private fun itemMesh(id: String): ChunkMesh? {
+        itemMeshes[id]?.let { return it }
+        val block = Blocks.get(Blocks.index(id))
+        if (block.id != "air") {
+            val part = Mobs.Part(-2f, -2f, -2f, 2f, 2f, 2f, block.tileSide, 1f)
+            val mesh = ChunkMesh()
+            mesh.upload(ChunkMesher.buildModelMesh(listOf(part)) { tile -> tile })
+            itemMeshes[id] = mesh
+            return mesh
+        }
+        // Non-block items (tools, food, materials) use a neutral chip tile so they stay visible.
+        val tile = com.arena.voxel.textures.Textures.indexOf("item_generic")
+        if (tile < 0) return null
+        val part = Mobs.Part(-2f, -2f, -2f, 2f, 2f, 2f, tile, 1f)
+        val mesh = ChunkMesh()
+        mesh.upload(ChunkMesher.buildModelMesh(listOf(part)) { t -> t })
+        itemMeshes[id] = mesh
+        return mesh
+    }
 
     private fun mobMesh(type: Int): ChunkMesh? {
         mobMeshes.getOrNull(type)?.let { return it }

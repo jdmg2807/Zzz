@@ -250,6 +250,10 @@ fun GameScreen(onExit: () -> Unit) {
                             val w = Game.world
                             val spawn = w?.gen?.spawnPoint()
                             if (w != null && spawn != null) {
+                                // Java drops the whole inventory on death.
+                                if (!Game.creative) {
+                                    com.arena.voxel.world.ItemEntities.dropInventory(pl)
+                                }
                                 pl.respawn(w, spawn.first, spawn.second, spawn.third)
                             } else {
                                 pl.health = pl.maxHealth
