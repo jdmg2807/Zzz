@@ -323,7 +323,7 @@ internal fun androidx.compose.foundation.layout.BoxScope.PlayerSlots(
     }
     for (c in 0 until 9) {
         Slot(gui, left + c * 18f, top + 58f, inv.get(c)) { current ->
-            transfer(inv, c, cursor, onCursor)
+            transfer(inv, c, cursor, current, onCursor)
         }
     }
 }
