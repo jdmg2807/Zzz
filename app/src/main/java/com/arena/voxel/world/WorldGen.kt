@@ -46,6 +46,20 @@ class WorldGen(val seed: Long) {
         return lerp(lerp(n00, n10, fx), lerp(n01, n11, fx), fz)
     }
 
+    /** Smooth 3D value noise for caves. */
+    fun noise3(x: Float, y: Float, z: Float): Float {
+        val x0 = floor(x).toInt(); val y0 = floor(y).toInt(); val z0 = floor(z).toInt()
+        val fx = smooth(x - x0); val fy = smooth(y - y0); val fz = smooth(z - z0)
+        fun h(ax: Int, ay: Int, az: Int): Float = hash3(ax, ay, az)
+        val c000 = h(x0, y0, z0); val c100 = h(x0 + 1, y0, z0)
+        val c010 = h(x0, y0 + 1, z0); val c110 = h(x0 + 1, y0 + 1, z0)
+        val c001 = h(x0, y0, z0 + 1); val c101 = h(x0 + 1, y0, z0 + 1)
+        val c011 = h(x0, y0 + 1, z0 + 1); val c111 = h(x0 + 1, y0 + 1, z0 + 1)
+        val x00 = lerp(c000, c100, fx); val x10 = lerp(c010, c110, fx)
+        val x01 = lerp(c001, c101, fx); val x11 = lerp(c011, c111, fx)
+        return lerp(lerp(x00, x10, fy), lerp(x01, x11, fy), fz)
+    }
+
     fun fbm(x: Float, z: Float, octaves: Int): Float {
         var total = 0f
         var amp = 0.5f
@@ -130,6 +144,20 @@ class WorldGen(val seed: Long) {
                     chunk.set(lx, y, lz, Blocks.index(block))
                 }
 
+                // Caves: two 3D noise fields, tunnels + wide chambers ("cheese" caves).
+                for (y in 2 until max(3, h - 3)) {
+                    if (y >= H) break
+                    val tunnelNoise = noise3(wx * 0.05f, y * 0.075f + 3f, wz * 0.05f)
+                    val chamberNoise = noise3(
+                        wx * 0.032f + 51f, y * 0.055f - 17f, wz * 0.032f + 23f
+                    )
+                    val tunnel = kotlin.math.abs(tunnelNoise - 0.5f) < 0.043f
+                    val chamber = chamberNoise > 0.795f
+                    if (tunnel || chamber) {
+                        chunk.set(lx, y, lz, Blocks.AIR)
+                    }
+                }
+
                 // Ore pockets.
                 for (y in 2 until (h - 4)) {
                     if (y >= H) break
@@ -151,9 +179,79 @@ class WorldGen(val seed: Long) {
             }
         }
 
+        // Some caves break the surface: keep a thin skin so the player never spawns in a hole.
+        for (lz in 0 until 16) {
+            for (lx in 0 until 16) {
+                val top = heightAt(baseX + lx, baseZ + lz)
+                if (top + 1 < H && chunk.get(lx, top, lz) == Blocks.AIR && top > SEA_LEVEL) {
+                    val biome = biomeAt(baseX + lx, baseZ + lz)
+                    val fill = when {
+                        biome == Biomes.DESERT -> "sand"
+                        biome == Biomes.SNOWY -> "snow"
+                        else -> "grass"
+                    }
+                    chunk.set(lx, top, lz, Blocks.index(fill))
+                }
+            }
+        }
+
+        maybeRuins(chunk)
         decorate(chunk)
         chunk.generated = true
         chunk.dirty = true
+    }
+
+    /**
+     * Small abandoned ruins: a cobblestone floor with broken pillars and a torch. They fit inside
+     * a single chunk, so no cross-chunk bookkeeping is needed.
+     */
+    private fun maybeRuins(chunk: Chunk) {
+        val region = 7
+        val rx = Math.floorDiv(chunk.cx, region)
+        val rz = Math.floorDiv(chunk.cz, region)
+        if (hash(rx * 73 + 11, rz * 97 - 5) > 0.22f) return
+
+        val lx = 4 + (hash(rx * 13 + 3, rz * 17 + 9) * 7).toInt()
+        val lz = 4 + (hash(rx * 23 + 5, rz * 31 + 1) * 7).toInt()
+        val wx = chunk.cx * 16 + lx
+        val wz = chunk.cz * 16 + lz
+        val ground = heightAt(wx, wz)
+        if (ground <= SEA_LEVEL + 1) return
+        val biome = biomeAt(wx, wz)
+        if (biome == Biomes.SNOWY) return
+
+        val cobble = Blocks.index("cobblestone")
+        val planks = Blocks.index("planks")
+
+        // Floor (5x5 with holes) and four pillars of different heights.
+        for (dx in -2..2) {
+            for (dz in -2..2) {
+                val tx = lx + dx
+                val tz = lz + dz
+                if (tx !in 0..15 || tz !in 0..15) continue
+                val y = ground
+                if (Blocks.get(chunk.get(tx, y, tz)).id == "grass" ||
+                    Blocks.get(chunk.get(tx, y, tz)).id == "sand"
+                ) {
+                    if (hash(wx + dx * 7, wz + dz * 11) > 0.22f) {
+                        chunk.set(tx, y, tz, if (hash(wx + dx, wz + dz) > 0.6f) planks else cobble)
+                    }
+                }
+            }
+        }
+        val corners = arrayOf(intArrayOf(-2, -2), intArrayOf(2, -2), intArrayOf(-2, 2), intArrayOf(2, 2))
+        for ((index, c) in corners.withIndex()) {
+            val tx = lx + c[0]
+            val tz = lz + c[1]
+            if (tx !in 0..15 || tz !in 0..15) continue
+            val height = 1 + (hash(wx + c[0] * 31, wz + c[1] * 17) * 3).toInt()
+            for (i in 1..height) {
+                if (ground + i < World.HEIGHT) chunk.set(tx, ground + i, tz, cobble)
+            }
+            if (index == 0 && height >= 2) {
+                chunk.set(tx, ground + height + 1, tz, Blocks.index("torch"))
+            }
+        }
     }
 
     private fun decorate(chunk: Chunk) {

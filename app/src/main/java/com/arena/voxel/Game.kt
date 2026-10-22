@@ -201,6 +201,9 @@ object Settings {
     var renderDistance = 4
     var fov = 70f
     var showHud = true
+    var usePacks = true
+    var useShaders = true
+    var useMods = true
 
     fun load(context: Context) {
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -208,6 +211,9 @@ object Settings {
         renderDistance = p.getInt("distance", 4).coerceIn(2, 6)
         fov = p.getFloat("fov", 70f).coerceIn(50f, 100f)
         showHud = p.getBoolean("hud", true)
+        usePacks = p.getBoolean("usePacks", true)
+        useShaders = p.getBoolean("useShaders", true)
+        useMods = p.getBoolean("useMods", true)
     }
 
     fun save(context: Context) {
@@ -216,6 +222,9 @@ object Settings {
             .putInt("distance", renderDistance)
             .putFloat("fov", fov)
             .putBoolean("hud", showHud)
+            .putBoolean("usePacks", usePacks)
+            .putBoolean("useShaders", useShaders)
+            .putBoolean("useMods", useMods)
             .apply()
     }
 }

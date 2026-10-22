@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.3.0 — Corrección de bugs visuales y rendimiento
+- **Bloques invisibles / agujeros**: las caras de los bordes de chunk dependían del chunk vecino y no
+  se recalculaban cuando este aparecía. Ahora se marcan sucios los 4 vecinos al generar un chunk.
+- **Paleta de bloques guardada en la partida** (`level.dat` v2): al añadir bloques nuevos en
+  versiones anteriores los ids se desplazaban y los mundos guardados mostraban bloques
+  equivocados o invisibles. Ahora se remapea por nombre al cargar (los saves antiguos avisan).
+- **Triángulos gigantes tras pausar**: al perderse el contexto EGL los VBOs quedaban inválidos y se
+  dibujaba basura. Ahora se recrean texturas, shaders y todas las mallas; también se libera el
+  mundo al volver al menú.
+- **Texturas de packs**: solo se aplican texturas reales de bloque (`textures/block|blocks`), se
+  ignoran overlays/partículas/GUI y las imágenes totalmente transparentes; el atlas pasa de
+  256 a 1024 huecos, así un pack como Faithful 64x ya no lo desborda ni deja bloques sin textura.
+- **Rendimiento**: caché de fuentes de luz por chunk (antes se escaneaban 9 chunks por malla),
+  descarte por frustum por chunk, generación/mallado con presupuesto de 6 ms por frame y
+  liberación temprana de mallas lejanas sin perder las construcciones del jugador.
+- **Ajustes**: interruptores para resource packs, shaders y mods (se aplican al entrar al mundo).
+- **Menú estilo Minecraft Java**: botones de piedra con borde y sombra, texto monoespaciado con
+  sombra, fondo de panorama (cielo, sol, colinas de bloques), splash amarillo, versión y aviso legal.
+- **Generación**: cuevas 3D (túneles + cámaras), ruinas de cobblestone con antorcha y spawn seguro
+  para no aparecer dentro de una cueva.
+- Bloque en la mano más pequeño y mejor encuadrado.
+
 ## v1.2.0 — Iluminación y sensación de "primera persona"
 - Luz de cielo por profundidad: las cuevas y el interior de construcciones se oscurecen.
 - Luz de bloque real (antorcha 14, glowstone 15) con caída por distancia.

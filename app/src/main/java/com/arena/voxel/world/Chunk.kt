@@ -12,6 +12,9 @@ class Chunk(val cx: Int, val cz: Int) {
     /** Cached biome id per column (lz * 16 + lx); filled by the mesher. */
     var biomes: IntArray? = null
 
+    /** Cached light emitters as x,y,z,level quads (world coordinates). Invalidated on edits. */
+    var lightSources: IntArray? = null
+
     var mesh: ChunkMesh? = null
     var waterMesh: ChunkMesh? = null
 

@@ -67,7 +67,7 @@ object ChunkMesher {
             }
         }
 
-        val sources = findLightSources(world, chunk)
+        val sources = lightSourcesFor(world, chunk)
 
         for (y in 0 until World.HEIGHT) {
             for (z in 0 until 16) {
@@ -133,42 +133,59 @@ object ChunkMesher {
         return Result(opaque.toArray(), water.toArray())
     }
 
-    private class LightSource(val x: Int, val y: Int, val z: Int, val level: Int)
-
-    private fun findLightSources(world: World, chunk: Chunk): List<LightSource> {
-        val out = ArrayList<LightSource>(16)
-        val cx = chunk.cx
-        val cz = chunk.cz
-        for (dx in -1..1) {
-            for (dz in -1..1) {
-                val c = world.chunk(cx + dx, cz + dz) ?: continue
-                for (y in 0 until World.HEIGHT) {
-                    for (z in 0 until 16) {
-                        for (x in 0 until 16) {
-                            val b = c.get(x, y, z)
-                            if (b == Blocks.AIR) continue
-                            val light = Blocks.get(b).light
-                            if (light <= 0) continue
-                            out.add(LightSource(c.cx * 16 + x, y, c.cz * 16 + z, light))
-                            if (out.size >= 64) return out
-                        }
-                    }
+    /** Light emitters of a chunk as x,y,z,level quads, cached on the chunk. */
+    private fun scanSources(c: Chunk): IntArray {
+        val out = ArrayList<Int>(32)
+        for (y in 0 until World.HEIGHT) {
+            for (z in 0 until 16) {
+                for (x in 0 until 16) {
+                    val b = c.get(x, y, z)
+                    if (b == Blocks.AIR) continue
+                    val light = Blocks.get(b).light
+                    if (light <= 0) continue
+                    out.add(c.cx * 16 + x)
+                    out.add(y)
+                    out.add(c.cz * 16 + z)
+                    out.add(light)
+                    if (out.size >= 512) return out.toIntArray()
                 }
             }
         }
-        return out
+        return out.toIntArray()
     }
 
-    private fun lightFrom(sources: List<LightSource>, x: Int, y: Int, z: Int): Float {
+    private fun lightSourcesFor(world: World, chunk: Chunk): IntArray {
+        val out = ArrayList<Int>(64)
+        for (dx in -1..1) {
+            for (dz in -1..1) {
+                val c = world.chunk(chunk.cx + dx, chunk.cz + dz) ?: continue
+                val arr = c.lightSources ?: scanSources(c).also { c.lightSources = it }
+                var i = 0
+                while (i + 3 < arr.size) {
+                    out.add(arr[i]); out.add(arr[i + 1]); out.add(arr[i + 2]); out.add(arr[i + 3])
+                    i += 4
+                    if (out.size >= 768) return out.toIntArray()
+                }
+            }
+        }
+        return out.toIntArray()
+    }
+
+    private fun lightFrom(sources: IntArray, x: Int, y: Int, z: Int): Float {
         var best = 0f
-        for (s in sources) {
-            val dx = (s.x - x).toFloat()
-            val dy = (s.y - y).toFloat()
-            val dz = (s.z - z).toFloat()
-            val dist = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
-            if (dist > 15f) continue
-            val v = (1f - dist / 15f) * (s.level / 15f)
-            if (v > best) best = v
+        var i = 0
+        while (i + 3 < sources.size) {
+            val dx = (sources[i] - x).toFloat()
+            val dy = (sources[i + 1] - y).toFloat()
+            val dz = (sources[i + 2] - z).toFloat()
+            val level = sources[i + 3] / 15f
+            val dist2 = dx * dx + dy * dy + dz * dz
+            if (dist2 < 225f) {
+                val dist = kotlin.math.sqrt(dist2)
+                val v = (1f - dist / 15f) * level
+                if (v > best) best = v
+            }
+            i += 4
         }
         return best
     }

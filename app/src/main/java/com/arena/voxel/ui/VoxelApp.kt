@@ -140,99 +140,6 @@ internal fun MenuButton(
 }
 
 @Composable
-fun MainMenu(
-    onNewWorld: () -> Unit,
-    onContinue: () -> Unit,
-    onMods: () -> Unit,
-    onPacks: () -> Unit,
-    onSettings: () -> Unit
-) {
-    val context = LocalContext.current
-    val hasSave = remember { Game.hasSave }
-    val modCount = remember { ModLoader.scan().count { it.error == null } }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFF16301A), Color(0xFF0C1117), Color(0xFF06070A))
-                )
-            )
-    ) {
-        // Simple decorative blocks in the background.
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 18.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            repeat(7) { i ->
-                val colors = listOf(Color(0xFF7CB342), Color(0xFF8B5A2B), Color(0xFF8A8A8A), Color(0xFFA9834F))
-                Box(
-                    Modifier
-                        .padding(3.dp)
-                        .size(26.dp)
-                        .background(colors[i % colors.size], RoundedCornerShape(3.dp))
-                )
-            }
-        }
-
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 28.dp, vertical = 58.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                "VOXELCRAFT",
-                fontSize = 46.sp,
-                fontWeight = FontWeight.Black,
-                color = Color(0xFFF2F7EE),
-                letterSpacing = 2.sp
-            )
-            Text(
-                "Minecraft para Android con mods, shaders y texturas de Java",
-                fontSize = 13.sp,
-                color = Color(0xFF9DB08F),
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(22.dp))
-
-            MenuButton("JUGAR", primary = true, modifier = Modifier.width(320.dp), onClick = onNewWorld)
-            if (hasSave) {
-                Spacer(Modifier.height(10.dp))
-                MenuButton("CONTINUAR PARTIDA", modifier = Modifier.width(320.dp), onClick = onContinue)
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.width(320.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MenuButton("MODS", modifier = Modifier.weight(1f), onClick = onMods)
-                MenuButton("TEXTURAS / SHADERS", modifier = Modifier.weight(1.7f), onClick = onPacks)
-            }
-            Spacer(Modifier.height(10.dp))
-            MenuButton("AJUSTES", modifier = Modifier.width(320.dp), onClick = onSettings)
-
-            Spacer(Modifier.height(18.dp))
-            Text(
-                "Versión ${BuildConfig.VERSION_NAME} · $modCount mod(s) instalados",
-                color = Color(0xFF6B7A80),
-                fontSize = 11.sp
-            )
-        }
-
-        Text(
-            "Carpeta del juego:\n${Ctx.base.absolutePath}",
-            color = Color(0xFF56636B),
-            fontSize = 10.sp,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(8.dp),
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-@Composable
 private fun ModsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
@@ -450,6 +357,9 @@ private fun SettingsScreen(onBack: () -> Unit) {
     var distance by remember { mutableStateOf(Settings.renderDistance.toFloat()) }
     var fov by remember { mutableStateOf(Settings.fov) }
     var hud by remember { mutableStateOf(Settings.showHud) }
+    var usePacks by remember { mutableStateOf(Settings.usePacks) }
+    var useShaders by remember { mutableStateOf(Settings.useShaders) }
+    var useMods by remember { mutableStateOf(Settings.useMods) }
 
     Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -458,6 +368,9 @@ private fun SettingsScreen(onBack: () -> Unit) {
                 Settings.renderDistance = distance.roundToInt()
                 Settings.fov = fov
                 Settings.showHud = hud
+                Settings.usePacks = usePacks
+                Settings.useShaders = useShaders
+                Settings.useMods = useMods
                 Settings.save(context)
                 onBack()
             }) { Text("‹ Volver", color = Accent) }
@@ -475,14 +388,23 @@ private fun SettingsScreen(onBack: () -> Unit) {
         SettingRow("Campo de visión", "${fov.roundToInt()}°") {
             Slider(value = fov, onValueChange = { fov = it }, valueRange = 50f..100f)
         }
-        Row(
-            Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("Mostrar HUD", color = Color(0xFFDCE3EA))
-            Switch(checked = hud, onCheckedChange = { hud = it })
-        }
+        ToggleRow("Mostrar HUD", hud) { hud = it }
+
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "CONTENIDO",
+            color = Color(0xFF7E8A9A),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
+        ToggleRow("Resource packs (texturas)", usePacks) { usePacks = it }
+        ToggleRow("Shaders", useShaders) { useShaders = it }
+        ToggleRow("Mods", useMods) { useMods = it }
+        Text(
+            "Los cambios de contenido se aplican al volver a entrar a un mundo (el mundo nuevo o\ncontinuar los usará).",
+            color = Color(0xFF6B7A80),
+            fontSize = 11.sp
+        )
 
         Spacer(Modifier.height(20.dp))
         Text(
@@ -496,6 +418,18 @@ private fun SettingsScreen(onBack: () -> Unit) {
                 "toca para colocar un bloque y mantén pulsado para romperlo.",
             color = Color(0xFF6B7A80), fontSize = 11.sp
         )
+    }
+}
+
+@Composable
+private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, color = Color(0xFFDCE3EA), fontSize = 14.sp)
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 

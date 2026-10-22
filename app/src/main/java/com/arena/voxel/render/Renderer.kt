@@ -71,6 +71,9 @@ class Renderer : GLSurfaceView.Renderer {
     private val lineData = FloatArray(12 * 2 * 3)
 
     private var initialized = false
+    private var contextGen = 0
+    private var lastContextGen = -1
+    private val frustum = FloatArray(24)
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.55f, 0.72f, 0.98f, 1f)
@@ -82,16 +85,39 @@ class Renderer : GLSurfaceView.Renderer {
         initialized = true
         lastNanos = 0L
         atlasTexture = 0
+        contextGen++
+        target.release()
         buildFullscreenQuad()
         buildLineCube()
-        // If the EGL context was lost while a world was loaded, rebuild GL resources.
-        if (world != null) {
-            try {
-                compilePrograms()
-                uploadAtlas()
-            } catch (t: Throwable) {
-                Log.e("No se pudo restaurar el contexto GL", t)
+        // A lost EGL context invalidates every VBO/texture/program. Rebuild them or the GPU
+        // draws garbage (that was the source of the huge random triangles after pausing).
+        lastContextGen = contextGen
+        if (world != null) restoreGpuResources()
+    }
+
+    /** Recreates every GPU resource after an EGL context loss, re-meshing all chunks. */
+    private fun restoreGpuResources() {
+        try {
+            if (shaderSources.isNotEmpty()) compilePrograms()
+            uploadAtlas()
+            val w = world ?: return
+            for (c in w.chunks.values) {
+                c.mesh?.release()
+                c.waterMesh?.release()
+                c.mesh = null
+                c.waterMesh = null
+                c.dirty = true
             }
+            handMesh?.release()
+            handMesh = null
+            handFor = ""
+            for (i in crackMeshes.indices) {
+                crackMeshes[i]?.release()
+                crackMeshes[i] = null
+            }
+            Log.i("Recursos GL restaurados (${w.chunks.size} chunks a re-mallar)")
+        } catch (t: Throwable) {
+            Log.e("No se pudo restaurar el contexto GL", t)
         }
     }
 
@@ -218,11 +244,23 @@ class Renderer : GLSurfaceView.Renderer {
 
             Game.setProgress(0.02f, "Cargando texturas...")
             Textures.prepareDefaults()
-            val packs = ResourcePacks.applyAll()
-            Game.packReport = if (packs.isEmpty()) "Sin packs (texturas integradas)" else packs.joinToString("\n")
+            val packs = if (Settings.usePacks) {
+                ResourcePacks.applyAll()
+            } else {
+                emptyList()
+            }
+            Game.packReport = when {
+                !Settings.usePacks -> "Texturas desactivadas en ajustes"
+                packs.isEmpty() -> "Sin packs (texturas integradas)"
+                else -> packs.joinToString("\n")
+            }
 
             Game.setProgress(0.06f, "Compilando shaders...")
-            val (packName, sources) = ResourcePacks.loadShaderSources()
+            val (packName, sources) = if (Settings.useShaders) {
+                ResourcePacks.loadShaderSources()
+            } else {
+                "integrado" to emptyMap()
+            }
             shaderSources = sources
             failedShaders.clear()
             Game.shaderPackName = if (sources.isEmpty()) "integrado" else "$packName (${sources.size} shaders)"
@@ -230,7 +268,7 @@ class Renderer : GLSurfaceView.Renderer {
 
             Game.setProgress(0.12f, "Cargando mods...")
             Blocks.init()
-            val report = ModLoader.loadAll()
+            val report = if (Settings.useMods) ModLoader.loadAll() else "Mods desactivados en ajustes"
             Game.modReport = report
 
             Game.setProgress(0.20f, "Generando atlas de texturas...")
@@ -241,6 +279,9 @@ class Renderer : GLSurfaceView.Renderer {
             if (loadSave) {
                 val loaded = World.loadFrom(Game.savesDir)
                 if (loaded != null) {
+                    if (loaded.legacy) {
+                        Game.chat("Partida de una versión anterior: si ves bloques raros, crea un mundo nuevo")
+                    }
                     w = loaded.world
                     p = loaded.player
                     Game.hotbar.clear()
@@ -347,53 +388,122 @@ class Renderer : GLSurfaceView.Renderer {
         c.dirty = false
     }
 
+    private fun markNeighboursDirty(w: World, cx: Int, cz: Int) {
+        // Border faces depend on the neighbour chunk: when it appears (or disappears) the
+        // already-built mesh must be rebuilt, otherwise holes and invisible faces show up.
+        w.chunk(cx - 1, cz)?.dirty = true
+        w.chunk(cx + 1, cz)?.dirty = true
+        w.chunk(cx, cz - 1)?.dirty = true
+        w.chunk(cx, cz + 1)?.dirty = true
+    }
+
     private fun streamChunks(w: World) {
         val p = player ?: return
         val pcx = floor(p.x / 16).toInt()
         val pcz = floor(p.z / 16).toInt()
         val radius = Settings.renderDistance
+        val start = System.nanoTime()
 
+        // Freeing the GPU copies early keeps VRAM low, but block data is kept much longer so
+        // builds do not vanish when the player walks away and comes back (only meshes are dropped).
         val iterator = w.chunks.values.iterator()
         while (iterator.hasNext()) {
             val c = iterator.next()
             val d = maxOf(abs(c.cx - pcx), abs(c.cz - pcz))
-            if (d > radius + 2) {
+            if (d > radius + 6) {
                 c.mesh?.release()
                 c.waterMesh?.release()
                 iterator.remove()
+            } else if (d > radius + 2 && c.mesh != null) {
+                c.mesh?.release()
+                c.waterMesh?.release()
+                c.mesh = null
+                c.waterMesh = null
+                c.dirty = true
             }
         }
 
         var generated = 0
         var meshed = 0
-        for (dx in -radius..radius) {
-            for (dz in -radius..radius) {
-                if (dx * dx + dz * dz > radius * radius + radius) continue
-                val cx = pcx + dx
-                val cz = pcz + dz
-                val existing = w.chunk(cx, cz)
-                if (existing == null) {
-                    if (generated < 2) {
-                        w.getOrCreateChunk(cx, cz)
-                        generated++
+        // Nearest chunks first: generate and mesh inside a per-frame time budget so the frame
+        // rate stays stable instead of stuttering on chunk creation.
+        for (ring in 0..radius) {
+            for (dx in -ring..ring) {
+                for (dz in -ring..ring) {
+                    if (maxOf(abs(dx), abs(dz)) != ring) continue
+                    if (dx * dx + dz * dz > radius * radius + radius) continue
+                    val cx = pcx + dx
+                    val cz = pcz + dz
+                    val existing = w.chunk(cx, cz)
+                    if (existing == null) {
+                        if (generated < 2) {
+                            w.getOrCreateChunk(cx, cz)
+                            markNeighboursDirty(w, cx, cz)
+                            generated++
+                        }
+                    } else if (existing.dirty && meshed < 4) {
+                        buildMesh(w, existing)
+                        meshed++
                     }
-                } else if (existing.dirty && meshed < 2) {
-                    buildMesh(w, existing)
-                    meshed++
+                    if ((System.nanoTime() - start) > 6_000_000L) break
                 }
             }
+            if ((System.nanoTime() - start) > 6_000_000L) break
         }
         Game.chunksReady = w.chunks.size
     }
 
-    private fun rebuildDrawList(w: World) {
+    // ------------------------------------------------------------------ frustum culling
+
+    private fun updateFrustum(vp: FloatArray) {
+        val m = vp
+        fun plane(index: Int, sign: Float, row: Int) {
+            val a = m[row] * sign
+            val b = m[4 + row] * sign
+            val c = m[8 + row] * sign
+            val d = m[12 + row] * sign
+            val len = kotlin.math.sqrt(a * a + b * b + c * c)
+            val k = if (len < 1e-6f) 1f else 1f / len
+            frustum[index] = a * k
+            frustum[index + 1] = b * k
+            frustum[index + 2] = c * k
+            frustum[index + 3] = d * k
+        }
+        // left, right, bottom, top, near, far
+        plane(0, 1f, 0); plane(4, -1f, 0)
+        plane(8, 1f, 1); plane(12, -1f, 1)
+        plane(16, 1f, 2); plane(20, -1f, 2)
+    }
+
+    private fun chunkVisible(minX: Float, minY: Float, minZ: Float, maxX: Float, maxY: Float, maxZ: Float): Boolean {
+        var i = 0
+        while (i < 24) {
+            val a = frustum[i]
+            val b = frustum[i + 1]
+            val c = frustum[i + 2]
+            val d = frustum[i + 3]
+            // Positive vertex test.
+            val px = if (a >= 0f) maxX else minX
+            val py = if (b >= 0f) maxY else minY
+            val pz = if (c >= 0f) maxZ else minZ
+            if (a * px + b * py + c * pz + d < 0f) return false
+            i += 4
+        }
+        return true
+    }
+
+    private fun rebuildDrawList(w: World, vp: FloatArray) {
         drawList.clear()
         val p = player ?: return
         val pcx = floor(p.x / 16).toInt()
         val pcz = floor(p.z / 16).toInt()
         val radius = Settings.renderDistance + 1
         for (c in w.chunks.values) {
-            if (maxOf(abs(c.cx - pcx), abs(c.cz - pcz)) <= radius && !c.dirty) drawList.add(c)
+            if (maxOf(abs(c.cx - pcx), abs(c.cz - pcz)) > radius || c.dirty) continue
+            val x0 = (c.cx * 16).toFloat()
+            val z0 = (c.cz * 16).toFloat()
+            if (!chunkVisible(x0, 0f, z0, x0 + 16f, World.HEIGHT.toFloat(), z0 + 16f)) continue
+            drawList.add(c)
         }
     }
 
@@ -444,8 +554,20 @@ class Renderer : GLSurfaceView.Renderer {
         lastNanos = now
         val dt = dtRaw.coerceIn(0f, 0.06f)
 
+        if (lastContextGen != contextGen) {
+            lastContextGen = contextGen
+            if (world != null) restoreGpuResources()
+        }
+
         val mode = Game.consumePendingStart()
         if (mode != 0) setupWorld(mode == 2)
+
+        // Leaving to the menu frees the world instead of keeping it invisible in VRAM.
+        if (Game.state == Game.State.MENU && world != null) {
+            releaseWorld()
+            Game.world = null
+            Game.player = null
+        }
 
         val w = world
         val p = player
@@ -510,13 +632,14 @@ class Renderer : GLSurfaceView.Renderer {
         }
 
         streamChunks(w)
-        rebuildDrawList(w)
 
         // ------------------------------------------------------------------ camera
         val aspect = width.toFloat() / height.toFloat()
         val proj = Mat4.perspective(Settings.fov, aspect, 0.08f, 420f)
         val view = Mat4.view(p.x.toFloat(), p.eyeY().toFloat(), p.z.toFloat(), p.yaw, p.pitch)
         val vp = Mat4.multiply(proj, view)
+        updateFrustum(vp)
+        rebuildDrawList(w, vp)
 
         val sunAngle = w.dayTime * Math.PI * 2.0
         val sunY = sin(sunAngle).toFloat()
@@ -709,7 +832,7 @@ class Renderer : GLSurfaceView.Renderer {
                             ),
                             Mat4.rotationY(36f - swingCurve * 55f)
                         ),
-                        Mat4.multiply(Mat4.rotationX(12f + swingCurve * 30f), Mat4.scale(0.34f, 0.34f, 0.34f))
+                        Mat4.multiply(Mat4.rotationX(10f + swingCurve * 32f), Mat4.scale(0.22f, 0.22f, 0.22f))
                     ),
                     Mat4.translation(-0.5f, -0.5f, -0.5f)
                 )
@@ -753,6 +876,8 @@ class Renderer : GLSurfaceView.Renderer {
         GLES20.glVertexAttribPointer(0, 2, GLES20.GL_FLOAT, false, 8, 0)
         GLES20.glDisableVertexAttribArray(1)
         GLES20.glDisableVertexAttribArray(2)
+        GLES20.glDisableVertexAttribArray(3)
+        GLES20.glDisableVertexAttribArray(4)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 3)
         GLES20.glDisableVertexAttribArray(0)
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)

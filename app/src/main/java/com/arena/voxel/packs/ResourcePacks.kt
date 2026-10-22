@@ -68,27 +68,47 @@ object ResourcePacks {
         }
     }
 
-    /** Names used inside the atlas for vanilla tiles. */
+    /**
+     * Vanilla texture names -> atlas tile names. Only base textures belong here: overlays
+     * (grass_block_side_overlay), particles or GUI art must never replace a block texture or
+     * the block ends up with an empty/invisible face.
+     */
     private val ALIASES = mapOf(
         "grass_block_top" to "grass_top",
         "grass_block_side" to "grass_side",
-        "grass_block_side_overlay" to "grass_side",
-        "grass_block_snow" to "snow_side",
-        "grass_path_top" to "dirt",
         "oak_log" to "log_side",
         "oak_log_top" to "log_top",
         "oak_leaves" to "leaves",
-        "oak_planks" to "oak_planks",
         "jungle_leaves" to "leaves",
-        "birch_leaves" to "leaves",
+        "acacia_leaves" to "leaves",
+        "dark_oak_leaves" to "leaves",
         "water_still" to "water",
         "water_flow" to "water",
         "bricks" to "brick",
         "snow_block" to "snow",
-        "iron_block" to "iron_ore",
-        "stone_slab_top" to "stone",
-        "cobblestone_slab_top" to "cobblestone"
+        "short_grass" to "tall_grass",
+        "grass" to "tall_grass",
+        "sandstone_top" to "sandstone",
+        "sandstone_normal" to "sandstone",
+        "oak_planks" to "oak_planks",
+        "cobblestone" to "cobblestone",
+        "dirt_path_top" to "dirt",
+        "deadbush" to "dead_bush"
     )
+
+    /** Only real block textures take part in the atlas. */
+    private fun isBlockTexture(entry: String): Boolean {
+        val lower = entry.lowercase()
+        if (!lower.endsWith(".png")) return false
+        if (!lower.contains("/textures/block/") && !lower.contains("/textures/blocks/") &&
+            !lower.startsWith("textures/block/") && !lower.startsWith("textures/blocks/")
+        ) return false
+        // Skip animated/auxiliary files and anything that is not a base texture.
+        if (lower.contains("_overlay") || lower.contains("destroy_stage") || lower.contains("_e.")
+            || lower.contains("_emissive") || lower.contains("_normal") || lower.contains("_height")
+        ) return false
+        return true
+    }
 
     private fun normalize(rawName: String): String? {
         val base = rawName.substringAfterLast('/').removeSuffix(".png").removeSuffix(".tga").lowercase()
@@ -114,7 +134,7 @@ object ResourcePacks {
                     val entries = src.entries()
                     val format = readFormat(src)
                     val desc = readDescription(src)
-                    val tiles = entries.count { it.contains("/textures/") && it.endsWith(".png") }
+                    val tiles = entries.count { isBlockTexture(it) }
                     val shaders = entries.count { it.contains("shaders/") && (it.endsWith(".vsh") || it.endsWith(".fsh")) }
                     val javaShader = isJavaShaderPack(src, entries)
                     PackInfo(file, src.name, format, desc, kind, tiles, shaders, javaShader)
@@ -177,22 +197,31 @@ object ResourcePacks {
         for (file in files) {
             try {
                 PackSource(file).use { src ->
-                    var count = 0
+                    var appliedCount = 0
+                    var skipped = 0
+                    val seen = HashSet<String>()
                     for (entry in src.entries()) {
-                        val lower = entry.lowercase()
-                        if (!lower.endsWith(".png")) continue
-                        if (!lower.contains("textures/")) continue
+                        if (!isBlockTexture(entry)) continue
                         val name = normalize(entry) ?: continue
+                        // Only tiles the engine uses: keeps the atlas tiny and avoids the pack's
+                        // thousands of unrelated textures pushing real ones out.
+                        if (!Textures.isKnown(name)) {
+                            skipped++
+                            continue
+                        }
+                        if (!seen.add(name)) continue
                         val bytes = src.read(entry) ?: continue
                         val bmp = Textures.decode(bytes) ?: continue
-                        // Only known vanilla names are overridden; unknown names become new tiles.
-                        if (!Textures.replace(name, bmp)) {
-                            Textures.put(name, bmp)
+                        if (!Textures.isUsableTexture(bmp)) {
+                            // Fully transparent texture would make the block invisible.
+                            bmp.recycle()
+                            skipped++
+                            continue
                         }
-                        count++
+                        if (Textures.replace(name, bmp)) appliedCount++
                     }
-                    applied.add("${src.name} ($count)")
-                    Log.i("Pack aplicado: ${src.name} ($count texturas)")
+                    applied.add("${src.name} ($appliedCount)")
+                    Log.i("Pack aplicado: ${src.name} ($appliedCount texturas, $skipped ignoradas)")
                 }
             } catch (t: Throwable) {
                 Log.e("Error aplicando pack ${file.name}", t)

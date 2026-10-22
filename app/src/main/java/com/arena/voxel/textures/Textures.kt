@@ -19,7 +19,7 @@ object Textures {
 
     /** Pixels per tile inside the atlas (source textures are scaled to this size). */
     const val TILE = 32
-    const val GRID = 16
+    const val GRID = 32
     const val ATLAS = TILE * GRID
 
     private class Tile(val name: String, var bitmap: Bitmap, var avg: Int)
@@ -77,6 +77,31 @@ object Textures {
     fun indexOf(name: String): Int = byName[name] ?: -1
 
     fun isTinted(name: String): Boolean = tinted.contains(name)
+
+    /** True when this pack texture maps onto a tile the engine actually uses. */
+    fun isKnown(name: String): Boolean = byName.containsKey(name)
+
+    /**
+     * Rejects textures that would make a block invisible (fully transparent PNGs happen in
+     * packs that ship placeholder or overlay art). Returns true when the bitmap is usable.
+     */
+    fun isUsableTexture(bmp: Bitmap): Boolean {
+        var opaque = 0
+        var total = 0
+        val stepX = (bmp.width / 8).coerceAtLeast(1)
+        val stepY = (bmp.height / 8).coerceAtLeast(1)
+        var y = 0
+        while (y < bmp.height) {
+            var x = 0
+            while (x < bmp.width) {
+                if ((bmp.getPixel(x, y) ushr 24) > 30) opaque++
+                total++
+                x += stepX
+            }
+            y += stepY
+        }
+        return total > 0 && opaque.toFloat() / total > 0.02f
+    }
 
     fun nameOf(index: Int): String = tiles.getOrNull(index)?.name ?: "?"
 

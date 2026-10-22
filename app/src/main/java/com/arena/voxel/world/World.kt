@@ -57,6 +57,12 @@ class World(val seed: Long) {
         val lz = z and 15
         c.set(lx, y, lz, blockIndex)
         c.dirty = true
+        // Light emitters changed: drop cached source lists around the edit.
+        for (dx in -1..1) {
+            for (dz in -1..1) {
+                chunk(cx + dx, cz + dz)?.lightSources = null
+            }
+        }
         if (lx == 0) chunk(cx - 1, cz)?.dirty = true
         if (lx == 15) chunk(cx + 1, cz)?.dirty = true
         if (lz == 0) chunk(cx, cz - 1)?.dirty = true
@@ -98,7 +104,12 @@ class World(val seed: Long) {
             File(dir, "level.dat").outputStream().use { fos ->
                 GZIPOutputStream(fos).use { gz ->
                     DataOutputStream(gz).use { out ->
+                        out.writeInt(MAGIC)
                         out.writeLong(seed)
+                        // Palette of block ids, so saves survive palette changes between versions.
+                        val palette = Blocks.ids()
+                        out.writeInt(palette.size)
+                        for (id in palette) out.writeUTF(id)
                         out.writeFloat(dayTime)
                         out.writeDouble(player.x)
                         out.writeDouble(player.y)
@@ -130,11 +141,15 @@ class World(val seed: Long) {
         const val SIZE = 16
         const val HEIGHT = 80
 
+        /** "VCX1": level.dat with an embedded block palette. */
+        private const val MAGIC = 0x56435831
+
         class Loaded(
             val world: World,
             val player: com.arena.voxel.player.Player,
             val hotbar: List<String>,
-            val selected: Int
+            val selected: Int,
+            val legacy: Boolean
         )
 
         /** Loads a saved world. Returns null when there is no save or it is corrupt. */
@@ -144,7 +159,24 @@ class World(val seed: Long) {
             return try {
                 GZIPInputStream(f.inputStream()).use { gz ->
                     DataInputStream(gz).use { inp ->
-                        val seed = inp.readLong()
+                        val first = inp.readInt()
+                        val modern = first == MAGIC
+                        val seed = if (modern) {
+                            inp.readLong()
+                        } else {
+                            ((first.toLong() shl 32) or (inp.readInt().toLong() and 0xffffffffL))
+                        }
+                        var remap: IntArray? = null
+                        if (modern) {
+                            val paletteSize = inp.readInt()
+                            val saved = ArrayList<String>(paletteSize)
+                            for (i in 0 until paletteSize) saved.add(inp.readUTF())
+                            // Map old palette index -> current palette index by name.
+                            remap = IntArray(paletteSize)
+                            for (i in 0 until paletteSize) {
+                                remap[i] = Blocks.index(saved[i])
+                            }
+                        }
                         val world = World(seed)
                         val dt = inp.readFloat()
                         val px = inp.readDouble()
@@ -167,6 +199,13 @@ class World(val seed: Long) {
                                 if (r <= 0) break
                                 read += r
                             }
+                            remap?.let { map ->
+                                for (i in c.blocks.indices) {
+                                    val old = c.blocks[i].toInt() and 0xff
+                                    val mapped = if (old < map.size) map[old] else 0
+                                    c.blocks[i] = mapped.toByte()
+                                }
+                            }
                             c.generated = true
                             c.dirty = true
                             world.chunks[world.keyOf(cx, cz)] = c
@@ -175,7 +214,7 @@ class World(val seed: Long) {
                         val p = com.arena.voxel.player.Player(px, py, pz)
                         p.yaw = yaw
                         p.pitch = pitch
-                        Loaded(world, p, hotbar, selected)
+                        Loaded(world, p, hotbar, selected, !modern)
                     }
                 }
             } catch (t: Throwable) {
