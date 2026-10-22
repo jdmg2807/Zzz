@@ -121,12 +121,53 @@ object McWorldImporter {
                 world.chunks[world.keyOf(cx, cz)] = c
             }
 
-            val saveDir = File(Ctx.savesDir, "importado")
+            // Import into the slot used by "Continuar partida" so it is playable right away.
+            val saveDir = com.arena.voxel.Game.savesDir
+            // Keep a backup of the previous world the first time we overwrite it.
+            if (File(saveDir, "level.dat").isFile) {
+                val backup = File(Ctx.savesDir, "mundo-anterior")
+                backup.mkdirs()
+                File(saveDir, "level.dat").copyTo(File(backup, "level.dat"), overwrite = true)
+                Logs.info("IMPORT", "Partida anterior respaldada en ${Ctx.relativePath(backup)}")
+            }
             saveDir.mkdirs()
+            // Minecraft y + offset, then look for the first free spot above the imported terrain.
+            var spawnTop = spawnY + World.MC_Y_OFFSET
+            val spawnChunk = world.chunk(Math.floorDiv(spawnX, 16), Math.floorDiv(spawnZ, 16))
+            if (spawnChunk != null) {
+                val lx = Math.floorMod(spawnX, 16)
+                val lz = Math.floorMod(spawnZ, 16)
+                for (y in (World.HEIGHT - 2) downTo 1) {
+                    if (spawnChunk.get(lx, y, lz) != Blocks.AIR) {
+                        spawnTop = y
+                        break
+                    }
+                }
+            }
+            var spawnPlayerY = (spawnTop + 1.2).coerceIn(2.0, (World.HEIGHT - 3).toDouble())
+            // Never start inside a block: climb until the two blocks above are free.
+            val pc = world.chunk(Math.floorDiv(spawnX, 16), Math.floorDiv(spawnZ, 16))
+            if (pc != null) {
+                val lx = Math.floorMod(spawnX, 16)
+                val lz = Math.floorMod(spawnZ, 16)
+                var guard = 0
+                while (guard < 80) {
+                    val feet = spawnPlayerY.toInt()
+                    val head = feet + 1
+                    if (feet + 2 >= World.HEIGHT) break
+                    if (pc.get(lx, feet, lz) == Blocks.AIR && pc.get(lx, head, lz) == Blocks.AIR) break
+                    spawnPlayerY += 1.0
+                    guard++
+                }
+            }
             val player = com.arena.voxel.player.Player(
                 spawnX + 0.5,
-                (spawnY + 1.6).coerceIn(1.0, (World.HEIGHT - 3).toDouble()),
+                spawnPlayerY,
                 spawnZ + 0.5
+            )
+            Logs.info(
+                "IMPORT",
+                "Spawn convertido: x=$spawnX z=$spawnZ → y=${spawnPlayerY.toInt()} (MC y=$spawnY)"
             )
             world.save(saveDir, player, com.arena.voxel.Game.hotbar.toList(), com.arena.voxel.Game.selectedSlot)
 

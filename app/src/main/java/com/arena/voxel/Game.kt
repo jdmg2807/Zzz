@@ -90,7 +90,7 @@ object Game {
     }
 
     /** Imports a Minecraft Java world in the background, then opens it. */
-    fun importMinecraftWorld(uri: android.net.Uri, onDone: (String) -> Unit) {
+    fun importMinecraftWorld(uri: android.net.Uri, onDone: (String, Boolean) -> Unit) {
         if (importing) return
         importing = true
         importStatus = "Leyendo el mundo de Minecraft..."
@@ -116,7 +116,7 @@ object Game {
             // Always export the log so the user can share what happened.
             val exported = com.arena.voxel.core.Logs.exportToDownloads(Ctx.app)
             Logs.info("IMPORT", exported)
-            onDone(message)
+            onDone(message, result?.success == true)
         }.start()
     }
 

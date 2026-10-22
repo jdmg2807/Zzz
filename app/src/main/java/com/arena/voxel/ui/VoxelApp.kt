@@ -89,7 +89,8 @@ fun VoxelApp() {
                     },
                     onMods = { screen = "mods" },
                     onPacks = { screen = "packs" },
-                    onSettings = { screen = "settings" }
+                    onSettings = { screen = "settings" },
+                    onPlay = { screen = "game" }
                 )
                 "mods" -> ModsScreen(onBack = { screen = "menu" })
                 "packs" -> PacksScreen(onBack = { screen = "menu" })

@@ -190,7 +190,8 @@ fun MainMenu(
     onContinue: () -> Unit,
     onMods: () -> Unit,
     onPacks: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    onPlay: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val hasSave = remember { Game.hasSave }
@@ -200,9 +201,10 @@ fun MainMenu(
     val worldPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             importing = true
-            Game.importMinecraftWorld(uri) { message ->
+            Game.importMinecraftWorld(uri) { message, success ->
                 importing = false
                 importMessage = message
+                if (success) onPlay()
             }
         }
     }

@@ -104,7 +104,7 @@ class Renderer : GLSurfaceView.Renderer {
     /** Recreates every GPU resource after an EGL context loss, re-meshing all chunks. */
     private fun restoreGpuResources() {
         try {
-            if (shaderSources.isNotEmpty()) compilePrograms()
+            compilePrograms()
             uploadAtlas()
             val w = world ?: return
             for (c in w.chunks.values) {

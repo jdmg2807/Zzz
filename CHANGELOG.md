@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.5.1
+- El mundo importado se guarda en la ranura que carga «Continuar partida» (con copia de
+  seguridad de la partida anterior en `saves/mundo-anterior`).
+- Spawn del mundo importado recalculado con el offset de altura y subiendo hasta un hueco libre.
+- Al terminar la importación se entra al mundo automáticamente.
+- Los shaders se recompilan siempre al recuperar el contexto OpenGL.
+
 ## v1.5.0 — Importar mundos de Java, log exportable y bugs de cactus/antorcha
 - **Importar mundos de Minecraft Java**: botón en el menú principal. Acepta el `.zip` del mundo
   (o una carpeta con `level.dat` + `region/`). Lector NBT + Anvil propio con soporte de:
