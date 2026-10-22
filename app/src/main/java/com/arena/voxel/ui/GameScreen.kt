@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -43,6 +45,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -63,6 +66,7 @@ fun GameScreen(onExit: () -> Unit) {
     var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
     var tick by remember { mutableIntStateOf(0) }
     var paused by remember { mutableStateOf(false) }
+    var picker by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -71,10 +75,12 @@ fun GameScreen(onExit: () -> Unit) {
         }
     }
 
-    BackHandler { paused = true }
+    BackHandler {
+        if (picker) picker = false else paused = true
+    }
 
-    LaunchedEffect(paused) {
-        Game.paused = paused
+    LaunchedEffect(paused, picker) {
+        Game.paused = paused || picker
     }
 
     val lifecycleOwner = context as? LifecycleOwner
@@ -133,11 +139,24 @@ fun GameScreen(onExit: () -> Unit) {
             Crosshair()
             Hotbar(tick)
             Joystick(Modifier.align(Alignment.BottomStart).padding(start = 26.dp, bottom = 26.dp).size(150.dp))
-            Controls(tick)
+            Controls(tick, onOpenPicker = { picker = true })
 
             Box(Modifier.align(Alignment.TopEnd).padding(12.dp)) {
                 TapButton("II") { paused = true }
             }
+        }
+
+        if (picker) {
+            BlockPicker(
+                selectedSlot = Game.selectedSlot,
+                onPick = { id ->
+                    if (Game.selectedSlot in Game.hotbar.indices) {
+                        Game.hotbar[Game.selectedSlot] = id
+                    }
+                    picker = false
+                },
+                onClose = { picker = false }
+            )
         }
 
         if (paused) {
@@ -316,7 +335,7 @@ private fun Joystick(modifier: Modifier) {
 }
 
 @Composable
-private fun BoxScope.Controls(tick: Int) {
+private fun BoxScope.Controls(tick: Int, onOpenPicker: () -> Unit) {
     val flying = remember(tick) { Game.player?.flying == true }
     Column(
         Modifier
@@ -328,6 +347,9 @@ private fun BoxScope.Controls(tick: Int) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             TapButton("⛏") { Game.requestBreak() }
             TapButton("■") { Game.requestPlace() }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            TapButton("▦", small = true, onClick = onOpenPicker)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             HoldButton(
@@ -415,6 +437,73 @@ private fun PauseOverlay(onResume: () -> Unit, onExit: () -> Unit) {
             })
             Spacer(Modifier.height(10.dp))
             MenuButton("Salir al menú", modifier = Modifier.fillMaxWidth(), onClick = onExit)
+        }
+    }
+}
+
+@Composable
+private fun BlockPicker(selectedSlot: Int, onPick: (String) -> Unit, onClose: () -> Unit) {
+    val blocks = remember { Blocks.all().drop(1) }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xE6080B10))
+            .pointerInput(Unit) { detectTapGestures { onClose() } }
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 28.dp, vertical = 18.dp)
+                .pointerInput(Unit) { detectTapGestures { } }
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "BLOQUES",
+                    color = Accent,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "toca uno para ponerlo en la ranura ${selectedSlot + 1}",
+                    color = Color(0xFF8A94A6),
+                    fontSize = 11.sp
+                )
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onClose) { Text("Cerrar", color = Accent) }
+            }
+            Spacer(Modifier.height(10.dp))
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(6),
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(blocks.size) { index ->
+                    val block = blocks[index]
+                    val color = Color(0xFF000000.toInt() or (block.color and 0xFFFFFF))
+                    Column(
+                        Modifier.clickable { onPick(block.id) },
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            Modifier
+                                .size(52.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(color)
+                                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(8.dp))
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            block.id,
+                            color = Color(0xFFCFD8E3),
+                            fontSize = 9.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
         }
     }
 }

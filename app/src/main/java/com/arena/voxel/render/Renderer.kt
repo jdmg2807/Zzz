@@ -462,6 +462,9 @@ class Renderer : GLSurfaceView.Renderer {
                 autosaveTimer = 0f
                 Game.saveWorld()
             }
+        } else {
+            // Drop touches that happened while paused / in menus.
+            Game.consumeAction()
         }
         Game.underwater = w.isLiquid(floor(p.x).toInt(), floor(p.eyeY()).toInt(), floor(p.z).toInt())
 
