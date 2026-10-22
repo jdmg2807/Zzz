@@ -188,7 +188,55 @@ object Blocks {
         add("deepslate_bricks", "deepslate_bricks", "deepslate_bricks", "deepslate_bricks", color = 0x3f4045, hardness = 3.5f, tool = "pickaxe")
         add("mud_bricks", "mud_bricks", "mud_bricks", "mud_bricks", color = 0x89685a, hardness = 1.5f, tool = "pickaxe")
         add("quartz_block", "quartz_block", "quartz_block", "quartz_block", color = 0xe8e3d8, hardness = 0.8f, tool = "pickaxe")
+
+        // ---- v1.8.0: redstone components -------------------------------------------------
+        // The wire uses one block id per power level: the mesher then needs no per-block tint.
+        for (level in 0..15) {
+            add(
+                "redstone_wire_$level", "redstone_wire_$level", "redstone_wire_$level",
+                "redstone_wire_$level", solid = false, opaque = false, color = 0x8a1a10,
+                shape = BlockShape.LAYER, hardness = 0f
+            )
+        }
+        add("redstone_block", "redstone_block", "redstone_block", "redstone_block",
+            color = 0xa82a1a, light = 0, hardness = 5f, tool = "pickaxe")
+        add("lever_off", "lever", "lever", "lever", solid = false, opaque = false, color = 0x8a7a5a,
+            shape = BlockShape.POST, hardness = 0.5f)
+        add("lever_on", "lever", "lever", "lever", solid = false, opaque = false, color = 0x8a7a5a,
+            shape = BlockShape.POST, hardness = 0.5f)
+        addCross("redstone_torch_on", "redstone_torch_on", color = 0xFF5A3A, light = 7)
+        addCross("redstone_torch_off", "redstone_torch_off", color = 0x6A2A1A)
+        add("repeater_off", "repeater", "repeater", "repeater", solid = false, opaque = false,
+            color = 0x9a9a9a, shape = BlockShape.LAYER, hardness = 0f)
+        add("repeater_on", "repeater_on", "repeater_on", "repeater_on", solid = false, opaque = false,
+            color = 0xb04a3a, shape = BlockShape.LAYER, hardness = 0f, light = 0)
+        add("comparator_off", "comparator", "comparator", "comparator", solid = false, opaque = false,
+            color = 0x9a9a9a, shape = BlockShape.LAYER, hardness = 0f)
+        add("comparator_on", "comparator_on", "comparator_on", "comparator_on", solid = false,
+            opaque = false, color = 0xa06a3a, shape = BlockShape.LAYER, hardness = 0f)
+        add("redstone_lamp_off", "redstone_lamp_off", "redstone_lamp_off", "redstone_lamp_off",
+            color = 0x4a3a2a, hardness = 0.3f)
+        add("redstone_lamp_on", "redstone_lamp_on", "redstone_lamp_on", "redstone_lamp_on",
+            color = 0xe0a860, light = 15, hardness = 0.3f)
+        add("observer", "observer_front", "observer_back", "observer_back", color = 0x5a5a5a,
+            hardness = 3f, tool = "pickaxe")
+        add("observer_on", "observer_front", "observer_back", "observer_back", color = 0x6a6a6a,
+            hardness = 3f, tool = "pickaxe")
+        add("piston", "piston_top", "piston_side", "piston_top", color = 0x8a7a5a, hardness = 1.5f)
+        add("piston_extended", "piston_top_extended", "piston_side", "piston_top", color = 0x9a8a6a,
+            hardness = 1.5f)
+        add("stone_button_off", "stone_button", "stone_button", "stone_button", solid = false,
+            opaque = false, color = 0x8a8a8a, shape = BlockShape.LAYER, hardness = 0.5f)
+        add("stone_button_on", "stone_button", "stone_button", "stone_button", solid = false,
+            opaque = false, color = 0x8a8a8a, shape = BlockShape.LAYER, hardness = 0.5f)
     }
+
+    /** All ids of a redstone wire power level, index = level. */
+    fun wireId(level: Int): String = "redstone_wire_${level.coerceIn(0, 15)}"
+
+    /** Power level encoded in a wire block id, or 0. */
+    fun wireLevel(id: String): Int =
+        if (id.startsWith("redstone_wire_")) id.removePrefix("redstone_wire_").toIntOrNull() ?: 0 else 0
 
     /** Hardness / tool table for the blocks declared before v1.7.0 (used by mining speed). */
     private val HARDNESS = mapOf(

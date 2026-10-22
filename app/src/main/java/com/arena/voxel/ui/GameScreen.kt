@@ -90,6 +90,20 @@ fun GameScreen(onExit: () -> Unit) {
         }
     }
 
+    // The renderer requests a screen (e.g. tapping a crafting table) through Game.openScreen.
+    LaunchedEffect(tick) {
+        when (Game.openScreen) {
+            "crafting_table" -> {
+                container = ContainerMode.CRAFTING_TABLE
+                Game.openScreen = ""
+            }
+            "inventory" -> {
+                container = ContainerMode.INVENTORY
+                Game.openScreen = ""
+            }
+        }
+    }
+
     LaunchedEffect(paused, picker, container) {
         Game.paused = paused || picker || container != null
     }

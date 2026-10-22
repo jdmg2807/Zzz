@@ -68,8 +68,26 @@ class World(val seed: Long) {
         if (lx == 15) chunk(cx + 1, cz)?.dirty = true
         if (lz == 0) chunk(cx, cz - 1)?.dirty = true
         if (lz == 15) chunk(cx, cz + 1)?.dirty = true
+        // Redstone reacts to every block change (cheap no-op for unrelated blocks).
+        if (!silent) Redstone.onChanged(this, x, y, z)
         return true
     }
+
+    /** Sets a block without triggering redstone updates (used by the redstone engine itself). */
+    fun setSilently(x: Int, y: Int, z: Int, blockIndex: Int): Boolean = withSilence { set(x, y, z, blockIndex) }
+
+    private var silenceDepth = 0
+
+    private inline fun <T> withSilence(block: () -> T): T {
+        silenceDepth++
+        return try {
+            block()
+        } finally {
+            silenceDepth--
+        }
+    }
+
+    private val silent: Boolean get() = silenceDepth > 0
 
     fun set(x: Int, y: Int, z: Int, id: String): Boolean = set(x, y, z, Blocks.index(id))
 

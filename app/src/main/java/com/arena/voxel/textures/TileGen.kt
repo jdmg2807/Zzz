@@ -42,8 +42,18 @@ object TileGen {
         if (x in 0 until S && y in 0 until S) px[y * S + x] = c
     }
 
-    private fun base(name: String): IntArray =
-        noise(BASE_COLORS[name] ?: 0x808080, 12, Random(name.hashCode().toLong()))
+    private fun base(name: String): IntArray {
+        // Redstone wire brightens with its power level (0..15), like the game's tint ramp.
+        if (name.startsWith("redstone_wire_")) {
+            val level = name.removePrefix("redstone_wire_").toIntOrNull() ?: 0
+            val f = level / 15f
+            val r = (0x48 + (0xFF - 0x48) * f).toInt()
+            val g = (0x08 + (0x30 - 0x08) * f).toInt()
+            val b = (0x08 + (0x20 - 0x08) * f).toInt()
+            return noise((r shl 16) or (g shl 8) or b, 10, Random(name.hashCode().toLong()))
+        }
+        return noise(BASE_COLORS[name] ?: 0x808080, 12, Random(name.hashCode().toLong()))
+    }
 
     private val BASE_COLORS = mapOf(
         "stone" to 0x8a8a8a, "dirt" to 0x8b5a2b, "cobblestone" to 0x7d7d7d, "oak_planks" to 0xa9834f,
@@ -74,7 +84,13 @@ object TileGen {
         "crafter_top" to 0x9a7a55, "crafter_side" to 0x8a6a4a, "crafter_bottom" to 0x6d5236,
         "vault_front" to 0x4d5257, "vault_side" to 0x5b5b5b, "vault_top" to 0x6b6f73,
         "trial_spawner_side" to 0x39424a, "trial_spawner_top" to 0x2b333a,
-        "deepslate_bricks" to 0x3f4045, "mud_bricks" to 0x89685a, "quartz_block" to 0xe8e3d8
+        "deepslate_bricks" to 0x3f4045, "mud_bricks" to 0x89685a, "quartz_block" to 0xe8e3d8,
+        "lever" to 0x8a7a5a, "redstone_torch_on" to 0xff5a3a, "redstone_torch_off" to 0x6a2a1a,
+        "repeater" to 0x9a9a9a, "repeater_on" to 0xb04a3a, "comparator" to 0x9a9a9a,
+        "comparator_on" to 0xa06a3a, "redstone_lamp_off" to 0x4a3a2a, "redstone_lamp_on" to 0xe0a860,
+        "piston_side" to 0x8a7a5a, "piston_top" to 0xa8987a, "piston_top_extended" to 0xc0b090,
+        "observer_back" to 0x5a5a5a, "observer_front" to 0x3a3a3a, "redstone_block" to 0xa82a1a,
+        "stone_button" to 0x8a8a8a, "oak_door_lower" to 0xa9834f, "oak_door_upper" to 0xa9834f
     )
 
     /** Names that exist in several biome variants. */

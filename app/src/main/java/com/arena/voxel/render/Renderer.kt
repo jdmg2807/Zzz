@@ -565,6 +565,11 @@ class Renderer : GLSurfaceView.Renderer {
     }
 
     private fun placeBlock(w: World, hit: BlockHit) {
+        // Levers and buttons react to the tap itself, like a right click in Java.
+        if (com.arena.voxel.world.Redstone.interact(w, hit.x, hit.y, hit.z)) {
+            Game.chat("Componente accionado")
+            return
+        }
         val x = hit.x + hit.nx
         val y = hit.y + hit.ny
         val z = hit.z + hit.nz
@@ -581,6 +586,11 @@ class Renderer : GLSurfaceView.Renderer {
         }
         if (hitsPlayer(p, x, y, z)) {
             Game.chat("No puedes colocar el bloque encima de ti")
+            return
+        }
+        val targetId = Blocks.get(w.get(hit.x, hit.y, hit.z)).id
+        if (targetId == "crafting_table" && Game.openScreen.isEmpty() && Game.selectedBlock() == "air") {
+            Game.openScreen = "crafting_table"
             return
         }
         if (w.set(x, y, z, blockIndex)) {
@@ -1029,7 +1039,7 @@ class Renderer : GLSurfaceView.Renderer {
                 hostileTimer = 3f
                 val night = w.dayTime > 0.52f
                 if (night) {
-                    val n = Mob.spawnHostiles(
+                    val n = Mobs.spawnHostiles(
                         w, w.gen,
                         kotlin.math.floor(p.x).toInt(), kotlin.math.floor(p.z).toInt(),
                         java.util.Random()

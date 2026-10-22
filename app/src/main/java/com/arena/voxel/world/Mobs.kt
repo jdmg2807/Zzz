@@ -243,7 +243,7 @@ class Mob(
         val cy = kotlin.math.floor(y).toInt()
         val cz = kotlin.math.floor(z).toInt()
         val dist = kotlin.math.sqrt((p.x - x) * (p.x - x) + (p.y - y) * (p.y - y) + (p.z - z) * (p.z - z))
-        if (dist < 6.0) p.hurt((28f * (1f - dist / 6f)).coerceAtLeast(1f))
+        if (dist < 6.0) p.hurt((28f * (1f - (dist / 6.0).toFloat())).coerceAtLeast(1f))
         for (bx in cx - 3..cx + 3) {
             for (by in cy - 2..cy + 3) {
                 for (bz in cz - 3..cz + 3) {

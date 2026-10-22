@@ -50,7 +50,16 @@ object Textures {
         "copper_block", "exposed_copper", "weathered_copper", "oxidized_copper",
         "chiseled_copper", "crafter_top", "crafter_side", "crafter_bottom",
         "vault_front", "vault_side", "vault_top", "trial_spawner_side", "trial_spawner_top",
-        "deepslate_bricks", "mud_bricks", "quartz_block"
+        "deepslate_bricks", "mud_bricks", "quartz_block",
+        // v1.8.0 redstone (one tile per power level so the wire brightens with signal)
+        "redstone_wire_0", "redstone_wire_1", "redstone_wire_2", "redstone_wire_3",
+        "redstone_wire_4", "redstone_wire_5", "redstone_wire_6", "redstone_wire_7",
+        "redstone_wire_8", "redstone_wire_9", "redstone_wire_10", "redstone_wire_11",
+        "redstone_wire_12", "redstone_wire_13", "redstone_wire_14", "redstone_wire_15",
+        "lever", "redstone_torch_on", "redstone_torch_off", "repeater", "repeater_on",
+        "comparator", "comparator_on", "redstone_lamp_off", "redstone_lamp_on",
+        "piston_side", "piston_top", "piston_top_extended", "observer_back", "observer_front",
+        "redstone_block", "stone_button", "oak_door_lower", "oak_door_upper"
     )
 
     /** Tiles rendered once per biome. */
