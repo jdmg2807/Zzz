@@ -91,8 +91,14 @@ jobs:
           {
             echo "Run ${{ github.run_id }} · commit ${{ github.sha }}"
             echo ""
+            echo "### Errores / avisos"
             echo '```'
-            tail -n 200 build.log 2>/dev/null || echo "sin build.log"
+            grep -E "^(e: |w: |FAILURE|What went wrong|> Task .*FAILED|Caused by|Execution failed)" build.log 2>/dev/null | head -120 || true
+            echo '```'
+            echo ""
+            echo "### Inicio del log"
+            echo '```'
+            head -n 80 build.log 2>/dev/null || echo "sin build.log"
             echo '```'
           } > /tmp/ci.md
           NUMBER=$(gh issue list --state open --search "CI build log in:title" --json number --jq '.[0].number // empty')
