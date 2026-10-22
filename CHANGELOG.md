@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.4.0 — Animales, cuevas y ruinas
+- **Animales**: cerdos, ovejas, vacas y gallinas con modelos de cajas, colores propios, gravedad,
+  paso automático, giro al chocar y deambular aleatorio. Aparecen sobre hierba según el bioma y
+  solo se actualizan/dibujan cerca del jugador.
+- **Cuevas 3D**: dos campos de ruido (túneles estrechos + cámaras amplias) tallados en la piedra,
+  con oscuridad real gracias a la luz de cielo por profundidad.
+- **Ruinas**: torres de cobblestone derruidas con suelo de tablones, huecos y una antorcha,
+  generadas de forma determinista sin cruzar chunks.
+- **Spawn seguro**: si una cueva abre la superficie el bloque de arriba se restituye, así no
+  apareces en un agujero.
+
 ## v1.3.1 — Hotfix del frustum culling
 - Corregida la extracción de planos del frustum (faltaba sumar la fila `w`), que en v1.3.0
   descartaba casi todos los chunks y hacía parecer que el mundo estaba vacío.

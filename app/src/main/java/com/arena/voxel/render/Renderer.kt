@@ -17,6 +17,8 @@ import com.arena.voxel.textures.Textures
 import com.arena.voxel.world.Blocks
 import com.arena.voxel.world.Chunk
 import com.arena.voxel.world.Biomes
+import com.arena.voxel.world.Mob
+import com.arena.voxel.world.Mobs
 import com.arena.voxel.world.World
 import com.arena.voxel.world.WorldGen
 import java.nio.ByteBuffer
@@ -61,6 +63,9 @@ class Renderer : GLSurfaceView.Renderer {
     private var mineProgress = 0f
     private var swing = 0f
     private var walkTime = 0f
+    private val mobMeshes = arrayOfNulls<ChunkMesh>(Mobs.TYPES.size)
+    private val mobTiles = HashMap<Int, Int>()
+    private val visibleMobs = ArrayList<Mob>()
     private var lastNanos = 0L
     private var fpsAccum = 0f
     private var fpsFrames = 0
@@ -270,6 +275,20 @@ class Renderer : GLSurfaceView.Renderer {
             Blocks.init()
             val report = if (Settings.useMods) ModLoader.loadAll() else "Mods desactivados en ajustes"
             Game.modReport = report
+
+            // Solid tiles for the animal boxes (registered before the atlas is uploaded).
+            mobTiles.clear()
+            for (type in Mobs.TYPES) {
+                for (color in type.colors) {
+                    if (!mobTiles.containsKey(color)) {
+                        mobTiles[color] = Textures.putSolid("mob_${Integer.toHexString(color)}", color)
+                    }
+                }
+            }
+            for (i in mobMeshes.indices) {
+                mobMeshes[i]?.release()
+                mobMeshes[i] = null
+            }
 
             Game.setProgress(0.20f, "Generando atlas de texturas...")
             uploadAtlas()
@@ -639,6 +658,7 @@ class Renderer : GLSurfaceView.Renderer {
         }
 
         streamChunks(w)
+        updateMobs(w, dt, p)
 
         // ------------------------------------------------------------------ camera
         val aspect = width.toFloat() / height.toFloat()
@@ -731,6 +751,33 @@ class Renderer : GLSurfaceView.Renderer {
             GLES20.glDepthMask(true)
             GLES20.glEnable(GLES20.GL_CULL_FACE)
             for (c in drawList) c.mesh?.draw()
+        }
+
+        // ------------------------------------------------------------------ animals
+        val mobProg = terrainProg
+        if (mobProg != null && visibleMobs.isNotEmpty()) {
+            mobProg.use()
+            mobProg.set1i("uTex", 0)
+            mobProg.set3f("uCam", p.x.toFloat(), p.eyeY().toFloat(), p.z.toFloat())
+            mobProg.set3f("uFogColor", fogR, fogG, fogB)
+            mobProg.set2f("uFog", fogNear, fogFar)
+            mobProg.set3f("uLightColor", lightR, lightG, lightB)
+            mobProg.set1f("uDay", brightness)
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, atlasTexture)
+            for (mob in visibleMobs) {
+                val mesh = mobMesh(mob.type) ?: continue
+                val bob = if (mob.moving) kotlin.math.abs(kotlin.math.sin(mob.walk)) * 0.035f else 0f
+                val model = Mat4.multiply(
+                    Mat4.translation(mob.x.toFloat(), (mob.y + bob).toFloat(), mob.z.toFloat()),
+                    Mat4.multiply(
+                        Mat4.rotationY(mob.yaw),
+                        Mat4.scale(1f / 16f, 1f / 16f, 1f / 16f)
+                    )
+                )
+                mobProg.setMat4("uMVP", Mat4.multiply(vp, model))
+                mesh.draw()
+            }
         }
 
         // ------------------------------------------------------------------ selection
@@ -898,6 +945,34 @@ class Renderer : GLSurfaceView.Renderer {
 
     private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
+    private fun mobMesh(type: Int): ChunkMesh? {
+        mobMeshes.getOrNull(type)?.let { return it }
+        val info = Mobs.typeOf(type)
+        val mesh = ChunkMesh()
+        mesh.upload(ChunkMesher.buildModelMesh(info.parts) { color -> mobTiles[color] ?: -1 })
+        mobMeshes[type] = mesh
+        return mesh
+    }
+
+    private fun updateMobs(w: World, dt: Float, p: Player) {
+        visibleMobs.clear()
+        val pcx = floor(p.x / 16).toInt()
+        val pcz = floor(p.z / 16).toInt()
+        for (c in w.chunks.values) {
+            val mobs = c.mobs ?: continue
+            if (maxOf(abs(c.cx - pcx), abs(c.cz - pcz)) > 5) continue
+            if (mobs.isEmpty()) continue
+            mobs.removeAll { it.y < -4.0 }
+            for (m in mobs) {
+                val dx = m.x - p.x
+                val dz = m.z - p.z
+                if (dx * dx + dz * dz > 96.0 * 96.0) continue
+                if (!Game.paused) m.update(dt, w)
+                visibleMobs.add(m)
+            }
+        }
+    }
+
     private fun crackMesh(stage: Int): ChunkMesh? {
         crackMeshes[stage]?.let { return it }
         val tile = Textures.indexOf("crack_${stage + 1}")
@@ -966,5 +1041,10 @@ class Renderer : GLSurfaceView.Renderer {
             crackMeshes[i]?.release()
             crackMeshes[i] = null
         }
+        for (i in mobMeshes.indices) {
+            mobMeshes[i]?.release()
+            mobMeshes[i] = null
+        }
+        visibleMobs.clear()
     }
 }

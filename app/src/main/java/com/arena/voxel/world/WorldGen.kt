@@ -17,6 +17,9 @@ class WorldGen(val seed: Long) {
 
     private val s = seed.toInt()
 
+    /** Public deterministic hash (0..2^31) used by other systems such as animal spawning. */
+    fun hashAt(x: Int, z: Int): Int = (hash(x, z) * Int.MAX_VALUE).toInt()
+
     private fun hash(x: Int, z: Int): Float {
         var h = x * 374761393 + z * 668265263 + s * 1013904223
         h = (h xor (h shr 13)) * 1274126177
@@ -197,6 +200,7 @@ class WorldGen(val seed: Long) {
 
         maybeRuins(chunk)
         decorate(chunk)
+        Mobs.spawnInChunk(chunk, this)
         chunk.generated = true
         chunk.dirty = true
     }

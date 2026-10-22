@@ -15,6 +15,9 @@ class Chunk(val cx: Int, val cz: Int) {
     /** Cached light emitters as x,y,z,level quads (world coordinates). Invalidated on edits. */
     var lightSources: IntArray? = null
 
+    /** Animals living in this chunk. Recreated when the chunk is generated. */
+    var mobs: ArrayList<Mob>? = null
+
     var mesh: ChunkMesh? = null
     var waterMesh: ChunkMesh? = null
 

@@ -35,6 +35,8 @@ Requisitos: Android 7.0+ (API 24) con OpenGL ES 3.0.
 |---|---|
 | Mundo infinito por chunks (16×16×80) con ruido procedural | ✅ |
 | 6 biomas (llanura, bosque, nevado, desierto, taiga, jungla) con colores propios | ✅ |
+| Cuevas 3D (túneles y cámaras) y ruinas con antorchas | ✅ |
+| Animales: cerdos, ovejas, vacas y gallinas con IA de deambular | ✅ |
 | Árboles por bioma (roble, abedul, pino, jungla), cactus, caña de azúcar, plantas | ✅ |
 | Oclusión ambiental (AO) por vértice y sombreado por cara | ✅ |
 | Iluminación: luz de cielo (cuevas oscuras) + luz de bloque (antorcha, glowstone) | ✅ |

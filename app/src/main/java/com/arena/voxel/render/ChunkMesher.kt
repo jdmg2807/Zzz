@@ -337,6 +337,38 @@ object ChunkMesher {
         plane(fx + 1f, fz, fx, fz + 1f)
     }
 
+    /**
+     * Builds an animal model out of boxes (see [com.arena.voxel.world.Mobs.Part]).
+     * Coordinates are in 1/16 block units.
+     */
+    fun buildModelMesh(
+        parts: List<com.arena.voxel.world.Mobs.Part>,
+        tileOf: (Int) -> Int
+    ): FloatArray {
+        val out = FloatList(6144)
+        for (p in parts) {
+            val tile = tileOf(p.color)
+            if (tile < 0) continue
+            val cube = buildCube(tile, tile, tile, 1f, 0f)
+            val sx = p.x1 - p.x0
+            val sy = p.y1 - p.y0
+            val sz = p.z1 - p.z0
+            var i = 0
+            while (i + 7 < cube.size) {
+                out.add(
+                    p.x0 + cube[i] * sx,
+                    p.y0 + cube[i + 1] * sy,
+                    p.z0 + cube[i + 2] * sz,
+                    cube[i + 3], cube[i + 4],
+                    cube[i + 5] * p.shade,
+                    cube[i + 6], cube[i + 7]
+                )
+                i += 8
+            }
+        }
+        return out.toArray()
+    }
+
     // ------------------------------------------------------------------ standalone cubes
 
     /**
