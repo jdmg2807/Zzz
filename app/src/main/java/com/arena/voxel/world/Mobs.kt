@@ -19,9 +19,30 @@ class Mob(
         const val SHEEP = 1
         const val COW = 2
         const val CHICKEN = 3
+        const val ZOMBIE = 4
+        const val SKELETON = 5
+        const val CREEPER = 6
     }
 
-    fun update(dt: Float, world: World) {
+    /** Hostile mobs (spawn in the dark, chase and attack the player). */
+    var health = 20f
+    var hostile = false
+    var attackCooldown = 0f
+    var fuse = -1f
+    var path: List<IntArray>? = null
+    var pathIndex = 0
+    var pathTimer = 0f
+    var target: com.arena.voxel.player.Player? = null
+
+    fun update(dt: Float, world: World) = update(dt, world, null)
+
+    fun update(dt: Float, world: World, playerTarget: com.arena.voxel.player.Player?) {
+        hostile = type == ZOMBIE || type == SKELETON || type == CREEPER
+        target = playerTarget
+        if (attackCooldown > 0f) attackCooldown -= dt
+        if (hostile && playerTarget != null && !playerTarget.isDead()) {
+            if (updateHostile(dt, world, playerTarget)) return
+        }
         timer -= dt
         if (timer <= 0f) {
             timer = 2.5f + Random().nextFloat() * 4.5f
@@ -71,6 +92,169 @@ class Mob(
             vy = 0.0
         }
         if (y < -5) y = 90.0
+    }
+
+    /**
+     * Chase/attack behaviour. Returns true when it handled movement, so the wander code below
+     * does not fight it for control of the mob.
+     *
+     * AI goals, in Java's priority order: attack the target, path towards it, otherwise idle.
+     */
+    private fun updateHostile(dt: Float, world: World, p: com.arena.voxel.player.Player): Boolean {
+        val dx = p.x - x
+        val dz = p.z - z
+        val dy = p.y - y
+        val dist = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+        if (dist > 24.0) {
+            path = null
+            return false
+        }
+        yaw = Math.toDegrees(kotlin.math.atan2(-dx, -dz)).toFloat()
+
+        // ---- Creeper: walk up, hiss, explode -------------------------------------------
+        if (type == CREEPER) {
+            if (dist < 2.4 && fuse < 0f) fuse = 1.5f
+            if (fuse >= 0f) {
+                fuse -= dt
+                if (fuse <= 0f) {
+                    explode(world, p)
+                    health = 0f
+                    return true
+                }
+            } else if (dist > 2.4) {
+                followPath(dt, world, p, 2.4)
+            }
+            applyGravity(dt, world)
+            return true
+        }
+
+        // ---- Skeleton: keep distance and shoot -----------------------------------------
+        if (type == SKELETON) {
+            if (dist in 4.0..14.0) {
+                if (attackCooldown <= 0f) {
+                    attackCooldown = 2f
+                    p.hurt(2f)
+                    com.arena.voxel.core.Logs.info("MOB", "Esqueleto dispara al jugador (vida ${p.health.toInt()})")
+                }
+                path = null
+                applyGravity(dt, world)
+                return true
+            }
+            if (dist < 4.0) {
+                // Back away.
+                val nx = x - dx / dist * 1.6 * dt
+                val nz = z - dz / dist * 1.6 * dt
+                if (!blocked(world, nx, y, z)) x = nx
+                if (!blocked(world, x, y, nz)) z = nz
+                applyGravity(dt, world)
+                return true
+            }
+            followPath(dt, world, p, 10.0)
+            applyGravity(dt, world)
+            return true
+        }
+
+        // ---- Zombie: melee -------------------------------------------------------------
+        if (dist < 2.0) {
+            if (attackCooldown <= 0f) {
+                attackCooldown = 1f
+                p.hurt(3f)
+                com.arena.voxel.core.Logs.info("MOB", "Zombi golpea al jugador (vida ${p.health.toInt()})")
+            }
+            path = null
+            applyGravity(dt, world)
+            return true
+        }
+        followPath(dt, world, p, 1.5)
+        applyGravity(dt, world)
+        return true
+    }
+
+    /** Recomputes the A* path when needed and walks along it. */
+    private fun followPath(dt: Float, world: World, p: com.arena.voxel.player.Player, stopAt: Double) {
+        pathTimer -= dt
+        val current = path
+        val needsNew = current == null || pathIndex >= current.size ||
+            pathTimer <= 0f ||
+            (current.isNotEmpty() && pathIndex < current.size &&
+                kotlin.math.abs(current[pathIndex][0] - p.x) > 3.0)
+        if (needsNew && pathTimer <= 0f) {
+            pathTimer = 1.2f
+            val startY = kotlin.math.floor(y + 0.01).toInt()
+            val found = Pathfinder.find(
+                world,
+                kotlin.math.floor(x).toInt(), startY, kotlin.math.floor(z).toInt(),
+                kotlin.math.floor(p.x).toInt(), kotlin.math.floor(p.y).toInt(), kotlin.math.floor(p.z).toInt()
+            )
+            path = found
+            pathIndex = 0
+        }
+        val list = path ?: return
+        if (pathIndex >= list.size) return
+        val node = list[pathIndex]
+        val tx = node[0] + 0.5
+        val ty = node[1].toDouble()
+        val tz = node[2] + 0.5
+        val ddx = tx - x
+        val ddz = tz - z
+        val d = kotlin.math.sqrt(ddx * ddx + ddz * ddz)
+        val speed = when (type) {
+            ZOMBIE -> 1.9
+            SKELETON -> 2.2
+            CREEPER -> 1.7
+            else -> 1.5
+        }
+        if (d < 0.35) {
+            // Reached the node: climb if it is above us.
+            if (node[1] > y + 1.0) {
+                vy = 6.3
+            }
+            pathIndex++
+            return
+        }
+        walk += dt * 8f
+        val nx = x + ddx / d * speed * dt
+        val nz = z + ddz / d * speed * dt
+        if (!blocked(world, nx, y, z)) x = nx
+        if (!blocked(world, x, y, nz)) z = nz
+        // Jump when the next node is one block higher.
+        if (pathIndex < list.size && list[pathIndex][1] > kotlin.math.floor(y).toInt() + 0.1) {
+            if (onGroundHeight(world)) vy = 6.3
+        }
+    }
+
+    private fun onGroundHeight(world: World): Boolean =
+        world.isSolid(kotlin.math.floor(x).toInt(), kotlin.math.floor(y - 0.05).toInt(), kotlin.math.floor(z).toInt())
+
+    private fun applyGravity(dt: Float, world: World) {
+        if (!onGroundHeight(world)) {
+            vy -= 22.0 * dt
+            if (vy < -30.0) vy = -30.0
+            val ny = y + vy * dt
+            if (!blocked(world, x, ny, z)) y = ny else vy = 0.0
+        } else if (vy < 0.0) {
+            vy = 0.0
+        }
+    }
+
+    /** Creeper explosion: damages the player and removes nearby soft blocks in a 3 block radius. */
+    private fun explode(world: World, p: com.arena.voxel.player.Player) {
+        val cx = kotlin.math.floor(x).toInt()
+        val cy = kotlin.math.floor(y).toInt()
+        val cz = kotlin.math.floor(z).toInt()
+        val dist = kotlin.math.sqrt((p.x - x) * (p.x - x) + (p.y - y) * (p.y - y) + (p.z - z) * (p.z - z))
+        if (dist < 6.0) p.hurt((28f * (1f - dist / 6f)).coerceAtLeast(1f))
+        for (bx in cx - 3..cx + 3) {
+            for (by in cy - 2..cy + 3) {
+                for (bz in cz - 3..cz + 3) {
+                    val d2 = (bx - x) * (bx - x) + (by - y) * (by - y) + (bz - z) * (bz - z)
+                    if (d2 > 9.0) continue
+                    val id = Blocks.get(world.get(bx, by, bz)).id
+                    if (id == "bedrock" || id == "obsidian" || id == "air") continue
+                    world.set(bx, by, bz, 0)
+                }
+            }
+        }
     }
 
     private fun blocked(world: World, px: Double, py: Double, pz: Double): Boolean {
@@ -175,9 +359,89 @@ object Mobs {
             ),
             0.6f
         )
+        ,
+        // Zombie (rotten green skin, blue trousers, arms forward)
+        TypeInfo(
+            "zombie",
+            intArrayOf(0x4E7A46, 0x2E5A8A),
+            listOf(
+                Part(-4f, 6f, -2f, 4f, 18f, 2f, 0x2E5A8A),       // legs/body lower
+                Part(-4f, 12f, -2f, 4f, 18f, 2f, 0x4E7A46),      // torso
+                Part(-4f, 18f, -4f, 4f, 26f, 2f, 0x4E7A46),      // head
+                Part(-6f, 15f, -4f, -4f, 25f, -2f, 0x4E7A46),    // arms forward
+                Part(4f, 15f, -4f, 6f, 25f, -2f, 0x4E7A46)
+            ),
+            1.7f
+        ),
+        // Skeleton (bone white)
+        TypeInfo(
+            "skeleton",
+            intArrayOf(0xD8D8D0, 0x9A9A94),
+            listOf(
+                Part(-3f, 8f, -1.5f, 3f, 26f, 1.5f, 0xD8D8D0),
+                Part(-4f, 26f, -3f, 4f, 34f, 2f, 0xD8D8D0),
+                Part(-5f, 22f, -2f, -3f, 32f, 0f, 0x9A9A94),
+                Part(3f, 22f, -2f, 5f, 32f, 0f, 0x9A9A94),
+                Part(-3f, 0f, -1.5f, -0.5f, 8f, 1.5f, 0xD8D8D0),
+                Part(0.5f, 0f, -1.5f, 3f, 8f, 1.5f, 0xD8D8D0)
+            ),
+            1.8f
+        ),
+        // Creeper (green, four short legs, no arms)
+        TypeInfo(
+            "creeper",
+            intArrayOf(0x5BBC4A, 0x2F7A2A),
+            listOf(
+                Part(-4f, 6f, -2f, 4f, 22f, 2f, 0x5BBC4A),
+                Part(-4f, 18f, -4f, 4f, 26f, 0f, 0x5BBC4A),
+                Part(-4f, 0f, -4f, -2f, 6f, -2f, 0x2F7A2A),
+                Part(2f, 0f, -4f, 4f, 6f, -2f, 0x2F7A2A),
+                Part(-4f, 0f, 2f, -2f, 6f, 4f, 0x2F7A2A),
+                Part(2f, 0f, 2f, 4f, 6f, 4f, 0x2F7A2A)
+            ),
+            1.5f
+        )
     )
 
     fun typeOf(index: Int): TypeInfo = TYPES[index.coerceIn(0, TYPES.size - 1)]
+
+    /** Dark, safe spot check for hostile spawning (night + solid ground + sky access). */
+    fun canSpawnHostile(world: World, gen: WorldGen, x: Int, y: Int, z: Int): Boolean {
+        if (!world.isAir(x, y, z) || !world.isAir(x, y + 1, z)) return false
+        if (!world.isSolid(x, y - 1, z)) return false
+        val below = Blocks.get(world.get(x, y - 1, z)).id
+        if (below == "water" || below == "leaves") return false
+        return true
+    }
+
+    /** Night-time hostile spawn around the player, Java-style (dark + ground). */
+    fun spawnHostiles(world: World, gen: WorldGen, px: Int, pz: Int, rnd: Random): Int {
+        var spawned = 0
+        repeat(6) {
+            val x = px + rnd.nextInt(33) - 16
+            val z = pz + rnd.nextInt(33) - 16
+            val y = Pathfinder.groundY(world, x, z)
+            if (!canSpawnHostile(world, gen, x, y, z)) return@repeat
+            if (y < 8) return@repeat
+            val chunk = world.getOrCreateChunk(x shr 4, z shr 4)
+            val list = chunk.mobs ?: ArrayList<Mob>().also { chunk.mobs = it }
+            if (list.size >= 6) return@repeat
+            val type = when (rnd.nextInt(10)) {
+                0, 1, 2, 3 -> Mob.ZOMBIE
+                4, 5, 6 -> Mob.SKELETON
+                else -> Mob.CREEPER
+            }
+            val mob = Mob(type, x + 0.5, y.toDouble(), z + 0.5, rnd.nextFloat() * 360f)
+            mob.health = when (type) {
+                Mob.ZOMBIE -> 20f
+                Mob.SKELETON -> 20f
+                else -> 20f
+            }
+            list.add(mob)
+            spawned++
+        }
+        return spawned
+    }
 
 
     /** Spawns 0-3 animals on grass for a freshly generated chunk. */

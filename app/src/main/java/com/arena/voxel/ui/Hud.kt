@@ -189,7 +189,7 @@ fun GameHud(gui: Gui, tick: Int, onOpenInventory: () -> Unit) {
 
 /** 1px inner padding helper (kept as an extension so the layout reads like the Java code). */
 private fun Modifier.padding1(gui: Gui): Modifier =
-    this.then(Modifier.offset(x = 0f, y = 0f))
+    this.then(Modifier.offset(x = 0.dp, y = 0.dp))
 
 @Composable
 private fun HeartIcon(gui: Gui, filled: Boolean, half: Boolean) {

@@ -111,8 +111,8 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
                     for (box in shape.boxes) {
                         boxes.add(
                             BlockShapeBox(
-                                bx + box.x0, by + box.y0, bz + box.z0,
-                                bx + box.x1, by + box.y1, bz + box.z1
+                                bx + box.x0.toDouble(), by + box.y0.toDouble(), bz + box.z0.toDouble(),
+                                bx + box.x1.toDouble(), by + box.y1.toDouble(), bz + box.z1.toDouble()
                             )
                         )
                     }
@@ -151,7 +151,7 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
                     val block = Blocks.get(world.get(bx, by, bz))
                     if (block.shape.isEmpty) continue
                     for (box in block.shape.boxes) {
-                        val yTop = by + box.y1
+                        val yTop = by + box.y1.toDouble()
                         if (yTop <= py + 0.001 && yTop > top) top = yTop
                     }
                 }

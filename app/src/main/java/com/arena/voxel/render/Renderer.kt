@@ -64,6 +64,7 @@ class Renderer : GLSurfaceView.Renderer {
     private var mineProgress = 0f
     private var swing = 0f
     private var walkTime = 0f
+    private var hostileTimer = 8f
     private val mobMeshes = arrayOfNulls<ChunkMesh>(Mobs.TYPES.size)
     private val mobTiles = HashMap<Int, Int>()
     private val visibleMobs = ArrayList<Mob>()
@@ -1012,8 +1013,29 @@ class Renderer : GLSurfaceView.Renderer {
                 val dx = m.x - p.x
                 val dz = m.z - p.z
                 if (dx * dx + dz * dz > 96.0 * 96.0) continue
-                if (!Game.paused) m.update(dt, w)
-                visibleMobs.add(m)
+                if (!Game.paused) m.update(dt, w, p)
+                if (m.health > 0f) visibleMobs.add(m)
+            }
+            // Dead mobs are removed from the chunk list.
+            mobs.removeAll { it.health <= 0f }
+        }
+
+        // Hostile spawning at night, around the player (Java spawns in dark spots nearby).
+        if (!Game.paused && Game.creative) {
+            // (creative keeps the world peaceful, like Java's peaceful-ish creative default)
+        } else if (!Game.paused) {
+            hostileTimer -= dt
+            if (hostileTimer <= 0f) {
+                hostileTimer = 3f
+                val night = w.dayTime > 0.52f
+                if (night) {
+                    val n = Mob.spawnHostiles(
+                        w, w.gen,
+                        kotlin.math.floor(p.x).toInt(), kotlin.math.floor(p.z).toInt(),
+                        java.util.Random()
+                    )
+                    if (n > 0) com.arena.voxel.core.Logs.info("MOB", "Aparecieron $n mobs hostiles (noche)")
+                }
             }
         }
     }
