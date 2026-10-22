@@ -457,11 +457,12 @@ class Renderer : GLSurfaceView.Renderer {
 
     private fun updateFrustum(vp: FloatArray) {
         val m = vp
+        // Clip = VP * v (column major). Plane = row3 +/- rowN, including row 3 (w).
         fun plane(index: Int, sign: Float, row: Int) {
-            val a = m[row] * sign
-            val b = m[4 + row] * sign
-            val c = m[8 + row] * sign
-            val d = m[12 + row] * sign
+            val a = m[row] * sign + m[3]
+            val b = m[4 + row] * sign + m[7]
+            val c = m[8 + row] * sign + m[11]
+            val d = m[12 + row] * sign + m[15]
             val len = kotlin.math.sqrt(a * a + b * b + c * c)
             val k = if (len < 1e-6f) 1f else 1f / len
             frustum[index] = a * k
@@ -504,6 +505,12 @@ class Renderer : GLSurfaceView.Renderer {
             val z0 = (c.cz * 16).toFloat()
             if (!chunkVisible(x0, 0f, z0, x0 + 16f, World.HEIGHT.toFloat(), z0 + 16f)) continue
             drawList.add(c)
+        }
+        // Safety net: if the frustum maths ever rejects everything, draw the whole radius.
+        if (drawList.isEmpty()) {
+            for (c in w.chunks.values) {
+                if (maxOf(abs(c.cx - pcx), abs(c.cz - pcz)) <= radius && !c.dirty) drawList.add(c)
+            }
         }
     }
 

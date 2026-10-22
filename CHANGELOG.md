@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.1 — Hotfix del frustum culling
+- Corregida la extracción de planos del frustum (faltaba sumar la fila `w`), que en v1.3.0
+  descartaba casi todos los chunks y hacía parecer que el mundo estaba vacío.
+- Red de seguridad: si el culling rechazara todo, se dibuja el radio completo.
+
 ## v1.3.0 — Corrección de bugs visuales y rendimiento
 - **Bloques invisibles / agujeros**: las caras de los bordes de chunk dependían del chunk vecino y no
   se recalculaban cuando este aparecía. Ahora se marcan sucios los 4 vecinos al generar un chunk.
