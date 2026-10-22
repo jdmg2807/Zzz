@@ -246,6 +246,9 @@ object Settings {
     var useShaders = true
     var useMods = true
 
+    /** 0 = automatic (Java formula), 1..4 = fixed GUI scale. */
+    var guiScale = 0
+
     fun load(context: Context) {
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         sensitivity = p.getFloat("sens", 1.0f)
@@ -255,6 +258,7 @@ object Settings {
         usePacks = p.getBoolean("usePacks", true)
         useShaders = p.getBoolean("useShaders", true)
         useMods = p.getBoolean("useMods", true)
+        guiScale = p.getInt("guiScale", 0).coerceIn(0, 4)
     }
 
     fun save(context: Context) {
@@ -266,6 +270,7 @@ object Settings {
             .putBoolean("usePacks", usePacks)
             .putBoolean("useShaders", useShaders)
             .putBoolean("useMods", useMods)
+            .putInt("guiScale", guiScale)
             .apply()
     }
 }

@@ -76,25 +76,35 @@ fun VoxelApp() {
         )
     ) {
         var screen by rememberSaveable { mutableStateOf("menu") }
+        val context = LocalContext.current
         Surface(modifier = Modifier.fillMaxSize(), color = BgDark) {
             when (screen) {
                 "menu" -> MainMenu(
-                    onNewWorld = {
-                        Game.startNewWorld(System.currentTimeMillis())
-                        screen = "game"
-                    },
-                    onContinue = {
-                        Game.startLoadedWorld()
-                        screen = "game"
-                    },
-                    onMods = { screen = "mods" },
-                    onPacks = { screen = "packs" },
+                    onSingleplayer = { screen = "singleplayer" },
                     onSettings = { screen = "settings" },
-                    onPlay = { screen = "game" }
+                    onQuit = {
+                        // Java's "Quit Game" closes the game; on Android that is finishing the Activity.
+                        (context as? android.app.Activity)?.finish()
+                    },
+                    onPlay = { screen = "game" },
+                    forcedScale = Settings.guiScale
+                )
+                "singleplayer" -> SingleplayerScreen(
+                    onBack = { screen = "menu" },
+                    onPlay = {
+                        if (!Game.hasSave) Game.startNewWorld(System.currentTimeMillis())
+                        else Game.startLoadedWorld()
+                        screen = "game"
+                    },
+                    forcedScale = Settings.guiScale
                 )
                 "mods" -> ModsScreen(onBack = { screen = "menu" })
                 "packs" -> PacksScreen(onBack = { screen = "menu" })
-                "settings" -> SettingsScreen(onBack = { screen = "menu" })
+                "settings" -> SettingsScreen(
+                    onBack = { screen = "menu" },
+                    onMods = { screen = "mods" },
+                    onPacks = { screen = "packs" }
+                )
                 "game" -> GameScreen(onExit = { screen = "menu" })
             }
         }
@@ -352,12 +362,13 @@ private fun PacksScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun SettingsScreen(onBack: () -> Unit) {
+private fun SettingsScreen(onBack: () -> Unit, onMods: () -> Unit = {}, onPacks: () -> Unit = {}) {
     val context = LocalContext.current
     var sens by remember { mutableStateOf(Settings.sensitivity) }
     var distance by remember { mutableStateOf(Settings.renderDistance.toFloat()) }
     var fov by remember { mutableStateOf(Settings.fov) }
     var hud by remember { mutableStateOf(Settings.showHud) }
+    var guiScale by remember { mutableStateOf(Settings.guiScale) }
     var usePacks by remember { mutableStateOf(Settings.usePacks) }
     var useShaders by remember { mutableStateOf(Settings.useShaders) }
     var useMods by remember { mutableStateOf(Settings.useMods) }
@@ -372,6 +383,7 @@ private fun SettingsScreen(onBack: () -> Unit) {
                 Settings.usePacks = usePacks
                 Settings.useShaders = useShaders
                 Settings.useMods = useMods
+                Settings.guiScale = guiScale
                 Settings.save(context)
                 onBack()
             }) { Text("‹ Volver", color = Accent) }
@@ -390,6 +402,34 @@ private fun SettingsScreen(onBack: () -> Unit) {
             Slider(value = fov, onValueChange = { fov = it }, valueRange = 50f..100f)
         }
         ToggleRow("Mostrar HUD", hud) { hud = it }
+        // Java's "GUI Scale" option: automatic, or forced 1..4.
+        SettingRow(
+            "Escala de interfaz",
+            if (guiScale == 0) "Automática" else "Nivel $guiScale"
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(0, 1, 2, 3, 4).forEach { level ->
+                    val selected = guiScale == level
+                    OutlinedButton(
+                        onClick = { guiScale = level },
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (selected) Accent else Color(0x33FFFFFF)
+                        ),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            horizontal = 10.dp,
+                            vertical = 2.dp
+                        )
+                    ) {
+                        Text(
+                            if (level == 0) "Auto" else "$level",
+                            color = if (selected) Accent else Color(0xFFDCE3EA),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+        }
 
         Spacer(Modifier.height(14.dp))
         Text(
@@ -401,6 +441,15 @@ private fun SettingsScreen(onBack: () -> Unit) {
         ToggleRow("Resource packs (texturas)", usePacks) { usePacks = it }
         ToggleRow("Shaders", useShaders) { useShaders = it }
         ToggleRow("Mods", useMods) { useMods = it }
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onPacks, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33FFFFFF))) {
+                Text("Texturas y shaders instalados", fontSize = 12.sp, color = Color(0xFFDCE3EA))
+            }
+            OutlinedButton(onClick = onMods, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33FFFFFF))) {
+                Text("Mods instalados", fontSize = 12.sp, color = Color(0xFFDCE3EA))
+            }
+        }
         Text(
             "Los cambios de contenido se aplican al volver a entrar a un mundo (el mundo nuevo o\ncontinuar los usará).",
             color = Color(0xFF6B7A80),
