@@ -102,8 +102,43 @@ object Recipes {
         Shapeless("copper_ingot_from_block", listOf("copper_block"), "copper_ingot", 9)
     )
 
+    /**
+     * What actually pops out of a broken block, straight from the wiki's block-drop tables.
+     * `null` means "nothing" (glass, ice, leaves without shears…).
+     */
+    val DROPS: Map<String, String> = mapOf(
+        "stone" to "cobblestone",
+        "grass" to "dirt",
+        "coal_ore" to "coal",
+        "iron_ore" to "raw_iron",
+        "gold_ore" to "raw_gold",
+        "diamond_ore" to "diamond",
+        "redstone_wire_0" to "redstone",
+        "gravel" to "gravel",
+        "clay" to "clay",
+        "snow_layer" to "snowball",
+        "furnace_lit" to "furnace",
+        "redstone_lamp_on" to "redstone_lamp_off",
+        "redstone_torch_on" to "redstone_torch_off",
+        "repeater_on" to "repeater_off",
+        "comparator_on" to "comparator_off",
+        "lever_on" to "lever_off",
+        "stone_button_on" to "stone_button_off",
+        "observer_on" to "observer",
+        "piston_extended" to "piston",
+        "snow" to "snowball"
+    )
+
+    /** Blocks that drop nothing when broken without shears/silk touch. */
+    val NO_DROP: Set<String> = setOf(
+        "glass", "ice", "packed_ice", "leaves", "spruce_leaves", "birch_leaves",
+        "tall_grass", "dead_bush", "bedrock"
+    )
+
     /** Smelting table (input -> result, experience). */
     val SMELTING: Map<String, Pair<String, Float>> = mapOf(
+        "raw_iron" to ("iron_ingot" to 0.7f),
+        "raw_gold" to ("gold_ingot" to 1.0f),
         "iron_ore" to ("iron_ingot" to 0.7f),
         "gold_ore" to ("gold_ingot" to 1.0f),
         "copper_ore" to ("copper_ingot" to 0.7f),

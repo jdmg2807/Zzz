@@ -329,6 +329,40 @@ void main() {
 }
 """.trimIndent()
 
+    /** Point-sprite particles with a per-vertex colour (block dust, sparks). */
+    val PARTICLE_VSH = """
+#version 300 es
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec4 aColor;
+
+uniform mat4 uMVP;
+uniform float uSize;
+
+out vec4 vColor;
+
+void main() {
+    gl_Position = uMVP * vec4(aPos, 1.0);
+    // Perspective-corrected point size, clamped so dust never fills the screen.
+    gl_PointSize = clamp(uSize / max(gl_Position.w, 0.6), 2.0, 26.0);
+    vColor = aColor;
+}
+""".trimIndent()
+
+    val PARTICLE_FSH = """
+#version 300 es
+precision mediump float;
+
+in vec4 vColor;
+out vec4 fragColor;
+
+void main() {
+    // Round the sprite and fade the edges so it does not look like a square pixel.
+    vec2 c = gl_PointCoord - vec2(0.5);
+    if (dot(c, c) > 0.25) discard;
+    fragColor = vColor;
+}
+""".trimIndent()
+
     fun all(): Map<String, String> = linkedMapOf(
         "terrain.vsh" to TERRAIN_VSH,
         "terrain.fsh" to TERRAIN_FSH,
@@ -337,6 +371,10 @@ void main() {
         "sky.vsh" to SKY_VSH,
         "sky.fsh" to SKY_FSH,
         "post.vsh" to POST_VSH,
-        "post.fsh" to POST_FSH
+        "post.fsh" to POST_FSH,
+        "line.vsh" to LINE_VSH,
+        "line.fsh" to LINE_FSH,
+        "particle.vsh" to PARTICLE_VSH,
+        "particle.fsh" to PARTICLE_FSH
     )
 }

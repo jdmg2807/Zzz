@@ -169,6 +169,10 @@ object Items {
         item("chest", "Cofre", 64)
         item("crafting_table", "Mesa de trabajo", 64)
         item("furnace", "Horno", 64)
+        item("raw_iron", "Hierro en bruto")
+        item("raw_gold", "Oro en bruto")
+        item("raw_copper", "Cobre en bruto")
+        item("snowball", "Bola de nieve", 16)
         item("redstone", "Redstone")
         item("redstone_torch", "Antorcha de redstone")
         item("repeater", "Repetidor")
@@ -188,6 +192,13 @@ object Items {
     fun food(id: String): Int = defs[id]?.food ?: 0
     fun tier(id: String): Int = defs[id]?.tier ?: 0
     fun toolType(id: String): String = defs[id]?.toolType ?: ""
+    /** Item id that a broken block leaves behind (null = nothing). */
+    fun dropOf(blockId: String): String? = when {
+        Recipes.NO_DROP.contains(blockId) -> null
+        Recipes.DROPS.containsKey(blockId) -> Recipes.DROPS[blockId]
+        else -> if (exists(blockId)) blockId else null
+    }
+
     fun attackSpeed(id: String): Float = defs[id]?.attackSpeed ?: 4f
     fun attackDamage(id: String): Float = defs[id]?.attack ?: 1f
 

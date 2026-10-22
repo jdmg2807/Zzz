@@ -50,6 +50,9 @@ class Renderer : GLSurfaceView.Renderer {
     private val target = RenderTarget()
     private var fullscreenVbo = 0
     private var lineVbo = 0
+    private var particleProg: ShaderProgram? = null
+    private var particleVbo = 0
+    private var particleData = FloatArray(7 * 512)
 
     private var world: World? = null
     private var player: Player? = null
@@ -66,6 +69,7 @@ class Renderer : GLSurfaceView.Renderer {
     private var walkTime = 0f
     private var hostileTimer = 8f
     private var containerTimer = 0f
+    private var fxTimer = 0f
     private val mobMeshes = arrayOfNulls<ChunkMesh>(Mobs.TYPES.size)
     private val itemMeshes = HashMap<String, ChunkMesh>()
     private val mobTiles = HashMap<Int, Int>()
@@ -124,6 +128,10 @@ class Renderer : GLSurfaceView.Renderer {
                 crackMeshes[i]?.release()
                 crackMeshes[i] = null
             }
+            for (m in itemMeshes.values) m.release()
+            itemMeshes.clear()
+            com.arena.voxel.world.Particles.clear()
+            com.arena.voxel.world.ItemEntities.clear()
             Log.i("Recursos GL restaurados (${w.chunks.size} chunks a re-mallar)")
         } catch (t: Throwable) {
             Log.e("No se pudo restaurar el contexto GL", t)
@@ -218,6 +226,15 @@ class Renderer : GLSurfaceView.Renderer {
         skyProg = compileWithFallback("sky", ShaderSources.SKY_VSH, ShaderSources.SKY_FSH)
         postProg = compileWithFallback("post", ShaderSources.POST_VSH, ShaderSources.POST_FSH)
         lineProg = ShaderProgram.create("line", ShaderSources.LINE_VSH, ShaderSources.LINE_FSH)
+        particleProg = ShaderProgram.create("particle", ShaderSources.PARTICLE_VSH, ShaderSources.PARTICLE_FSH)
+        val pIds = IntArray(1)
+        GLES20.glGenBuffers(1, pIds, 0)
+        particleVbo = pIds[0]
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, particleVbo)
+        GLES20.glBufferData(
+            GLES20.GL_ARRAY_BUFFER, particleData.size * 4, null, GLES20.GL_DYNAMIC_DRAW
+        )
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
         Gl.checkError("programas")
     }
 
@@ -629,11 +646,13 @@ class Renderer : GLSurfaceView.Renderer {
             return
         }
         if (w.set(hit.x, hit.y, hit.z, 0)) {
+            com.arena.voxel.world.Particles.blockBreak(w, hit.x, hit.y, hit.z, id)
             if (!Game.creative) {
-                if (id != "air" && com.arena.voxel.items.Items.exists(id)) {
-                    // Java spawns an ItemEntity that the player then walks over.
+                // Java drops the block's loot table entry, not the block itself.
+                val drop = com.arena.voxel.items.Items.dropOf(id)
+                if (drop != null) {
                     com.arena.voxel.world.ItemEntities.spawn(
-                        id, 1,
+                        drop, 1,
                         hit.x + 0.5, hit.y + 0.35, hit.z + 0.5
                     )
                 }
@@ -738,6 +757,7 @@ class Renderer : GLSurfaceView.Renderer {
         streamChunks(w)
         updateMobs(w, dt, p)
         com.arena.voxel.world.ItemEntities.update(dt, w, p)
+        com.arena.voxel.world.Particles.update(dt, w)
 
         // ------------------------------------------------------------------ camera
         val aspect = width.toFloat() / height.toFloat()
@@ -876,6 +896,9 @@ class Renderer : GLSurfaceView.Renderer {
             }
         }
 
+        // ------------------------------------------------------------------ particles
+        drawParticles(vp, p)
+
         // ------------------------------------------------------------------ selection
         val line = lineProg
         if (line != null && hit != null) {
@@ -928,8 +951,14 @@ class Renderer : GLSurfaceView.Renderer {
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, atlasTexture)
 
-            // Mining cracks on the targeted block.
+            // Mining cracks on the targeted block (plus the occasional dust puff).
             if (Game.mining && mineProgress > 0.02f && !Game.paused) {
+                fxTimer -= dt
+                if (fxTimer <= 0f && hit != null) {
+                    fxTimer = 0.12f
+                    val target = Blocks.get(w.get(hit.x, hit.y, hit.z)).id
+                    com.arena.voxel.world.Particles.mining(w, hit.x, hit.y, hit.z, target)
+                }
                 val stage = (mineProgress * 6f).toInt().coerceIn(0, 5)
                 val mesh = crackMesh(stage)
                 if (mesh != null && hit != null) {
@@ -1018,6 +1047,45 @@ class Renderer : GLSurfaceView.Renderer {
         }
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0)
+    }
+
+    /** Uploads the live particles as one point-sprite batch and draws them additively off. */
+    private fun drawParticles(vp: FloatArray, p: Player) {
+        val prog = particleProg ?: return
+        val visible = com.arena.voxel.world.Particles.near(p.x.toFloat(), p.z.toFloat(), 28f)
+        if (visible.isEmpty()) return
+        val needed = visible.size * 7
+        if (needed > particleData.size) particleData = FloatArray(needed * 2)
+        var i = 0
+        for (particle in visible) {
+            particleData[i++] = particle.x
+            particleData[i++] = particle.y
+            particleData[i++] = particle.z
+            particleData[i++] = particle.r
+            particleData[i++] = particle.g
+            particleData[i++] = particle.b
+            particleData[i++] = particle.a * (particle.life / 0.7f).coerceIn(0f, 1f)
+        }
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, particleVbo)
+        val buf = java.nio.ByteBuffer.allocateDirect(needed * 4)
+            .order(java.nio.ByteOrder.nativeOrder()).asFloatBuffer()
+        buf.put(particleData, 0, needed).position(0)
+        GLES20.glBufferSubData(GLES20.GL_ARRAY_BUFFER, 0, needed * 4, buf)
+        prog.use()
+        prog.setMat4("uMVP", vp)
+        prog.set1f("uSize", 90f)
+        GLES20.glEnableVertexAttribArray(0)
+        GLES20.glVertexAttribPointer(0, 3, GLES20.GL_FLOAT, false, 28, 0)
+        GLES20.glEnableVertexAttribArray(1)
+        GLES20.glVertexAttribPointer(1, 4, GLES20.GL_FLOAT, false, 28, 12)
+        GLES20.glDisable(GLES20.GL_CULL_FACE)
+        GLES20.glEnable(GLES20.GL_DEPTH_TEST)
+        GLES20.glDepthMask(false)
+        GLES20.glDrawArrays(GLES20.GL_POINTS, 0, visible.size)
+        GLES20.glDepthMask(true)
+        GLES20.glEnable(GLES20.GL_CULL_FACE)
+        GLES20.glDisableVertexAttribArray(1)
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
     }
 
     private fun drawFullscreen() {
