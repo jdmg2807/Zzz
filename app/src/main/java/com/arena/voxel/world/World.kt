@@ -141,10 +141,14 @@ class World(val seed: Long) {
 
     companion object {
         const val SIZE = 16
-        /** Taller than before so imported Java worlds keep their terrain and mountains. */
-        const val HEIGHT = 144
+        /**
+         * Tall columns: Minecraft y = -64 lands at 0, so a 256 block column covers
+         * y = -64..191. Castles, towers and mountains of imported worlds no longer get cut off
+         * (with 144 they were clipped above y = 79). Cost: 64 KB per chunk of block data.
+         */
+        const val HEIGHT = 256
 
-        /** Minecraft y = 0 lands here (imported worlds occupy -64..79). */
+        /** Minecraft y = 0 lands here (imported worlds occupy -64..191). */
         const val MC_Y_OFFSET = 64
 
         fun keyOfStatic(cx: Int, cz: Int): Long =

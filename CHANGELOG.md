@@ -25,6 +25,9 @@
   diorita, tuff, calcita, arcilla, netherrack, hielo y hielo compacto.
 - **Texturas animadas**: se usa el primer fotograma (antes el agua se veía como una tira
   aplastada de 32 fotogramas).
+- **Mundo más alto (256)**: los mundos importados ocupan Minecraft y = −64…191, así que castillos
+  y montañas ya no se cortan por arriba (antes la columna era de 144 bloques, es decir y ≤ 79).
+  Los guardados anteriores se siguen leyendo (se alinean abajo).
 - **`docs/JAVA_PARITY.md`**: plan de paridad 100 % con las reglas públicas de luz, tick, física,
   dureza, generación, estructuras y color de biomas, y qué está hecho / aproximado / pendiente.
 
