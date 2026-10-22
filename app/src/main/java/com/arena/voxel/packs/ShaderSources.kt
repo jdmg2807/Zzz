@@ -49,6 +49,7 @@ void main() {
     vec3 c = t.rgb * vShade * uLightColor;
     float d = distance(vWorld, uCam);
     float f = clamp((d - uFog.x) / max(uFog.y - uFog.x, 0.001), 0.0, 1.0);
+    f = f * f * (3.0 - 2.0 * f);
     fragColor = vec4(mix(c, uFogColor, f), t.a);
 }
 """.trimIndent()
@@ -68,9 +69,8 @@ out vec3 vWorld;
 
 void main() {
     vec3 p = aPos;
-    if (aShade > 0.99) {
-        p.y += sin(p.x * 1.3 + uTime * 1.6) * 0.05 + cos(p.z * 1.7 + uTime * 1.2) * 0.05;
-    }
+    // Gentle swell on the surface quads only (shade stores the face factor).
+    p.y += sin(p.x * 0.9 + uTime * 1.4) * 0.035 + cos(p.z * 1.1 + uTime * 1.1) * 0.035;
     vUV = aUV;
     vShade = aShade;
     vWorld = p;
@@ -91,17 +91,31 @@ uniform vec3 uCam;
 uniform vec3 uFogColor;
 uniform vec2 uFog;
 uniform vec3 uLightColor;
+uniform vec3 uSunDir;
 uniform float uTime;
 
 out vec4 fragColor;
 
 void main() {
-    vec2 uv = vUV + vec2(sin(uTime * 0.8 + vWorld.z) * 0.02, cos(uTime * 0.6 + vWorld.x) * 0.02);
+    vec2 uv = vUV + vec2(sin(uTime * 0.8 + vWorld.z * 0.7) * 0.018, cos(uTime * 0.6 + vWorld.x * 0.7) * 0.018);
     vec4 t = texture(uTex, uv);
-    vec3 c = t.rgb * (0.85 + vShade * 0.25) * uLightColor;
+    vec3 base = t.rgb * (0.85 + vShade * 0.25) * uLightColor;
+
+    // Fresnel: water reflects the sky at grazing angles.
+    vec3 viewDir = normalize(uCam - vWorld);
+    float fres = pow(1.0 - clamp(viewDir.y, 0.0, 1.0), 3.0);
+    vec3 skyTint = uFogColor * 1.15;
+    vec3 c = mix(base, skyTint, fres * 0.65);
+
+    // Specular highlight from the sun.
+    vec3 h = normalize(uSunDir + viewDir);
+    float spec = pow(max(dot(vec3(0.0, 1.0, 0.0), h), 0.0), 160.0);
+    c += vec3(1.0, 0.96, 0.86) * spec * 0.55;
+
     float d = distance(vWorld, uCam);
     float f = clamp((d - uFog.x) / max(uFog.y - uFog.x, 0.001), 0.0, 1.0);
-    fragColor = vec4(mix(c, uFogColor, f), 0.72);
+    float alpha = mix(0.72, 0.94, fres);
+    fragColor = vec4(mix(c, uFogColor, f * f * (3.0 - 2.0 * f)), alpha);
 }
 """.trimIndent()
 
@@ -122,7 +136,7 @@ void main() {
 
     val SKY_FSH = """
 #version 300 es
-precision mediump float;
+precision highp float;
 
 in vec3 vDir;
 
@@ -130,16 +144,83 @@ uniform vec3 uSunDir;
 uniform vec3 uZenith;
 uniform vec3 uHorizon;
 uniform vec3 uSunColor;
+uniform vec3 uCam;
+uniform float uTime;
+uniform float uCloudY;
+uniform float uCloudCover;
+uniform float uBrightness;
 
 out vec4 fragColor;
+
+float hash21(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+
+float vnoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash21(i);
+    float b = hash21(i + vec2(1.0, 0.0));
+    float c = hash21(i + vec2(0.0, 1.0));
+    float d = hash21(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    for (int i = 0; i < 4; i++) {
+        v += vnoise(p) * a;
+        p *= 2.03;
+        a *= 0.5;
+    }
+    return v;
+}
 
 void main() {
     vec3 d = normalize(vDir);
     float h = clamp(d.y * 0.5 + 0.5, 0.0, 1.0);
-    vec3 c = mix(uHorizon, uZenith, pow(h, 0.75));
-    float sun = max(dot(d, normalize(uSunDir)), 0.0);
-    c += uSunColor * pow(sun, 220.0) * 1.4;
-    c += uSunColor * pow(sun, 8.0) * 0.10;
+    vec3 c = mix(uHorizon, uZenith, pow(h, 0.8));
+
+    // Sun glow + disc.
+    vec3 sunDir = normalize(uSunDir);
+    float sunDot = max(dot(d, sunDir), 0.0);
+    c += uSunColor * pow(sunDot, 8.0) * 0.14 * uBrightness;
+    c += uSunColor * smoothstep(0.9992, 0.9997, sunDot) * 1.6;
+
+    // Moon: opposite the sun, with a soft crescent.
+    vec3 moonDir = -sunDir;
+    float moonDot = max(dot(d, moonDir), 0.0);
+    float moon = smoothstep(0.9990, 0.9996, moonDot);
+    vec3 moonShift = normalize(moonDir + vec3(0.035, 0.03, 0.0));
+    float shadow = smoothstep(0.9990, 0.9996, max(dot(d, moonShift), 0.0));
+    c += vec3(0.92, 0.94, 1.0) * moon * (1.0 - shadow * 0.75) * (1.0 - uBrightness) * 1.3;
+
+    // Stars.
+    if (uBrightness < 0.55 && d.y > 0.0) {
+        vec2 sp = d.xz / max(d.y, 0.15) * 42.0;
+        float s = hash21(floor(sp));
+        float star = step(0.9965, s) * (1.0 - uBrightness / 0.55);
+        star *= 0.55 + 0.45 * sin(uTime * 2.0 + s * 40.0);
+        c += vec3(star) * 1.1;
+    }
+
+    // Flat cloud layer, Minecraft style, drifting with the wind.
+    if (d.y > 0.015) {
+        float t = (uCloudY - uCam.y) / d.y;
+        if (t > 0.0) {
+            vec2 p = (uCam.xz + d.xz * t) * 0.045 + vec2(uTime * 0.004, uTime * 0.0016);
+            float n = fbm(p);
+            float cover = smoothstep(1.05 - uCloudCover, 1.32 - uCloudCover, n);
+            float fade = smoothstep(0.015, 0.22, d.y) * exp(-t * 0.0016);
+            vec3 cloudColor = mix(vec3(0.78, 0.80, 0.86), vec3(1.0, 1.0, 1.0), uBrightness);
+            c = mix(c, cloudColor, cover * fade * 0.9);
+        }
+    }
+
     fragColor = vec4(c, 1.0);
 }
 """.trimIndent()
@@ -172,15 +253,24 @@ out vec4 fragColor;
 void main() {
     vec2 uv = vUV;
     if (uUnderwater > 0.5) {
-        uv.x += sin(uv.y * 24.0 + uTime * 2.0) * 0.0022;
-        uv.y += cos(uv.x * 20.0 + uTime * 1.6) * 0.0022;
+        uv.x += sin(uv.y * 26.0 + uTime * 2.0) * 0.0022;
+        uv.y += cos(uv.x * 22.0 + uTime * 1.6) * 0.0022;
     }
     vec3 c = texture(uScene, uv).rgb;
-    float vignette = smoothstep(0.92, 0.32, distance(vUV, vec2(0.5)));
-    c *= mix(0.80, 1.0, vignette);
-    c = mix(c, c * vec3(0.42, 0.68, 1.0), uUnderwater * 0.62);
-    c = pow(c, vec3(1.02));
-    fragColor = vec4(c, 1.0);
+
+    // Subtle contrast + saturation, closer to the Java look.
+    c = (c - 0.5) * 1.045 + 0.5;
+    float luma = dot(c, vec3(0.299, 0.587, 0.114));
+    c = mix(vec3(luma), c, 1.07);
+
+    // Vignette.
+    float vignette = smoothstep(0.95, 0.35, distance(vUV, vec2(0.5)));
+    c *= mix(0.86, 1.0, vignette);
+
+    // Underwater tint.
+    c = mix(c, c * vec3(0.42, 0.68, 1.05), uUnderwater * 0.62);
+
+    fragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
 }
 """.trimIndent()
 

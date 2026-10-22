@@ -27,7 +27,9 @@ object ResourcePacks {
         val description: String,
         val kind: String,
         val tiles: Int = 0,
-        val shaderFiles: Int = 0
+        val shaderFiles: Int = 0,
+        /** True for Iris/OptiFine packs: their programs follow a different pipeline. */
+        val javaShader: Boolean = false
     )
 
     class PackSource(val file: File) : AutoCloseable {
@@ -114,13 +116,40 @@ object ResourcePacks {
                     val desc = readDescription(src)
                     val tiles = entries.count { it.contains("/textures/") && it.endsWith(".png") }
                     val shaders = entries.count { it.contains("shaders/") && (it.endsWith(".vsh") || it.endsWith(".fsh")) }
-                    PackInfo(file, src.name, format, desc, kind, tiles, shaders)
+                    val javaShader = isJavaShaderPack(src, entries)
+                    PackInfo(file, src.name, format, desc, kind, tiles, shaders, javaShader)
                 }
             } catch (t: Throwable) {
                 Log.w("Pack invalido ${file.name}: ${t.message}")
                 null
             }
         }
+    }
+
+    /**
+     * Iris / OptiFine shader packs (BSL, Complementary, SEUS...) use gbuffers/composite/deferred
+     * programs, shadow passes and uniforms that this engine does not implement, so feeding their
+     * files into our slots only produces GLSL errors. They are detected and skipped.
+     */
+    private fun isJavaShaderPack(src: PackSource, entries: List<String>): Boolean {
+        for (entry in entries) {
+            val lower = entry.lowercase()
+            if (!lower.contains("shaders/")) continue
+            if (lower.endsWith(".properties")) return true
+            val fileName = lower.substringAfterLast('/')
+            if (fileName.startsWith("gbuffers_") || fileName.startsWith("composite") ||
+                fileName.startsWith("deferred") || fileName.startsWith("shadow") ||
+                fileName == "final.fsh" || fileName == "final.vsh"
+            ) return true
+            if (lower.endsWith(".fsh") || lower.endsWith(".vsh")) {
+                val head = src.read(entry)?.let { String(it.copyOf(minOf(it.size, 400)), Charsets.UTF_8) }
+                if (head != null && (head.contains("#version 330") || head.contains("#version 400") ||
+                        head.contains("#version 410") || head.contains("#version 430") ||
+                        head.contains("iris_") || head.contains("MC_"))
+                ) return true
+            }
+        }
+        return false
     }
 
     private fun readFormat(src: PackSource): Int {
@@ -196,7 +225,13 @@ object ResourcePacks {
 
         for (file in shaderFiles) {
             try {
-                PackSource(file).use { collect(it, true) }
+                PackSource(file).use { src ->
+                    if (isJavaShaderPack(src, src.entries())) {
+                        Log.i("Shader pack ${src.name}: pipeline de Iris/OptiFine, se omite")
+                    } else {
+                        collect(src, true)
+                    }
+                }
             } catch (t: Throwable) {
                 Log.e("Shader pack invalido ${file.name}", t)
             }
@@ -206,7 +241,9 @@ object ResourcePacks {
         }?.sortedBy { it.name.lowercase() } ?: emptyList()
         for (file in resFiles) {
             try {
-                PackSource(file).use { collect(it, false) }
+                PackSource(file).use { src ->
+                    if (!isJavaShaderPack(src, src.entries())) collect(src, false)
+                }
             } catch (_: Throwable) {
             }
         }

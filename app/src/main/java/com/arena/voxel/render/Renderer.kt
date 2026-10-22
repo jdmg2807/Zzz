@@ -16,7 +16,9 @@ import com.arena.voxel.player.Raycast
 import com.arena.voxel.textures.Textures
 import com.arena.voxel.world.Blocks
 import com.arena.voxel.world.Chunk
+import com.arena.voxel.world.Biomes
 import com.arena.voxel.world.World
+import com.arena.voxel.world.WorldGen
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.microedition.khronos.egl.EGLConfig
@@ -50,6 +52,7 @@ class Renderer : GLSurfaceView.Renderer {
     private var player: Player? = null
     private var shaderSources: Map<String, String> = emptyMap()
 
+    private val failedShaders = ArrayList<String>()
     private var lastNanos = 0L
     private var fpsAccum = 0f
     private var fpsFrames = 0
@@ -140,13 +143,23 @@ class Renderer : GLSurfaceView.Renderer {
     }
 
     private fun compileWithFallback(name: String, baseVert: String, baseFrag: String): ShaderProgram? {
-        val vert = shaderSources["$name.vsh"] ?: baseVert
-        val frag = shaderSources["$name.fsh"] ?: baseFrag
+        val customVert = shaderSources["$name.vsh"]
+        val customFrag = shaderSources["$name.fsh"]
+        val vert = customVert ?: baseVert
+        val frag = customFrag ?: baseFrag
+        if (customVert == null && customFrag == null) {
+            return try {
+                ShaderProgram.create(name, baseVert, baseFrag)
+            } catch (t: Throwable) {
+                Log.e("Shader $name integrado falló", t)
+                null
+            }
+        }
         return try {
             ShaderProgram.create(name, vert, frag)
         } catch (t: Throwable) {
             Log.e("Shader $name del pack falló, se usa el integrado", t)
-            Game.chat("Shader $name del pack falló; usando el integrado")
+            failedShaders.add(name)
             try {
                 ShaderProgram.create(name, baseVert, baseFrag)
             } catch (t2: Throwable) {
@@ -203,6 +216,7 @@ class Renderer : GLSurfaceView.Renderer {
             Game.setProgress(0.06f, "Compilando shaders...")
             val (packName, sources) = ResourcePacks.loadShaderSources()
             shaderSources = sources
+            failedShaders.clear()
             Game.shaderPackName = if (sources.isEmpty()) "integrado" else "$packName (${sources.size} shaders)"
             compilePrograms()
 
@@ -285,7 +299,12 @@ class Renderer : GLSurfaceView.Renderer {
             Game.setProgress(1f, "Listo")
             Game.onWorldReady()
             ModLoader.worldReady()
-            Game.chat("${ModLoader.count()} mod(s) activos · ${Textures.count()} texturas")
+            if (failedShaders.isNotEmpty()) {
+                Game.chat(
+                    "Shaders del pack no compatibles: ${failedShaders.joinToString(", ")} (se usa el integrado)"
+                )
+            }
+            Game.chat("${ModLoader.count()} mod(s) activos · ${Textures.count()} texturas · ${Biomes.NAMES.size} biomas")
             if (packs.isNotEmpty()) Game.chat("Packs: ${packs.joinToString(", ")}")
             autosaveTimer = 0f
         } catch (t: Throwable) {
@@ -311,7 +330,8 @@ class Renderer : GLSurfaceView.Renderer {
     }
 
     private fun buildMesh(w: World, c: Chunk) {
-        val result = ChunkMesher.build(w, c)
+        val biomes = c.biomes ?: w.gen.biomes(c.cx, c.cz).also { c.biomes = it }
+        val result = ChunkMesher.build(w, c, biomes)
         val mesh = c.mesh ?: ChunkMesh().also { c.mesh = it }
         mesh.upload(result.opaque)
         val water = c.waterMesh ?: ChunkMesh().also { c.waterMesh = it }
@@ -441,14 +461,14 @@ class Renderer : GLSurfaceView.Renderer {
                 Game.down -> -1f
                 else -> 0f
             }
-            p.update(dt, w, Game.move[0], Game.move[1], ascend, Game.jump)
+            p.update(dt, w, Game.move[0], Game.move[1], ascend, Game.jump, Game.sprint)
             w.tick(dt)
         }
 
         val forward = p.forward()
         val hit = Raycast.cast(
             w, p.x, p.eyeY(), p.z,
-            forward[0].toDouble(), forward[1].toDouble(), forward[2].toDouble(), 6.0
+            forward[0].toDouble(), forward[1].toDouble(), forward[2].toDouble(), 5.0
         )
         Game.targetHit = hit
 
@@ -543,6 +563,11 @@ class Renderer : GLSurfaceView.Renderer {
                 skyP.set3f("uZenith", zenithR, zenithG, zenithB)
                 skyP.set3f("uHorizon", horizonR, horizonG, horizonB)
                 skyP.set3f("uSunColor", 1f, 0.92f, 0.72f)
+                skyP.set3f("uCam", p.x.toFloat(), p.eyeY().toFloat(), p.z.toFloat())
+                skyP.set1f("uTime", w.time)
+                skyP.set1f("uCloudY", WorldGen.CLOUD_Y)
+                skyP.set1f("uCloudCover", 0.52f)
+                skyP.set1f("uBrightness", brightness)
                 drawFullscreen()
                 GLES20.glDepthMask(true)
             }
@@ -592,6 +617,7 @@ class Renderer : GLSurfaceView.Renderer {
             water.set2f("uFog", fogNear, fogFar)
             water.set3f("uLightColor", lightR, lightG, lightB)
             water.set1f("uTime", w.time)
+            water.set3f("uSunDir", sunDir[0], sunDir[1], sunDir[2])
             water.set1i("uTex", 0)
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, atlasTexture)

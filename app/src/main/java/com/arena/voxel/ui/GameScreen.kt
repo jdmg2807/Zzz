@@ -3,6 +3,7 @@ package com.arena.voxel.ui
 import android.opengl.GLSurfaceView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -57,6 +59,7 @@ import com.arena.voxel.Settings
 import com.arena.voxel.mods.ModLoader
 import com.arena.voxel.render.Renderer
 import com.arena.voxel.world.Blocks
+import com.arena.voxel.textures.Textures
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -266,16 +269,13 @@ private fun BoxScope.Hotbar(tick: Int) {
             .padding(4.dp)
     ) {
         slots.forEachIndexed { index, id ->
-            val color = remember(id) {
-                val c = Blocks.get(Blocks.index(id)).color
-                Color(0xFF000000.toInt() or (c and 0xFFFFFF))
-            }
+            val icon = remember(id) { blockIcon(id, 64) }
             Box(
                 Modifier
                     .padding(2.dp)
                     .size(46.dp)
                     .clip(RoundedCornerShape(7.dp))
-                    .background(if (index == selected) Color(0x66FFFFFF) else Color(0x44000000))
+                    .background(if (index == selected) Color(0x66FFFFFF) else Color(0x40000000))
                     .border(
                         if (index == selected) 2.dp else 1.dp,
                         if (index == selected) Accent else Color(0x33FFFFFF),
@@ -284,9 +284,13 @@ private fun BoxScope.Hotbar(tick: Int) {
                     .clickable { Game.selectedSlot = index },
                 contentAlignment = Alignment.Center
             ) {
-                Canvas(Modifier.size(28.dp)) {
-                    drawRect(color)
-                    drawRect(Color(0x33000000), topLeft = Offset(0f, size.height * 0.65f), size = Size(size.width, size.height * 0.35f))
+                if (icon != null) {
+                    Image(
+                        bitmap = icon,
+                        contentDescription = id,
+                        modifier = Modifier.size(36.dp),
+                        filterQuality = androidx.compose.ui.graphics.FilterQuality.None
+                    )
                 }
             }
         }
@@ -360,6 +364,11 @@ private fun BoxScope.Controls(tick: Int, onOpenPicker: () -> Unit) {
             TapButton(if (flying) "✈ ON" else "✈", small = true) {
                 Game.player?.let { it.flying = !it.flying; it.vy = 0.0 }
             }
+            HoldButton(
+                "»",
+                onPress = { Game.sprint = true },
+                onRelease = { Game.sprint = false }
+            )
         }
         if (flying) {
             HoldButton(
@@ -481,7 +490,7 @@ private fun BlockPicker(selectedSlot: Int, onPick: (String) -> Unit, onClose: ()
             ) {
                 items(blocks.size) { index ->
                     val block = blocks[index]
-                    val color = Color(0xFF000000.toInt() or (block.color and 0xFFFFFF))
+                    val icon = remember(block.id) { blockIcon(block.id, 64) }
                     Column(
                         Modifier.clickable { onPick(block.id) },
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -490,9 +499,19 @@ private fun BlockPicker(selectedSlot: Int, onPick: (String) -> Unit, onClose: ()
                             Modifier
                                 .size(52.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(color)
-                                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(8.dp))
-                        )
+                                .background(Color(0x33000000))
+                                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (icon != null) {
+                                Image(
+                                    bitmap = icon,
+                                    contentDescription = block.id,
+                                    modifier = Modifier.size(46.dp),
+                                    filterQuality = androidx.compose.ui.graphics.FilterQuality.None
+                                )
+                            }
+                        }
                         Spacer(Modifier.height(2.dp))
                         Text(
                             block.id,
@@ -505,5 +524,16 @@ private fun BlockPicker(selectedSlot: Int, onPick: (String) -> Unit, onClose: ()
                 }
             }
         }
+    }
+}
+
+/** Isometric icon for a block id, cached by the caller with remember(). */
+private fun blockIcon(id: String, size: Int): androidx.compose.ui.graphics.ImageBitmap? {
+    val block = Blocks.get(Blocks.index(id))
+    if (block.id == "air") return null
+    return try {
+        Textures.blockIcon(block.tileTop, block.tileSide, size)?.asImageBitmap()
+    } catch (t: Throwable) {
+        null
     }
 }

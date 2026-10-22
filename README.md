@@ -34,16 +34,19 @@ Requisitos: Android 7.0+ (API 24) con OpenGL ES 3.0.
 | Sistema | Estado |
 |---|---|
 | Mundo infinito por chunks (16×16×80) con ruido procedural | ✅ |
-| Biomas (playa, bosque, nieve), árboles, minerales, cuevas de agua/lagos | ✅ |
-| Render por chunks con atlas de texturas, niebla y culling de caras | ✅ |
-| Día/noche con luz dinámica y cielo con sol procedural | ✅ |
-| Agua animada con transparencia y post-proceso bajo el agua | ✅ |
+| 6 biomas (llanura, bosque, nevado, desierto, taiga, jungla) con colores propios | ✅ |
+| Árboles por bioma (roble, abedul, pino, jungla), cactus, caña de azúcar, plantas | ✅ |
+| Oclusión ambiental (AO) por vértice y sombreado por cara | ✅ |
+| Cielo con nubes a la deriva, sol, luna con fase y estrellas nocturnas | ✅ |
+| Agua con fresnel, brillo del sol, oleaje y superficie 2/16 más baja | ✅ |
+| Render por chunks con atlas de texturas, niebla suave y culling de caras | ✅ |
 | Física del jugador: colisión AABB, salto, natación, vuelo creativo | ✅ |
 | Colocar / romper bloques con raycast (toque y pulsación larga) | ✅ |
 | Guardado automático del mundo (chunks comprimidos + jugador) | ✅ |
 | **Resource packs de Minecraft Java** (.zip o carpeta, modernos y legacy) | ✅ |
 | **Shader packs** (reemplazan terrain/water/sky/post con GLSL ES 3.0) | ✅ |
 | **Mods en .jar** con API Java (bloques, texturas, HUD, mundo, chat) | ✅ |
+| Iconos isométricos de bloque en el hotbar y en el selector | ✅ |
 | Selector de bloques (también muestra los bloques de los mods) | ✅ |
 | Interfaz Compose: menú, mods, packs, ajustes, HUD táctil | ✅ |
 
@@ -55,7 +58,7 @@ Requisitos: Android 7.0+ (API 24) con OpenGL ES 3.0.
 - **Pulsación larga**: romper el bloque apuntado.
 - **↥**: saltar / subir volando. **↧**: bajar volando. **✈**: activar vuelo creativo.
 - **⛏ / ■**: romper / colocar (botones dedicados).
-- **▦**: selector de bloques (incluye los bloques añadidos por mods) para la ranura activa.
+- **»**: esprintar (mantener). **▦**: selector de bloques (incluye los bloques añadidos por mods) para la ranura activa.
 - **II** (arriba a la derecha): pausa, guardar y salir.
 
 ## Carpetas del juego
@@ -113,8 +116,12 @@ En el juego: **Texturas / Shaders → Exportar shaders de ejemplo** escribe el p
 completo en `shaderpacks/mis_shaders/` para editarlo. También hay un ejemplo de post-proceso
 sepia en `samples/ShaderPackEjemplo/`.
 
-Si un shader del pack no compila, el juego avisa en el chat y usa el integrado (nunca se rompe
-el arranque).
+Si un shader del pack no compila, el juego avisa una sola vez en el chat y usa el integrado
+(nunca se rompe el arranque).
+
+Los packs de **Iris/OptiFine** (BSL, Complementary, SEUS…) se detectan automáticamente y se
+omiten con un aviso en la pantalla de packs: usan `gbuffers_*`, `composite`, `deferred`, pases
+de sombra y `#version 330`, un pipeline distinto al de este motor. Sus texturas sí se aplican.
 
 ## Mods
 
@@ -204,6 +211,9 @@ samples/                    pack de texturas y shader de ejemplo
 - Los shaders usan GLSL ES 3.0: los `.vsh/.fsh` de Optifine/iris con `#version 330` o
   uniforms `gbuffers_*` no compilan tal cual; adapta el código o usa los integrados como base.
 - Guardado: un solo mundo (`mundo1`). Se puede ampliar a varias ranuras.
+- Sin inventario/crafteo todavía (selector creativo por ahora).
+- Sin luz de bloque propagada: el AO da profundidad pero las cuevas no se oscurecen.
+- Packs de shaders tipo OptiFine/Iris no soportados (ver arriba).
 
 Hecho con cariño para jugar en el móvil. Los PRs con nuevos mods, packs o mejoras del motor
 son bienvenidos.

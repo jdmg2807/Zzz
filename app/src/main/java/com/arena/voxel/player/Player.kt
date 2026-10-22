@@ -57,7 +57,9 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
      * @param ascend vertical intent -1..1 (used while flying)
      * @param jump jump/ascend button held
      */
-    fun update(dt: Float, world: World, moveX: Float, moveZ: Float, ascend: Float, jump: Boolean) {
+    fun update(
+        dt: Float, world: World, moveX: Float, moveZ: Float, ascend: Float, jump: Boolean, sprint: Boolean = false
+    ) {
         val step = dt.coerceAtMost(0.05f)
         inWater = world.isLiquid(
             floor(x).toInt(),
@@ -66,8 +68,9 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
         )
 
         val speed = when {
-            flying -> 12.0
+            flying -> if (sprint) 22.0 else 11.0
             inWater -> 3.4
+            sprint -> 6.1
             else -> 4.7
         }
 

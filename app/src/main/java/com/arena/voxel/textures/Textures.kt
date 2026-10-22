@@ -5,13 +5,15 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
+import com.arena.voxel.world.Biomes
 
 /**
- * Tile registry + atlas builder.
+ * Tile registry + atlas builder + inventory icons.
  *
- * Tiles are addressed by name ("stone", "grass_top", ...). Resource packs override tiles
- * by name, mods append new tiles, and everything ends up in one atlas texture so the whole
- * world can be drawn with a single draw call per chunk.
+ * Tiles are addressed by name ("stone", "grass_top", ...). Tintable tiles (grass, leaves,
+ * tall grass, water) are stored as one variant per biome, so the mesher can pick the right
+ * colours just by adding the biome index — no runtime tinting and no atlas rebuilds.
+ * Resource packs override tiles by name (tinted tiles get a single variant for every biome).
  */
 object Textures {
 
@@ -24,66 +26,88 @@ object Textures {
 
     private val tiles = ArrayList<Tile>()
     private val byName = HashMap<String, Int>()
+    private val tinted = HashSet<String>()
+    private val variantCount = HashMap<String, Int>()
     private var atlas: Bitmap? = null
 
-    /** Default tile names, in stable order. */
-    val DEFAULTS = listOf(
-        "grass_top", "grass_side", "dirt", "stone", "cobblestone", "oak_planks",
-        "sand", "gravel", "log_side", "log_top", "leaves", "water",
-        "glass", "snow", "snow_side", "bedrock",
-        "coal_ore", "iron_ore", "gold_ore", "diamond_ore", "brick", "obsidian",
-        "tnt_side", "tnt_top", "glowstone"
+    /** Plain tiles, in stable atlas order. */
+    private val SIMPLE = listOf(
+        "dirt", "stone", "cobblestone", "oak_planks", "sand", "gravel", "log_side", "log_top",
+        "glass", "snow", "bedrock", "coal_ore", "iron_ore", "gold_ore", "diamond_ore", "brick",
+        "obsidian", "tnt_side", "tnt_top", "glowstone", "sandstone", "cactus_side", "cactus_top",
+        "dead_bush", "dandelion", "poppy", "spruce_log_side", "spruce_log_top", "spruce_leaves",
+        "birch_log_side", "birch_log_top", "birch_leaves", "sugar_cane"
     )
+
+    /** Tiles rendered once per biome. */
+    private val TINTED = listOf("grass_top", "grass_side", "leaves", "tall_grass", "water")
+
+    val DEFAULTS: List<String> get() = TINTED + SIMPLE
 
     fun reset() {
         tiles.clear()
         byName.clear()
+        tinted.clear()
+        variantCount.clear()
         atlas?.recycle()
         atlas = null
     }
 
     fun prepareDefaults() {
         reset()
-        for (name in DEFAULTS) addTile(name, TileGen.make(name))
-    }
-
-    private fun addTile(name: String, bmp: Bitmap): Int {
-        val idx = tiles.size
-        tiles.add(Tile(name, bmp, average(bmp)))
-        byName[name] = idx
-        return idx
+        for (name in TINTED) {
+            val base = tiles.size
+            byName[name] = base
+            tinted.add(name)
+            variantCount[name] = Biomes.COUNT
+            for (biome in 0 until Biomes.COUNT) {
+                val bmp = TileGen.makeTinted(name, biome)
+                tiles.add(Tile(if (biome == 0) name else "$name@$biome", bmp, average(bmp)))
+            }
+        }
+        for (name in SIMPLE) {
+            byName[name] = tiles.size
+            variantCount[name] = 1
+            val bmp = TileGen.make(name)
+            tiles.add(Tile(name, bmp, average(bmp)))
+        }
     }
 
     fun indexOf(name: String): Int = byName[name] ?: -1
 
+    fun isTinted(name: String): Boolean = tinted.contains(name)
+
     fun nameOf(index: Int): String = tiles.getOrNull(index)?.name ?: "?"
 
-    /** Replaces an existing tile (resource pack override). Returns false if the name is unknown. */
+    /** Replaces a tile from a resource pack. Tinted tiles replace every biome variant. */
     fun replace(name: String, bmp: Bitmap): Boolean {
-        val idx = byName[name] ?: return false
-        val old = tiles[idx]
-        if (old.bitmap !== bmp) old.bitmap.recycle()
-        old.bitmap = bmp
-        old.avg = average(bmp)
-        atlas?.recycle()
-        atlas = null
+        val base = byName[name] ?: return false
+        val count = variantCount[name] ?: 1
+        for (i in 0 until count) {
+            val tile = tiles.getOrNull(base + i) ?: continue
+            // Tinted tiles need one copy per biome variant so every biome shows the pack art.
+            val copy = if (count > 1) bmp.copy(Bitmap.Config.ARGB_8888, false) ?: bmp else bmp
+            if (tile.bitmap !== copy) tile.bitmap.recycle()
+            tile.bitmap = copy
+            tile.avg = average(copy)
+        }
+        invalidate()
         return true
     }
 
-    /**
-     * Adds a tile for a mod. If the name already exists it is overridden instead,
-     * so mods can also restyle vanilla blocks.
-     */
+    /** Adds a new tile (mod textures, unknown pack textures). */
     fun put(name: String, bmp: Bitmap): Int {
-        val existing = byName[name]
-        if (existing != null) {
+        byName[name]?.let { existing ->
             replace(name, bmp)
             return existing
         }
         if (tiles.size >= GRID * GRID) return 0
-        atlas?.recycle()
-        atlas = null
-        return addTile(name, bmp)
+        invalidate()
+        val idx = tiles.size
+        tiles.add(Tile(name, bmp, average(bmp)))
+        byName[name] = idx
+        variantCount[name] = 1
+        return idx
     }
 
     fun putSolid(name: String, color: Int): Int = put(name, TileGen.solid(color))
@@ -96,6 +120,8 @@ object Textures {
     fun count(): Int = tiles.size
 
     fun allNames(): List<String> = tiles.map { it.name }
+
+    fun bitmapOf(index: Int): Bitmap? = tiles.getOrNull(index)?.bitmap
 
     fun decode(bytes: ByteArray, scaleToTile: Boolean = true): Bitmap? {
         val opts = BitmapFactory.Options()
@@ -133,6 +159,11 @@ object Textures {
         return (((r / n).toInt() and 0xff) shl 16) or (((g / n).toInt() and 0xff) shl 8) or ((b / n).toInt() and 0xff)
     }
 
+    fun invalidate() {
+        atlas?.recycle()
+        atlas = null
+    }
+
     fun buildAtlas(): Bitmap {
         atlas?.let { return it }
         val out = Bitmap.createBitmap(ATLAS, ATLAS, Bitmap.Config.ARGB_8888)
@@ -151,5 +182,67 @@ object Textures {
         }
         atlas = out
         return out
+    }
+
+    // ------------------------------------------------------------------ icons
+
+    /**
+     * Isometric block icon (like the Minecraft hotbar) built from the top and side tiles.
+     * Returns null when the tiles are missing.
+     */
+    fun blockIcon(topTile: Int, sideTile: Int, out: Int = 48): Bitmap? {
+        val top = tiles.getOrNull(topTile)?.bitmap ?: return null
+        val side = tiles.getOrNull(sideTile)?.bitmap ?: return null
+        val s = out
+        val px = IntArray(s * s)
+        val k = s / 48f
+
+        fun sample(bmp: Bitmap, u: Float, v: Float): Int {
+            val x = (u * bmp.width).toInt().coerceIn(0, bmp.width - 1)
+            val y = (v * bmp.height).toInt().coerceIn(0, bmp.height - 1)
+            return bmp.getPixel(x, y)
+        }
+
+        fun shade(c: Int, f: Float): Int {
+            val a = (c ushr 24) and 0xff
+            val r = (((c shr 16) and 0xff) * f).toInt().coerceIn(0, 255)
+            val g = (((c shr 8) and 0xff) * f).toInt().coerceIn(0, 255)
+            val b = ((c and 0xff) * f).toInt().coerceIn(0, 255)
+            return (a shl 24) or (r shl 16) or (g shl 8) or b
+        }
+
+        // Parallelogram: origin + u*e1 + v*e2 (inverted per pixel).
+        fun fillQuad(ox: Float, oy: Float, e1x: Float, e1y: Float, e2x: Float, e2y: Float, bmp: Bitmap, f: Float) {
+            val det = e1x * e2y - e1y * e2x
+            if (kotlin.math.abs(det) < 0.0001f) return
+            for (y in 0 until s) {
+                for (x in 0 until s) {
+                    val dx = x + 0.5f - ox
+                    val dy = y + 0.5f - oy
+                    val u = (dx * e2y - dy * e2x) / det
+                    val v = (dy * e1x - dx * e1y) / det
+                    if (u < 0f || u > 1f || v < 0f || v > 1f) continue
+                    val c = sample(bmp, u, v)
+                    if ((c ushr 24) < 100) continue
+                    px[y * s + x] = shade(c, f)
+                }
+            }
+        }
+
+        // Cube in a 48x48 box: top diamond, then the two visible sides.
+        val ax = 24f * k; val ay = 1f * k
+        val bx = 47f * k; val by = 12f * k
+        val cx = 24f * k; val cy = 23f * k
+        val dx = 1f * k; val dy = 12f * k
+        val lift = 23f * k
+
+        // Left face (D -> C, down)
+        fillQuad(dx, dy, cx - dx, cy - dy, 0f, lift, side, 0.74f)
+        // Right face (C -> B, down)
+        fillQuad(cx, cy, bx - cx, by - cy, 0f, lift, side, 0.56f)
+        // Top face (A -> B, A -> D)
+        fillQuad(ax, ay, bx - ax, by - ay, dx - ax, dy - ay, top, 1.0f)
+
+        return Bitmap.createBitmap(px, s, s, Bitmap.Config.ARGB_8888)
     }
 }

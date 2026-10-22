@@ -381,6 +381,15 @@ private fun PacksScreen(onBack: () -> Unit) {
                     if (pack.description.isNotEmpty()) {
                         Text(pack.description, color = Color(0xFF9AA6B2), fontSize = 11.sp)
                     }
+                    if (pack.javaShader) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Shader pack de Iris/OptiFine detectado: sus programas (gbuffers/composite/shadow) " +
+                                "no son compatibles con este motor, así que solo se aplican sus texturas.",
+                            color = Color(0xFFE5B567),
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }
 
@@ -406,6 +415,13 @@ private fun PacksScreen(onBack: () -> Unit) {
                 ) {
                     Text(pack.name, color = Color(0xFFE8EDF2), fontWeight = FontWeight.Bold)
                     Text("${pack.shaderFiles} archivos de shader", color = Color(0xFF7E8A9A), fontSize = 11.sp)
+                    if (pack.javaShader) {
+                        Text(
+                            "Pipeline de Iris/OptiFine: no compatible (se omite)",
+                            color = Color(0xFFE5B567),
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }
 

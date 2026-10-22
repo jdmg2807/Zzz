@@ -42,6 +42,7 @@ object Game {
     val move = FloatArray(2)
     @Volatile var jump = false
     @Volatile var down = false
+    @Volatile var sprint = false
 
     var world: World? = null
     var player: Player? = null

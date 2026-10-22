@@ -9,6 +9,9 @@ class Chunk(val cx: Int, val cz: Int) {
     var generated = false
     var dirty = true
 
+    /** Cached biome id per column (lz * 16 + lx); filled by the mesher. */
+    var biomes: IntArray? = null
+
     var mesh: ChunkMesh? = null
     var waterMesh: ChunkMesh? = null
 

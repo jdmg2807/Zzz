@@ -6,8 +6,13 @@ import com.arena.voxel.world.Chunk
 import com.arena.voxel.world.World
 
 /**
- * Converts a chunk into triangles. Only faces touching air / transparent blocks are emitted,
- * and water goes to a separate buffer so it can be blended after the opaque pass.
+ * Converts a chunk into triangles.
+ *
+ * - only faces touching air / transparent blocks are emitted (huge geometry reduction)
+ * - ambient occlusion per vertex, baked into the shade attribute
+ * - biome tinted tiles: the mesher just adds the biome index to the base tile
+ * - water gets its own buffer (blended later) and a lowered surface
+ * - plants use crossed quads with alpha test
  */
 object ChunkMesher {
 
@@ -28,16 +33,24 @@ object ChunkMesher {
     private val VY = intArrayOf(0, 0, 0, 0, 0, 0)
     private val VZ = intArrayOf(1, -1, -1, 1, 0, 0)
 
-    private val SHADE = floatArrayOf(0.80f, 0.80f, 1.0f, 0.52f, 0.68f, 0.68f)
+    private val FACE_SHADE = floatArrayOf(0.80f, 0.80f, 1.0f, 0.52f, 0.68f, 0.68f)
     private val VERTICAL_UV = booleanArrayOf(true, true, false, false, true, true)
+    private val AO_LEVEL = floatArrayOf(0.55f, 0.72f, 0.87f, 1.0f)
+
+    /** Water surface sits 2/16 below a full block, like Minecraft. */
+    private const val WATER_DROP = 0.12f
 
     class Result(val opaque: FloatArray, val water: FloatArray)
 
-    fun build(world: World, chunk: Chunk): Result {
-        val opaque = FloatList(8192)
-        val water = FloatList(1024)
+    private val cornerU = intArrayOf(0, 1, 1, 0)
+    private val cornerV = intArrayOf(0, 0, 1, 1)
+
+    fun build(world: World, chunk: Chunk, biomes: IntArray): Result {
+        val opaque = FloatList(12288)
+        val water = FloatList(2048)
         val baseX = chunk.cx * 16
         val baseZ = chunk.cz * 16
+        val shades = FloatArray(4)
 
         for (y in 0 until World.HEIGHT) {
             for (z in 0 until 16) {
@@ -47,21 +60,50 @@ object ChunkMesher {
                     val block = Blocks.get(b)
                     val wx = baseX + x
                     val wz = baseZ + z
-                    val target = if (block.liquid) water else opaque
+                    val biome = biomes[z * 16 + x]
+
+                    if (block.cross) {
+                        val tint = if (block.tintTop) biome else 0
+                        addCross(opaque, wx, y, wz, block.tileTop + tint, 0.96f)
+                        continue
+                    }
+
+                    val liquid = block.liquid
+                    val target = if (liquid) water else opaque
+                    val aboveIsSame = world.get(wx, y + 1, wz) == b
+
                     for (f in 0..5) {
                         val nb = world.get(wx + DX[f], y + DY[f], wz + DZ[f])
                         if (Blocks.isOpaque(nb)) continue
-                        if (block.liquid) {
+                        if (liquid) {
                             if (nb == b) continue
                         } else if (!block.opaque && nb == b) {
                             continue
                         }
-                        val tile = when (f) {
+
+                        val tinted = when (f) {
+                            2 -> block.tintTop
+                            3 -> block.tintBottom
+                            else -> block.tintSide
+                        }
+                        val baseTile = when (f) {
                             2 -> block.tileTop
                             3 -> block.tileBottom
                             else -> block.tileSide
                         }
-                        addQuad(target, wx, y, wz, f, tile, SHADE[f], VERTICAL_UV[f])
+                        val tile = baseTile + if (tinted) biome else 0
+
+                        if (liquid || !block.opaque && block.cross) {
+                            for (i in 0..3) shades[i] = FACE_SHADE[f]
+                        } else {
+                            for (i in 0..3) {
+                                val ao = occlusion(world, wx, y, wz, f, cornerU[i], cornerV[i])
+                                shades[i] = FACE_SHADE[f] * AO_LEVEL[ao]
+                            }
+                        }
+
+                        val topOff = if (liquid && !aboveIsSame) WATER_DROP else 0f
+                        addQuad(target, wx, y, wz, f, tile, shades, topOff)
                     }
                 }
             }
@@ -69,14 +111,38 @@ object ChunkMesher {
         return Result(opaque.toArray(), water.toArray())
     }
 
-    private fun addQuad(out: FloatList, x: Int, y: Int, z: Int, face: Int, tile: Int, shade: Float, verticalUv: Boolean) {
+    /** 0..3, where 0 is the most occluded corner. */
+    private fun occlusion(world: World, bx: Int, by: Int, bz: Int, f: Int, du: Int, dv: Int): Int {
+        val su = if (du == 1) 1 else -1
+        val sv = if (dv == 1) 1 else -1
+        val nx = DX[f]
+        val ny = DY[f]
+        val nz = DZ[f]
+
+        fun solid(ax: Int, ay: Int, az: Int): Int =
+            if (Blocks.isOpaque(world.get(bx + nx + ax, by + ny + ay, bz + nz + az))) 1 else 0
+
+        val s1 = solid(UX[f] * su, UY[f] * su, UZ[f] * su)
+        val s2 = solid(VX[f] * sv, VY[f] * sv, VZ[f] * sv)
+        val c = solid(UX[f] * su + VX[f] * sv, UY[f] * su + VY[f] * sv, UZ[f] * su + VZ[f] * sv)
+        return if (s1 == 1 && s2 == 1) 0 else 3 - (s1 + s2 + c)
+    }
+
+    private fun addQuad(
+        out: FloatList,
+        x: Int, y: Int, z: Int,
+        face: Int,
+        tile: Int,
+        shades: FloatArray,
+        topOffset: Float
+    ) {
         val col = tile % Textures.GRID
         val row = tile / Textures.GRID
         val ts = 1f / Textures.GRID
         val eps = 0.5f / Textures.ATLAS
         val u0 = col * ts + eps
         val u1 = (col + 1) * ts - eps
-        // Bitmap row 0 is uploaded at v = 0, so tile rows grow downwards in v.
+        // Bitmap row 0 lives at v = 0, so tile rows grow downwards in v.
         val vTop = row * ts + eps
         val vBottom = (row + 1) * ts - eps
 
@@ -90,27 +156,99 @@ object ChunkMesher {
         val vy = VY[face]
         val vz = VZ[face]
 
-        val c0x = ox.toFloat(); val c0y = oy.toFloat(); val c0z = oz.toFloat()
-        val c1x = (ox + ux).toFloat(); val c1y = (oy + uy).toFloat(); val c1z = (oz + uz).toFloat()
-        val c2x = (ox + ux + vx).toFloat(); val c2y = (oy + uy + vy).toFloat(); val c2z = (oz + uz + vz).toFloat()
-        val c3x = (ox + vx).toFloat(); val c3y = (oy + vy).toFloat(); val c3z = (oz + vz).toFloat()
+        val px = floatArrayOf(
+            ox.toFloat(), (ox + ux).toFloat(), (ox + ux + vx).toFloat(), (ox + vx).toFloat()
+        )
+        val py = floatArrayOf(
+            oy.toFloat(), (oy + uy).toFloat(), (oy + uy + vy).toFloat(), (oy + vy).toFloat()
+        )
+        val pz = floatArrayOf(
+            oz.toFloat(), (oz + uz).toFloat(), (oz + uz + vz).toFloat(), (oz + vz).toFloat()
+        )
 
-        if (verticalUv) {
-            // Side faces: the U axis of the quad is vertical, so map texture V to it.
-            out.add(c0x, c0y, c0z, u0, vBottom, shade)
-            out.add(c1x, c1y, c1z, u0, vTop, shade)
-            out.add(c2x, c2y, c2z, u1, vTop, shade)
-            out.add(c0x, c0y, c0z, u0, vBottom, shade)
-            out.add(c2x, c2y, c2z, u1, vTop, shade)
-            out.add(c3x, c3y, c3z, u1, vBottom, shade)
-        } else {
-            // Top/bottom faces: the U axis of the quad is horizontal.
-            out.add(c0x, c0y, c0z, u0, vTop, shade)
-            out.add(c1x, c1y, c1z, u1, vTop, shade)
-            out.add(c2x, c2y, c2z, u1, vBottom, shade)
-            out.add(c0x, c0y, c0z, u0, vTop, shade)
-            out.add(c2x, c2y, c2z, u1, vBottom, shade)
-            out.add(c3x, c3y, c3z, u0, vBottom, shade)
+        if (topOffset != 0f) {
+            if (VERTICAL_UV[face]) {
+                // Vertical quad: corners 1 and 2 are the top edge.
+                py[1] -= topOffset
+                py[2] -= topOffset
+            } else if (face == 2) {
+                for (i in 0..3) py[i] -= topOffset
+            }
         }
+
+        val uu = FloatArray(4)
+        val vv = FloatArray(4)
+        if (VERTICAL_UV[face]) {
+            uu[0] = u0; vv[0] = vBottom
+            uu[1] = u0; vv[1] = vTop
+            uu[2] = u1; vv[2] = vTop
+            uu[3] = u1; vv[3] = vBottom
+        } else {
+            uu[0] = u0; vv[0] = vTop
+            uu[1] = u1; vv[1] = vTop
+            uu[2] = u1; vv[2] = vBottom
+            uu[3] = u0; vv[3] = vBottom
+        }
+
+        // Split the quad along the diagonal that keeps the AO gradient smooth.
+        if (shades[0] + shades[2] > shades[1] + shades[3]) {
+            vertex(out, px, py, pz, uu, vv, shades, 0)
+            vertex(out, px, py, pz, uu, vv, shades, 1)
+            vertex(out, px, py, pz, uu, vv, shades, 2)
+            vertex(out, px, py, pz, uu, vv, shades, 0)
+            vertex(out, px, py, pz, uu, vv, shades, 2)
+            vertex(out, px, py, pz, uu, vv, shades, 3)
+        } else {
+            vertex(out, px, py, pz, uu, vv, shades, 1)
+            vertex(out, px, py, pz, uu, vv, shades, 2)
+            vertex(out, px, py, pz, uu, vv, shades, 3)
+            vertex(out, px, py, pz, uu, vv, shades, 1)
+            vertex(out, px, py, pz, uu, vv, shades, 3)
+            vertex(out, px, py, pz, uu, vv, shades, 0)
+        }
+    }
+
+    private fun vertex(
+        out: FloatList,
+        px: FloatArray, py: FloatArray, pz: FloatArray,
+        uu: FloatArray, vv: FloatArray,
+        shades: FloatArray, i: Int
+    ) {
+        out.add(px[i], py[i], pz[i], uu[i], vv[i], shades[i])
+    }
+
+    private fun addCross(out: FloatList, x: Int, y: Int, z: Int, tile: Int, shade: Float) {
+        val col = tile % Textures.GRID
+        val row = tile / Textures.GRID
+        val ts = 1f / Textures.GRID
+        val eps = 0.5f / Textures.ATLAS
+        val u0 = col * ts + eps
+        val u1 = (col + 1) * ts - eps
+        val vTop = row * ts + eps
+        val vBottom = (row + 1) * ts - eps
+
+        val fx = x.toFloat()
+        val fy = y.toFloat()
+        val fz = z.toFloat()
+
+        fun plane(ax: Float, az: Float, bx: Float, bz: Float) {
+            // front
+            out.add(ax, fy, az, u0, vBottom, shade)
+            out.add(bx, fy, bz, u1, vBottom, shade)
+            out.add(bx, fy + 1f, bz, u1, vTop, shade)
+            out.add(ax, fy, az, u0, vBottom, shade)
+            out.add(bx, fy + 1f, bz, u1, vTop, shade)
+            out.add(ax, fy + 1f, az, u0, vTop, shade)
+            // back
+            out.add(bx, fy, bz, u0, vBottom, shade)
+            out.add(ax, fy, az, u1, vBottom, shade)
+            out.add(ax, fy + 1f, az, u1, vTop, shade)
+            out.add(bx, fy, bz, u0, vBottom, shade)
+            out.add(ax, fy + 1f, az, u1, vTop, shade)
+            out.add(bx, fy + 1f, bz, u0, vTop, shade)
+        }
+
+        plane(fx, fz, fx + 1f, fz + 1f)
+        plane(fx + 1f, fz, fx, fz + 1f)
     }
 }
