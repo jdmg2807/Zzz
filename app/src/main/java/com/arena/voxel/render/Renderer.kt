@@ -7,6 +7,7 @@ import android.opengl.GLUtils
 import com.arena.voxel.Game
 import com.arena.voxel.Settings
 import com.arena.voxel.core.Log
+import com.arena.voxel.core.Logs
 import com.arena.voxel.mods.ModLoader
 import com.arena.voxel.packs.ResourcePacks
 import com.arena.voxel.packs.ShaderSources
@@ -234,6 +235,8 @@ class Renderer : GLSurfaceView.Renderer {
     }
 
     private fun setupWorld(loadSave: Boolean) {
+        val setupStart = System.nanoTime()
+        Logs.section(if (loadSave) "CARGAR MUNDO" else "MUNDO NUEVO")
         try {
             // Drop geometry from a previous world (if any) before rebuilding everything.
             world?.let { old ->
@@ -249,6 +252,7 @@ class Renderer : GLSurfaceView.Renderer {
 
             Game.setProgress(0.02f, "Cargando texturas...")
             Textures.prepareDefaults()
+            Logs.info("SETUP", "Texturas base: ${Textures.count()} tiles")
             val packs = if (Settings.usePacks) {
                 ResourcePacks.applyAll()
             } else {
@@ -259,6 +263,9 @@ class Renderer : GLSurfaceView.Renderer {
                 packs.isEmpty() -> "Sin packs (texturas integradas)"
                 else -> packs.joinToString("\n")
             }
+
+            Logs.info("SETUP", "Packs: ${if (packs.isEmpty()) "ninguno" else packs.joinToString()}")
+            Logs.info("SETUP", "Shaders activados: ${Settings.useShaders} · mods: ${Settings.useMods}")
 
             Game.setProgress(0.06f, "Compilando shaders...")
             val (packName, sources) = if (Settings.useShaders) {
@@ -271,10 +278,12 @@ class Renderer : GLSurfaceView.Renderer {
             Game.shaderPackName = if (sources.isEmpty()) "integrado" else "$packName (${sources.size} shaders)"
             compilePrograms()
 
+            Logs.info("SETUP", "Shader pack: ${Game.shaderPackName} (${sources.size} archivos personalizados)")
             Game.setProgress(0.12f, "Cargando mods...")
             Blocks.init()
             val report = if (Settings.useMods) ModLoader.loadAll() else "Mods desactivados en ajustes"
             Game.modReport = report
+            Logs.info("SETUP", "Mods: ${report.replace("\n", " | ")}")
 
             // Solid tiles for the animal boxes (registered before the atlas is uploaded).
             mobTiles.clear()
@@ -290,6 +299,7 @@ class Renderer : GLSurfaceView.Renderer {
                 mobMeshes[i] = null
             }
 
+            Logs.info("SETUP", "Atlas: ${Textures.count()} tiles (${Textures.ATLAS}x${Textures.ATLAS})")
             Game.setProgress(0.20f, "Generando atlas de texturas...")
             uploadAtlas()
 
@@ -364,6 +374,12 @@ class Renderer : GLSurfaceView.Renderer {
                 return
             }
 
+            val seconds = (System.nanoTime() - setupStart) / 1e9
+            Logs.info(
+                "SETUP",
+                "Mundo listo en %.2f s · %d chunks iniciales · semilla %d · bloques %d"
+                    .format(seconds, w.chunks.size, w.seed, Blocks.all().size)
+            )
             Game.setProgress(1f, "Listo")
             Game.onWorldReady()
             ModLoader.worldReady()

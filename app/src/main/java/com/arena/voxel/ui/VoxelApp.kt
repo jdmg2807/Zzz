@@ -406,6 +406,28 @@ private fun SettingsScreen(onBack: () -> Unit) {
             fontSize = 11.sp
         )
 
+        Spacer(Modifier.height(16.dp))
+        Text("DIAGNÓSTICO", color = Color(0xFF7E8A9A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "El log registra todo lo que pasa (texturas, shaders, mods, importación de mundos y errores). " +
+                "Se guarda en Descargas/VoxelCraft/ al pausar el juego.",
+            color = Color(0xFF8A94A6),
+            fontSize = 11.sp
+        )
+        Spacer(Modifier.height(8.dp))
+        var logMessage by remember { mutableStateOf("") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                logMessage = com.arena.voxel.core.Logs.exportToDownloads(context)
+            }) { Text("Guardar log en Descargas") }
+            OutlinedButton(onClick = {
+                logMessage = com.arena.voxel.core.Logs.share(context)
+            }) { Text("Compartir log") }
+        }
+        if (logMessage.isNotEmpty()) {
+            Text(logMessage, color = Accent, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+        }
+
         Spacer(Modifier.height(20.dp))
         Text(
             "Carpeta del juego: ${Ctx.base.absolutePath}\n" +

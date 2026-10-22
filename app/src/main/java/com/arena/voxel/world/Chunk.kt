@@ -18,6 +18,9 @@ class Chunk(val cx: Int, val cz: Int) {
     /** Animals living in this chunk. Recreated when the chunk is generated. */
     var mobs: ArrayList<Mob>? = null
 
+    /** Highest non-air block; the mesher stops here instead of scanning the whole column. */
+    var maxY: Int = 0
+
     var mesh: ChunkMesh? = null
     var waterMesh: ChunkMesh? = null
 

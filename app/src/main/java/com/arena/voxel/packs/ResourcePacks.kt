@@ -2,6 +2,7 @@ package com.arena.voxel.packs
 
 import com.arena.voxel.core.Ctx
 import com.arena.voxel.core.Log
+import com.arena.voxel.core.Logs
 import com.arena.voxel.textures.Textures
 import java.io.File
 import java.io.InputStream
@@ -184,6 +185,9 @@ object ResourcePacks {
         return Regex("\"description\"\\s*:\\s*\"([^\"]*)\"").find(text)?.groupValues?.get(1) ?: ""
     }
 
+    /** Plant tiles drawn as crossed quads: they must keep transparency. */
+    private val PLANTS = setOf("tall_grass", "dead_bush", "poppy", "dandelion", "sugar_cane", "torch")
+
     /**
      * Applies every resource pack, overriding the default tiles. Returns the applied pack names.
      * Must be called after [Textures.prepareDefaults].
@@ -214,11 +218,26 @@ object ResourcePacks {
                         val bmp = Textures.decode(bytes) ?: continue
                         if (!Textures.isUsableTexture(bmp)) {
                             // Fully transparent texture would make the block invisible.
+                            Logs.warn("PACK", "${src.name}: '$entry' es transparente, se ignora")
                             bmp.recycle()
                             skipped++
                             continue
                         }
-                        if (Textures.replace(name, bmp)) appliedCount++
+                        if (PLANTS.any { name == it || name.startsWith(it) } && Textures.isOpaqueTexture(bmp)) {
+                            // An opaque plant texture turns crossed quads into solid green walls.
+                            Logs.warn(
+                                "PACK",
+                                "${src.name}: '$entry' es opaca para una planta ($name), se ignora"
+                            )
+                            bmp.recycle()
+                            skipped++
+                            continue
+                        }
+                        if (Textures.replace(name, bmp)) {
+                            appliedCount++
+                        } else {
+                            bmp.recycle()
+                        }
                     }
                     applied.add("${src.name} ($appliedCount)")
                     Log.i("Pack aplicado: ${src.name} ($appliedCount texturas, $skipped ignoradas)")

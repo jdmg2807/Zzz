@@ -159,6 +159,25 @@ object Textures {
         return scaled
     }
 
+    /** True when the image has (almost) no transparent pixels: unusable for crossed plants. */
+    fun isOpaqueTexture(bmp: Bitmap): Boolean {
+        var transparent = 0
+        var total = 0
+        val stepX = (bmp.width / 12).coerceAtLeast(1)
+        val stepY = (bmp.height / 12).coerceAtLeast(1)
+        var y = 0
+        while (y < bmp.height) {
+            var x = 0
+            while (x < bmp.width) {
+                if ((bmp.getPixel(x, y) ushr 24) < 30) transparent++
+                total++
+                x += stepX
+            }
+            y += stepY
+        }
+        return total == 0 || transparent.toFloat() / total < 0.05f
+    }
+
     private fun average(bmp: Bitmap): Int {
         var r = 0L
         var g = 0L

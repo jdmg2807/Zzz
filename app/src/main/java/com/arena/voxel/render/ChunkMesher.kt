@@ -57,7 +57,7 @@ object ChunkMesher {
         for (z in 0 until 16) {
             for (x in 0 until 16) {
                 var top = 0
-                for (y in World.HEIGHT - 1 downTo 0) {
+                for (y in (chunk.maxY).coerceAtMost(World.HEIGHT - 1) downTo 0) {
                     if (Blocks.isOpaque(chunk.get(x, y, z))) {
                         top = y
                         break
@@ -69,7 +69,8 @@ object ChunkMesher {
 
         val sources = lightSourcesFor(world, chunk)
 
-        for (y in 0 until World.HEIGHT) {
+        val topY = (chunk.maxY + 1).coerceIn(1, World.HEIGHT)
+        for (y in 0 until topY) {
             for (z in 0 until 16) {
                 for (x in 0 until 16) {
                     val b = chunk.get(x, y, z)
@@ -99,7 +100,7 @@ object ChunkMesher {
                         if (Blocks.isOpaque(nb)) continue
                         if (liquid) {
                             if (nb == b) continue
-                        } else if (!block.opaque && nb == b) {
+                        } else if (!block.opaque && nb == b && block.inset <= 0f) {
                             continue
                         }
 
@@ -125,7 +126,7 @@ object ChunkMesher {
                         }
 
                         val topOff = if (liquid && !aboveIsSame) WATER_DROP else 0f
-                        addQuad(target, wx, y, wz, f, tile, shades, topOff, sky, blockLight)
+                        addQuad(target, wx, y, wz, f, tile, shades, topOff, sky, blockLight, block.inset)
                     }
                 }
             }
@@ -136,7 +137,8 @@ object ChunkMesher {
     /** Light emitters of a chunk as x,y,z,level quads, cached on the chunk. */
     private fun scanSources(c: Chunk): IntArray {
         val out = ArrayList<Int>(32)
-        for (y in 0 until World.HEIGHT) {
+        val topY = (c.maxY + 1).coerceIn(1, World.HEIGHT)
+        for (y in 0 until topY) {
             for (z in 0 until 16) {
                 for (x in 0 until 16) {
                     val b = c.get(x, y, z)
@@ -217,7 +219,8 @@ object ChunkMesher {
         shades: FloatArray,
         topOffset: Float,
         sky: Float,
-        blockLight: Float
+        blockLight: Float,
+        inset: Float = 0f
     ) {
         val px = floatArrayOf(
             (x + OX[face]).toFloat(),
@@ -244,6 +247,16 @@ object ChunkMesher {
                 py[2] -= topOffset
             } else if (face == 2) {
                 for (i in 0..3) py[i] -= topOffset
+            }
+        }
+
+        // Minecraft-like inset boxes (cactus is 14/16 wide and shows its own sides).
+        if (inset > 0f) {
+            val low = inset
+            val high = 1f - inset
+            for (i in 0..3) {
+                px[i] = x + low + (px[i] - x) * (high - low)
+                pz[i] = z + low + (pz[i] - z) * (high - low)
             }
         }
 

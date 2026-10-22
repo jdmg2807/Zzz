@@ -201,6 +201,9 @@ class WorldGen(val seed: Long) {
         maybeRuins(chunk)
         decorate(chunk)
         Mobs.spawnInChunk(chunk, this)
+        chunk.maxY = chunk.blocks.indexOfLast { it != 0.toByte() }.let { idx ->
+            if (idx < 0) 0 else idx / (16 * 16)
+        }
         chunk.generated = true
         chunk.dirty = true
     }

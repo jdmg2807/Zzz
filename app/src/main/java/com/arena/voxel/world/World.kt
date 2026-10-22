@@ -20,7 +20,7 @@ class World(val seed: Long) {
     var dayTime = 0.28f
         private set
 
-    fun keyOf(cx: Int, cz: Int): Long = (cx.toLong() shl 32) xor (cz.toLong() and 0xffffffffL)
+    fun keyOf(cx: Int, cz: Int): Long = keyOfStatic(cx, cz)
 
     fun tick(dt: Float) {
         time += dt
@@ -57,6 +57,7 @@ class World(val seed: Long) {
         val lz = z and 15
         c.set(lx, y, lz, blockIndex)
         c.dirty = true
+        if (blockIndex != 0 && y > c.maxY) c.maxY = y
         // Light emitters changed: drop cached source lists around the edit.
         for (dx in -1..1) {
             for (dz in -1..1) {
@@ -83,7 +84,7 @@ class World(val seed: Long) {
     fun highestSolidY(x: Int, z: Int): Int {
         val c = chunk(x shr 4, z shr 4)
         if (c == null) return gen.highestAt(x, z)
-        for (y in HEIGHT - 1 downTo 0) {
+        for (y in (c.maxY).coerceAtMost(HEIGHT - 1) downTo 0) {
             if (Blocks.isSolid(c.get(x and 15, y, z and 15))) return y
         }
         return 0
@@ -104,7 +105,8 @@ class World(val seed: Long) {
             File(dir, "level.dat").outputStream().use { fos ->
                 GZIPOutputStream(fos).use { gz ->
                     DataOutputStream(gz).use { out ->
-                        out.writeInt(MAGIC)
+                        out.writeInt(MAGIC2)
+                        out.writeInt(HEIGHT)
                         out.writeLong(seed)
                         // Palette of block ids, so saves survive palette changes between versions.
                         val palette = Blocks.ids()
@@ -139,10 +141,18 @@ class World(val seed: Long) {
 
     companion object {
         const val SIZE = 16
-        const val HEIGHT = 80
+        /** Taller than before so imported Java worlds keep their terrain and mountains. */
+        const val HEIGHT = 144
 
-        /** "VCX1": level.dat with an embedded block palette. */
+        /** Minecraft y = 0 lands here (imported worlds occupy -64..79). */
+        const val MC_Y_OFFSET = 64
+
+        fun keyOfStatic(cx: Int, cz: Int): Long =
+            (cx.toLong() shl 32) xor (cz.toLong() and 0xffffffffL)
+
+        /** "VCX1": original format (height 80). "VCX2": stores the world height. */
         private const val MAGIC = 0x56435831
+        private const val MAGIC2 = 0x56435832
 
         class Loaded(
             val world: World,
@@ -160,7 +170,9 @@ class World(val seed: Long) {
                 GZIPInputStream(f.inputStream()).use { gz ->
                     DataInputStream(gz).use { inp ->
                         val first = inp.readInt()
-                        val modern = first == MAGIC
+                        val modern = first == MAGIC2 || first == MAGIC
+                        var savedHeight = 80
+                        if (first == MAGIC2) savedHeight = inp.readInt()
                         val seed = if (modern) {
                             inp.readLong()
                         } else {
@@ -193,11 +205,25 @@ class World(val seed: Long) {
                             val cx = inp.readInt()
                             val cz = inp.readInt()
                             val c = Chunk(cx, cz)
-                            var read = 0
-                            while (read < c.blocks.size) {
-                                val r = inp.read(c.blocks, read, c.blocks.size - read)
-                                if (r <= 0) break
-                                read += r
+                            if (savedHeight == HEIGHT) {
+                                var read = 0
+                                while (read < c.blocks.size) {
+                                    val r = inp.read(c.blocks, read, c.blocks.size - read)
+                                    if (r <= 0) break
+                                    read += r
+                                }
+                            } else {
+                                // Older saves are shorter: read them and place the data at the
+                                // bottom of the (now taller) chunk.
+                                val old = ByteArray(16 * 16 * savedHeight)
+                                var read = 0
+                                while (read < old.size) {
+                                    val r = inp.read(old, read, old.size - read)
+                                    if (r <= 0) break
+                                    read += r
+                                }
+                                val copy = minOf(old.size, c.blocks.size)
+                                System.arraycopy(old, 0, c.blocks, 0, copy)
                             }
                             remap?.let { map ->
                                 for (i in c.blocks.indices) {
@@ -208,6 +234,10 @@ class World(val seed: Long) {
                             }
                             c.generated = true
                             c.dirty = true
+                            c.maxY = c.blocks.indexOfLast { it != 0.toByte() }.let { idx ->
+                                if (idx < 0) 0 else idx / (16 * 16)
+                            }
+                            c.lightSources = null
                             world.chunks[world.keyOf(cx, cz)] = c
                         }
                         world.dayTime = dt

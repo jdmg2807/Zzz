@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.5.0 — Importar mundos de Java, log exportable y bugs de cactus/antorcha
+- **Importar mundos de Minecraft Java**: botón en el menú principal. Acepta el `.zip` del mundo
+  (o una carpeta con `level.dat` + `region/`). Lector NBT + Anvil propio con soporte de:
+  - 1.18+ (`sections[].block_states` con paleta y longs empaquetados)
+  - 1.16–1.17 (`Level.Sections` con `Palette` + `BlockStates`)
+  - 1.13–1.15 (empaquetado continuo antiguo)
+  - 1.8–1.12 (`Blocks` byte array, ids clásicos)
+  Importa un radio de 6 chunks alrededor del spawn, mapea los bloques a la paleta del juego y
+  guarda el resultado como partida normal; luego se abre con «Continuar partida».
+- **Mundo más alto (144)**: los mundos importados conservan cuevas y montañas (offset +64).
+  El mallado solo recorre hasta el último bloque de cada chunk, así que no cuesta FPS.
+  Los guardados antiguos se siguen leyendo (formato VCX1 → VCX2 con altura).
+- **Log de diagnóstico**: todo queda registrado (arranque, texturas aplicadas/ignoradas, shaders
+  con su log del compilador, mods, importación y errores) y se exporta automáticamente a
+  **Descargas/VoxelCraft/voxelcraft-<fecha>.txt** al pausar, al importar y ante un crash.
+  En Ajustes: «Guardar log en Descargas» y «Compartir log».
+- **Cactus arreglado**: ahora es una caja de 14/16 como en Java (antes cubo completo) y las
+  plantas de los packs ya no pueden convertirse en paredes verdes opacas (se rechazan texturas
+  sin transparencia para plantas).
+- **Antorchas (y flores, hierba alta, caña) ya se pueden romper**: el raycast solo golpeaba
+  bloques sólidos, así que los bloques en cruz eran inmutables.
+
 ## v1.4.0 — Animales, cuevas y ruinas
 - **Animales**: cerdos, ovejas, vacas y gallinas con modelos de cajas, colores propios, gravedad,
   paso automático, giro al chocar y deambular aleatorio. Aparecen sobre hierba según el bioma y

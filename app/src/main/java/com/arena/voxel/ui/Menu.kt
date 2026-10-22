@@ -1,5 +1,7 @@
 package com.arena.voxel.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,12 +18,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -37,9 +42,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.arena.voxel.BuildConfig
 import com.arena.voxel.Game
 import com.arena.voxel.mods.ModLoader
+import kotlinx.coroutines.delay
 import kotlin.math.sin
 
 /**
@@ -185,7 +192,30 @@ fun MainMenu(
     onPacks: () -> Unit,
     onSettings: () -> Unit
 ) {
+    val context = LocalContext.current
     val hasSave = remember { Game.hasSave }
+    var importMessage by remember { mutableStateOf<String?>(null) }
+    var importing by remember { mutableStateOf(false) }
+
+    val worldPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            importing = true
+            Game.importMinecraftWorld(uri) { message ->
+                importing = false
+                importMessage = message
+            }
+        }
+    }
+    // The import runs on a worker thread: keep the UI in sync with its state.
+    LaunchedEffect(importing) {
+        while (importing) {
+            delay(300)
+            if (!Game.importing && Game.importStatus.isNotEmpty()) {
+                importing = false
+                importMessage = Game.importStatus
+            }
+        }
+    }
     val modCount = remember { ModLoader.scan().count { it.error == null } }
     val splashes = remember {
         listOf(
@@ -248,13 +278,62 @@ fun MainMenu(
                     onClick = onContinue
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    McButton("Mods  ($modCount)", Modifier.weight(1f), onClick = onMods)
+                    McButton(
+                    "Importar mundo de Java",
+                    Modifier.fillMaxWidth(),
+                    enabled = !importing
+                ) { worldPicker.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }
+                McButton("Mods  ($modCount)", Modifier.weight(1f), onClick = onMods)
                     McButton("Texturas / shaders", Modifier.weight(1.5f), onClick = onPacks)
                 }
                 McButton("Ajustes", Modifier.fillMaxWidth(), onClick = onSettings)
                 McButton("Cerrar el juego", Modifier.fillMaxWidth(), enabled = false) { }
             }
             Spacer(Modifier.height(26.dp))
+        }
+
+        if (importing) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color(0xC0080B10))
+                    .pointerInput(Unit) { detectTapGestures { } },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Importando mundo de Minecraft…",
+                        color = Color(0xFFF2F2F2),
+                        fontSize = 17.sp,
+                        fontFamily = FontFamily.Monospace,
+                        style = TextStyle(shadow = McTextShadow)
+                    )
+                    Text(
+                        "El log se guardará en Descargas/VoxelCraft",
+                        color = Color(0xFFB8C4B0),
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
+            }
+        }
+
+        importMessage?.let { message ->
+            AlertDialog(
+                onDismissRequest = { importMessage = null },
+                title = { Text("Importación de mundo") },
+                text = {
+                    Text(
+                        message + "\n\nLog: Descargas/VoxelCraft (o Ajustes → Compartir log)",
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { importMessage = null }) { Text("Entendido") }
+                }
+            )
         }
 
         Text(

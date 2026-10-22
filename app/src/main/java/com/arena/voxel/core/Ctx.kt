@@ -33,6 +33,9 @@ object Ctx {
         return d
     }
 
+    val downloadsLogHint: String
+        get() = "Descargas/VoxelCraft/voxelcraft-<fecha>.txt"
+
     fun relativePath(file: File): String =
         try {
             file.absolutePath.substring(base.absolutePath.length).trimStart('/')
@@ -41,10 +44,35 @@ object Ctx {
         }
 }
 
+/**
+ * Shorthand used everywhere. Everything is mirrored into [Logs], which keeps the exported file
+ * with the whole history of the session.
+ */
 object Log {
     private const val TAG = "VoxelCraft"
 
-    fun i(msg: String) = ALog.i(TAG, msg)
-    fun w(msg: String) = ALog.w(TAG, msg)
-    fun e(msg: String, t: Throwable? = null) = ALog.e(TAG, msg, t)
+    fun i(msg: String) {
+        ALog.i(TAG, msg)
+        Logs.info(TAG, msg)
+    }
+
+    fun w(msg: String) {
+        ALog.w(TAG, msg)
+        Logs.warn(TAG, msg)
+    }
+
+    fun e(msg: String, t: Throwable? = null) {
+        ALog.e(TAG, msg, t)
+        Logs.error(TAG, msg, t)
+    }
+
+    fun tag(name: String, msg: String) {
+        ALog.i(name, msg)
+        Logs.info(name, msg)
+    }
+
+    fun tagError(name: String, msg: String, t: Throwable? = null) {
+        ALog.e(name, msg, t)
+        Logs.error(name, msg, t)
+    }
 }

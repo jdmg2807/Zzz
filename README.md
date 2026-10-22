@@ -176,6 +176,30 @@ e impórtalo desde la pantalla **Mods** (o cópialo a `mods/`).
 > Los mods de Forge/Fabric **no** son compatibles: usan código de Minecraft y Mixin. Este
 > motor define su propia API para que puedas escribir mods en Java sin Minecraft.
 
+## Importar mundos de Minecraft Java
+
+Menú principal → **Importar mundo de Java** → elige el `.zip` del mundo (o una carpeta con
+`level.dat` y `region/`). El juego:
+
+1. Detecta la versión (1.8 → 1.21) leyendo `level.dat` (NBT).
+2. Lee las regiones `.mca` (formato Anvil, compresión zlib/gzip) y decodifica las paletas de
+   bloques, incluidas las empaquetadas en longs.
+3. Convierte un radio de 6 chunks alrededor del spawn y **mapea los bloques de Java** a la
+   paleta del juego (los desconocidos se listan en el log).
+4. Guarda el resultado como partida normal: se abre con «Continuar partida».
+
+## Logs
+
+Todo lo que pasa se escribe en un archivo de texto, incluidos los errores de shaders con el log
+del compilador y los bloques de Java que no tienen equivalente:
+
+```
+Descargas/VoxelCraft/voxelcraft-<fecha>.txt
+```
+
+Se guarda automáticamente al pausar, al importar algo y ante un crash. También puedes forzarlo
+desde **Ajustes → Guardar log en Descargas** o enviarlo con **Ajustes → Compartir log**.
+
 ## Historial de versiones
 
 Ver [CHANGELOG.md](CHANGELOG.md): v1.0 motor + mods/texturas/shaders, v1.1 biomas/vegetación/cielo,

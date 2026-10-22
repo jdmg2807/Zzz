@@ -17,7 +17,9 @@ class Block(
     val tintBottom: Boolean = false,
     val color: Int = 0x808080,
     /** Emitted light level 0..15. */
-    val light: Int = 0
+    val light: Int = 0,
+    /** Horizontal inset in blocks, e.g. 1/16 for cactus. 0 = full cube. */
+    val inset: Float = 0f
 )
 
 /**
@@ -71,7 +73,7 @@ object Blocks {
         add("obsidian", "obsidian", "obsidian", "obsidian", color = 0x2a1f3d)
         add("tnt", "tnt_top", "tnt_side", "tnt_top", color = 0xd4462c)
         add("glowstone", "glowstone", "glowstone", "glowstone", color = 0xc9a13c, light = 15)
-        add("cactus", "cactus_top", "cactus_side", "cactus_top", color = 0x2f7a35)
+        add("cactus", "cactus_top", "cactus_side", "cactus_top", color = 0x2f7a35, inset = 1f / 16f)
         add("spruce_log", "spruce_log_top", "spruce_log_side", "spruce_log_top", color = 0x3c2a17)
         add("spruce_leaves", "spruce_leaves", "spruce_leaves", "spruce_leaves", opaque = false, color = 0x33502F)
         add("birch_log", "birch_log_top", "birch_log_side", "birch_log_top", color = 0xd8d4c4)
@@ -94,9 +96,9 @@ object Blocks {
     private fun add(
         id: String,
         top: String, side: String, bottom: String,
-        solid: Boolean = true, opaque: Boolean = true, color: Int, light: Int = 0
+        solid: Boolean = true, opaque: Boolean = true, color: Int, light: Int = 0, inset: Float = 0f
     ) {
-        add(id, tile(top), tile(side), tile(bottom), solid, opaque, false, false, color, light = light)
+        add(id, tile(top), tile(side), tile(bottom), solid, opaque, false, false, color, light = light, inset = inset)
     }
 
     private fun addTinted(
@@ -123,12 +125,16 @@ object Blocks {
     private fun add(
         id: String, top: Int, side: Int, bottom: Int,
         solid: Boolean, opaque: Boolean, liquid: Boolean = false, cross: Boolean = false, color: Int,
-        tintTop: Boolean = false, tintSide: Boolean = false, tintBottom: Boolean = false, light: Int = 0
+        tintTop: Boolean = false, tintSide: Boolean = false, tintBottom: Boolean = false, light: Int = 0,
+        inset: Float = 0f
     ) {
         if (byId.containsKey(id)) return
         byId[id] = list.size
         list.add(
-            Block(id, top, side, bottom, solid, opaque, liquid, cross, tintTop, tintSide, tintBottom, color, light)
+            Block(
+                id, top, side, bottom, solid, opaque, liquid, cross,
+                tintTop, tintSide, tintBottom, color, light, inset
+            )
         )
     }
 
@@ -172,6 +178,129 @@ object Blocks {
     fun isOpaque(index: Int): Boolean = get(index).opaque
 
     fun isLiquid(index: Int): Boolean = get(index).liquid
+
+    /**
+     * Maps a Minecraft Java block id ("minecraft:grass_block") to our palette.
+     * Unknown blocks return air and are counted in [stats] so the log can list them.
+     */
+    fun fromMinecraft(rawName: String, stats: MutableMap<String, Int>? = null): Int {
+        val name = rawName.removePrefix("minecraft:")
+        val direct = byId[name]
+        if (direct != null) {
+            stats?.merge(name, 1, Int::plus)
+            return direct
+        }
+        VALID_ALIASES[name]?.let { alias ->
+            byId[alias]?.let {
+                stats?.merge(name, 1, Int::plus)
+                return it
+            }
+        }
+        // Heuristics for the hundreds of variants we do not model.
+        val guess = when {
+            name.contains("leaves") -> "leaves"
+            name == "spruce_leaves" -> "spruce_leaves"
+            name == "birch_leaves" -> "birch_leaves"
+            name.contains("log") || name.contains("wood") || name.contains("stem") -> "log"
+            name.contains("planks") || name.contains("fence") || name.contains("door") ||
+                name.contains("table") || name.contains("chest") || name.contains("shelf") -> "planks"
+            name.contains("cobble") -> "cobblestone"
+            name.contains("brick") -> "brick"
+            name.contains("sandstone") -> "sandstone"
+            name.contains("sand") -> "sand"
+            name.contains("gravel") -> "gravel"
+            name.contains("dirt") || name.contains("path") || name.contains("farmland") -> "dirt"
+            name.contains("grass") || name.contains("moss") -> "grass"
+            name.contains("snow") -> "snow"
+            name.contains("ice") -> "snow"
+            name.contains("water") -> "water"
+            name.contains("glass") -> "glass"
+            name.contains("coal") -> "coal_ore"
+            name.contains("iron_ore") -> "iron_ore"
+            name.contains("gold_ore") -> "gold_ore"
+            name.contains("diamond") -> "diamond_ore"
+            name.contains("obsidian") || name.contains("bedrock") -> "obsidian"
+            name.contains("torch") -> "torch"
+            name.contains("cactus") -> "cactus"
+            name.contains("wool") || name.contains("carpet") -> "snow"
+            name.contains("stone") -> "stone"
+            name.contains("air") -> null
+            else -> null
+        }
+        if (guess != null) {
+            byId[guess]?.let {
+                stats?.merge(name, 1, Int::plus)
+                return it
+            }
+        }
+        stats?.merge("?$name", 1, Int::plus)
+        return AIR
+    }
+
+    private val VALID_ALIASES = mapOf(
+        "grass_block" to "grass",
+        "short_grass" to "tall_grass",
+        "grass" to "tall_grass",
+        "fern" to "tall_grass",
+        "tall_grass" to "tall_grass",
+        "seagrass" to "tall_grass",
+        "kelp" to "tall_grass",
+        "oak_leaves" to "leaves",
+        "jungle_leaves" to "leaves",
+        "acacia_leaves" to "leaves",
+        "dark_oak_leaves" to "leaves",
+        "mangrove_leaves" to "leaves",
+        "azalea_leaves" to "leaves",
+        "oak_log" to "log",
+        "stripped_oak_log" to "log",
+        "birch_log" to "birch_log",
+        "spruce_log" to "spruce_log",
+        "oak_planks" to "planks",
+        "water" to "water",
+        "flowing_water" to "water",
+        "bubble_column" to "water",
+        "snow_block" to "snow",
+        "snow" to "snow",
+        "powder_snow" to "snow",
+        "glass" to "glass",
+        "glass_pane" to "glass",
+        "bricks" to "brick",
+        "stone_bricks" to "brick",
+        "coal_ore" to "coal_ore",
+        "deepslate_coal_ore" to "coal_ore",
+        "iron_ore" to "iron_ore",
+        "deepslate_iron_ore" to "iron_ore",
+        "gold_ore" to "gold_ore",
+        "diamond_ore" to "diamond_ore",
+        "deepslate_diamond_ore" to "diamond_ore",
+        "dead_bush" to "dead_bush",
+        "poppy" to "poppy",
+        "dandelion" to "dandelion",
+        "sugar_cane" to "sugar_cane",
+        "sand" to "sand",
+        "red_sand" to "sand",
+        "grass_path" to "dirt",
+        "dirt_path" to "dirt",
+        "coarse_dirt" to "dirt",
+        "podzol" to "dirt",
+        "mycelium" to "dirt",
+        "bedrock" to "bedrock",
+        "tnt" to "tnt",
+        "glowstone" to "glowstone",
+        "lava" to "glowstone",
+        "crying_obsidian" to "obsidian",
+        "granite" to "stone",
+        "diorite" to "stone",
+        "andesite" to "stone",
+        "deepslate" to "stone",
+        "tuff" to "stone",
+        "calcite" to "stone",
+        "ice" to "snow",
+        "packed_ice" to "snow",
+        "blue_ice" to "snow",
+        "clay" to "gravel",
+        "white_wool" to "snow"
+    )
 
     fun ids(): List<String> = list.map { it.id }
 

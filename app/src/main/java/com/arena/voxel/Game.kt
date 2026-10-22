@@ -2,6 +2,7 @@ package com.arena.voxel
 
 import android.content.Context
 import com.arena.voxel.core.Ctx
+import com.arena.voxel.core.Logs
 import com.arena.voxel.core.Log
 import com.arena.voxel.mods.ModLoader
 import com.arena.voxel.player.BlockHit
@@ -59,6 +60,12 @@ object Game {
     @Volatile var pendingLoad = false
         private set
 
+    @Volatile var importing = false
+        private set
+    @Volatile var importStatus = ""
+        private set
+    @Volatile var importResult: String? = null
+
     private var lookDX = 0f
     private var lookDY = 0f
     private val lookLock = Any()
@@ -80,6 +87,37 @@ object Game {
                 listOf("grass", "dirt", "stone", "cobblestone", "planks", "log", "leaves", "sand", "glass")
             )
         }
+    }
+
+    /** Imports a Minecraft Java world in the background, then opens it. */
+    fun importMinecraftWorld(uri: android.net.Uri, onDone: (String) -> Unit) {
+        if (importing) return
+        importing = true
+        importStatus = "Leyendo el mundo de Minecraft..."
+        importResult = null
+        Thread {
+            val work = File(Ctx.base, "imports").apply { mkdirs() }
+            val result = try {
+                com.arena.voxel.imports.McWorldImporter.importWorld(uri, work)
+            } catch (t: Throwable) {
+                Log.e("Import falló", t)
+                null
+            }
+            importing = false
+            val message = result?.message ?: "Error inesperado al importar (revisa el log)"
+            importStatus = message
+            importResult = message
+            if (result?.success == true) {
+                chat("Mundo importado: ${result.chunks} chunks")
+                startLoadedWorld()
+            } else {
+                chat("No se pudo importar el mundo")
+            }
+            // Always export the log so the user can share what happened.
+            val exported = com.arena.voxel.core.Logs.exportToDownloads(Ctx.app)
+            Logs.info("IMPORT", exported)
+            onDone(message)
+        }.start()
     }
 
     fun startNewWorld(seed: Long) {

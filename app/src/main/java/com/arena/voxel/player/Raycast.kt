@@ -9,6 +9,18 @@ data class BlockHit(val x: Int, val y: Int, val z: Int, val nx: Int, val ny: Int
 /** Amanatides & Woo voxel traversal. */
 object Raycast {
 
+    /**
+     * Everything except air and liquids can be targeted: torches, flowers, tall grass and sugar
+     * cane used to be ignored because only solid blocks were tested, which made them impossible
+     * to break.
+     */
+    private fun hitTest(world: World, x: Int, y: Int, z: Int): Boolean {
+        val id = world.get(x, y, z)
+        if (id == 0) return false
+        val block = com.arena.voxel.world.Blocks.get(id)
+        return !block.liquid
+    }
+
     fun cast(world: World, ox: Double, oy: Double, oz: Double, dx: Double, dy: Double, dz: Double, maxDist: Double): BlockHit? {
         var x = floor(ox).toInt()
         var y = floor(oy).toInt()
@@ -31,7 +43,7 @@ object Raycast {
         var nz = 0
         var t = 0.0
 
-        if (world.isSolid(x, y, z) && world.get(x, y, z) != 0) {
+        if (hitTest(world, x, y, z)) {
             return BlockHit(x, y, z, 0, 1, 0)
         }
 
@@ -59,8 +71,7 @@ object Raycast {
                 nz = -stepZ
             }
             if (t > maxDist) break
-            val b = world.get(x, y, z)
-            if (b != 0 && world.isSolid(x, y, z)) {
+            if (hitTest(world, x, y, z)) {
                 return BlockHit(x, y, z, nx, ny, nz)
             }
         }
