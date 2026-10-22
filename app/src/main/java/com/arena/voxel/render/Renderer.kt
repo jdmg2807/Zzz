@@ -590,6 +590,10 @@ class Renderer : GLSurfaceView.Renderer {
     }
 
     private fun placeBlock(w: World, hit: BlockHit) {
+        // Holding a tool, a food or any other non-block item: nothing to place.
+        val heldItem = Game.selectedItem()
+        if (Game.selectedBlock() == "air" && heldItem != "air") return
+
         // Storage blocks open their GUI on a tap with an empty hand, like a right click.
         if (Game.selectedBlock() == "air") {
             val id = Blocks.get(w.get(hit.x, hit.y, hit.z)).id
@@ -632,10 +636,10 @@ class Renderer : GLSurfaceView.Renderer {
         if (w.set(x, y, z, blockIndex)) {
             com.arena.voxel.core.Sounds.play("place", 0.6f)
             if (!Game.creative) {
-                val slot = Game.inventory.selected
-                val held = Game.inventory.get(slot)
+                // Survival consumes one of the held block, exactly like Java's `BlockItem`.
+                val held = Game.inventory.held()
                 if (held != null && held.id == id) {
-                    Game.inventory.shrink(slot, 1)
+                    Game.inventory.consumeHeld(1)
                     Game.syncHotbar()
                 }
             }
@@ -661,7 +665,7 @@ class Renderer : GLSurfaceView.Renderer {
         com.arena.voxel.core.Sounds.play("eat", 0.5f)
         Game.chat("Has comido ${com.arena.voxel.items.Items.nameOf(heldId)}")
         if (!Game.creative) {
-            Game.inventory.shrink(Game.inventory.selected, 1)
+            Game.inventory.consumeHeld(1)
             Game.syncHotbar()
         }
         return true

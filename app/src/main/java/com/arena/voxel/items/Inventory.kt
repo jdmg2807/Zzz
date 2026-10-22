@@ -73,6 +73,28 @@ class Inventory(val size: Int = 36) {
     /** Selected stack, or null. */
     fun held(): ItemStack? = slots.getOrNull(selected)
 
+    /** Adds `count` of an item by id; returns the leftovers. */
+    fun addItem(id: String, count: Int = 1): Int = add(ItemStack(id, count))
+
+    /** Consumes from the held stack (placing a block, eating, shooting). */
+    fun consumeHeld(amount: Int = 1): Boolean {
+        val s = slots.getOrNull(selected) ?: return false
+        s.count -= amount
+        if (s.count <= 0) slots[selected] = null
+        return true
+    }
+
+    /** Drops everything and returns the stacks (death, /clear). */
+    fun drain(): List<ItemStack> {
+        val out = ArrayList<ItemStack>()
+        for (i in slots.indices) {
+            val s = slots[i] ?: continue
+            out.add(s)
+            slots[i] = null
+        }
+        return out
+    }
+
     /** Java's middle-click / pick block: move an existing stack to the hotbar. */
     fun pickToHotbar(id: String) {
         for (i in 0 until size) {

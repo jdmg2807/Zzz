@@ -182,7 +182,7 @@ fun GameScreen(onExit: () -> Unit) {
             GuiScreen(Settings.guiScale) { gui ->
                 GameHud(gui, tick) {
                     // "E": inventory with the 2x2 crafting grid (creative has the tabs inside).
-                    container = ContainerMode.INVENTORY
+                    container = if (Game.creative) ContainerMode.CREATIVE else ContainerMode.INVENTORY
                 }
             }
             Joystick(Modifier.align(Alignment.BottomStart).padding(start = 26.dp, bottom = 26.dp).size(150.dp))
