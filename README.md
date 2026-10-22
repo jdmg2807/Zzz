@@ -44,6 +44,7 @@ Requisitos: Android 7.0+ (API 24) con OpenGL ES 3.0.
 | **Resource packs de Minecraft Java** (.zip o carpeta, modernos y legacy) | ✅ |
 | **Shader packs** (reemplazan terrain/water/sky/post con GLSL ES 3.0) | ✅ |
 | **Mods en .jar** con API Java (bloques, texturas, HUD, mundo, chat) | ✅ |
+| Selector de bloques (también muestra los bloques de los mods) | ✅ |
 | Interfaz Compose: menú, mods, packs, ajustes, HUD táctil | ✅ |
 
 ## Controles
@@ -54,6 +55,7 @@ Requisitos: Android 7.0+ (API 24) con OpenGL ES 3.0.
 - **Pulsación larga**: romper el bloque apuntado.
 - **↥**: saltar / subir volando. **↧**: bajar volando. **✈**: activar vuelo creativo.
 - **⛏ / ■**: romper / colocar (botones dedicados).
+- **▦**: selector de bloques (incluye los bloques añadidos por mods) para la ranura activa.
 - **II** (arriba a la derecha): pausa, guardar y salir.
 
 ## Carpetas del juego

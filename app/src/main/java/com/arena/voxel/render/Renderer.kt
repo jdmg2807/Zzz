@@ -213,10 +213,6 @@ class Renderer : GLSurfaceView.Renderer {
 
             Game.setProgress(0.20f, "Generando atlas de texturas...")
             uploadAtlas()
-            val validSlots = Game.hotbar.filter { Blocks.index(it) != 0 }
-            Game.hotbar.clear()
-            Game.hotbar.addAll(validSlots)
-            Game.initHotbar()
 
             var w: World
             var p: Player
@@ -243,6 +239,12 @@ class Renderer : GLSurfaceView.Renderer {
                 val spawn = w.gen.spawnPoint()
                 p = Player(spawn.first, spawn.second, spawn.third)
             }
+
+            // Drop hotbar slots that point to blocks which no longer exist (removed mods).
+            val validSlots = Game.hotbar.filter { Blocks.index(it) != 0 }
+            Game.hotbar.clear()
+            Game.hotbar.addAll(validSlots)
+            Game.initHotbar()
 
             world = w
             player = p

@@ -149,6 +149,7 @@ fun MainMenu(
 ) {
     val context = LocalContext.current
     val hasSave = remember { Game.hasSave }
+    val modCount = remember { ModLoader.scan().count { it.error == null } }
     Box(
         Modifier
             .fillMaxSize()
@@ -213,7 +214,7 @@ fun MainMenu(
 
             Spacer(Modifier.height(18.dp))
             Text(
-                "Versión ${BuildConfig.VERSION_NAME} · ${ModLoader.scan().count { it.loaded || it.error == null }} mod(s) instalados",
+                "Versión ${BuildConfig.VERSION_NAME} · $modCount mod(s) instalados",
                 color = Color(0xFF6B7A80),
                 fontSize = 11.sp
             )
