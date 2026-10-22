@@ -73,6 +73,7 @@ fun GameScreen(onExit: () -> Unit) {
     var tick by remember { mutableIntStateOf(0) }
     var paused by remember { mutableStateOf(false) }
     var picker by remember { mutableStateOf(false) }
+    var container by remember { mutableStateOf<ContainerMode?>(null) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -82,11 +83,15 @@ fun GameScreen(onExit: () -> Unit) {
     }
 
     BackHandler {
-        if (picker) picker = false else paused = true
+        when {
+            container != null -> container = null
+            picker -> picker = false
+            else -> paused = true
+        }
     }
 
-    LaunchedEffect(paused, picker) {
-        Game.paused = paused || picker
+    LaunchedEffect(paused, picker, container) {
+        Game.paused = paused || picker || container != null
     }
 
     val lifecycleOwner = context as? LifecycleOwner
@@ -150,7 +155,12 @@ fun GameScreen(onExit: () -> Unit) {
 
             HudInfo(tick)
             Crosshair()
-            Hotbar(tick)
+            GuiScreen(Settings.guiScale) { gui ->
+                GameHud(gui, tick) {
+                    // "E": inventory with the 2x2 crafting grid (creative has the tabs inside).
+                    container = ContainerMode.INVENTORY
+                }
+            }
             Joystick(Modifier.align(Alignment.BottomStart).padding(start = 26.dp, bottom = 26.dp).size(150.dp))
             Controls(tick, onOpenPicker = { picker = true })
 
@@ -170,6 +180,12 @@ fun GameScreen(onExit: () -> Unit) {
                 },
                 onClose = { picker = false }
             )
+        }
+
+        container?.let { mode ->
+            GuiScreen(Settings.guiScale) { gui ->
+                ContainerScreen(gui, mode) { container = null }
+            }
         }
 
         if (paused) {

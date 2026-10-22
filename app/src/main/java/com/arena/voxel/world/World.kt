@@ -99,13 +99,19 @@ class World(val seed: Long) {
         }
     }
 
-    fun save(dir: File, player: com.arena.voxel.player.Player, hotbar: List<String>, selected: Int) {
+    fun save(
+        dir: File,
+        player: com.arena.voxel.player.Player,
+        hotbar: List<String>,
+        selected: Int,
+        inventory: String = ""
+    ) {
         try {
             dir.mkdirs()
             File(dir, "level.dat").outputStream().use { fos ->
                 GZIPOutputStream(fos).use { gz ->
                     DataOutputStream(gz).use { out ->
-                        out.writeInt(MAGIC2)
+                        out.writeInt(MAGIC3)
                         out.writeInt(HEIGHT)
                         out.writeLong(seed)
                         // Palette of block ids, so saves survive palette changes between versions.
@@ -121,6 +127,11 @@ class World(val seed: Long) {
                         out.writeInt(selected)
                         out.writeInt(hotbar.size)
                         for (h in hotbar) out.writeUTF(h)
+                        // v1.7: full player state (inventory, health, hunger) as one string.
+                        out.writeUTF(
+                            "$inventory#${player.health.toInt()},${player.food}," +
+                                "${player.air},${player.experience.toInt()},${player.level}"
+                        )
                         val list = chunks.values.filter { it.generated }
                         out.writeInt(list.size)
                         for (c in list) {
@@ -154,16 +165,23 @@ class World(val seed: Long) {
         fun keyOfStatic(cx: Int, cz: Int): Long =
             (cx.toLong() shl 32) xor (cz.toLong() and 0xffffffffL)
 
-        /** "VCX1": original format (height 80). "VCX2": stores the world height. */
+        /** "VCX1": original (height 80). "VCX2": stores height. "VCX3": + player state. */
         private const val MAGIC = 0x56435831
         private const val MAGIC2 = 0x56435832
+        private const val MAGIC3 = 0x56435833
 
         class Loaded(
             val world: World,
             val player: com.arena.voxel.player.Player,
             val hotbar: List<String>,
             val selected: Int,
-            val legacy: Boolean
+            val legacy: Boolean,
+            val inventory: String = "",
+            val health: Float = 20f,
+            val food: Int = 20,
+            val air: Int = 300,
+            val experience: Int = 0,
+            val level: Int = 0
         )
 
         /** Loads a saved world. Returns null when there is no save or it is corrupt. */
@@ -174,9 +192,10 @@ class World(val seed: Long) {
                 GZIPInputStream(f.inputStream()).use { gz ->
                     DataInputStream(gz).use { inp ->
                         val first = inp.readInt()
-                        val modern = first == MAGIC2 || first == MAGIC
+                        val v3 = first == MAGIC3
+                        val modern = v3 || first == MAGIC2 || first == MAGIC
                         var savedHeight = 80
-                        if (first == MAGIC2) savedHeight = inp.readInt()
+                        if (v3 || first == MAGIC2) savedHeight = inp.readInt()
                         val seed = if (modern) {
                             inp.readLong()
                         } else {
@@ -204,6 +223,25 @@ class World(val seed: Long) {
                         val hotCount = inp.readInt()
                         val hotbar = ArrayList<String>()
                         for (i in 0 until hotCount) hotbar.add(inp.readUTF())
+                        var invText = ""
+                        var health = 20f
+                        var food = 20
+                        var air = 300
+                        var xp = 0
+                        var lvl = 0
+                        if (v3) {
+                            val packed = inp.readUTF()
+                            val bar = packed.indexOf('#')
+                            invText = if (bar >= 0) packed.substring(0, bar) else packed
+                            if (bar >= 0) {
+                                val nums = packed.substring(bar + 1).split(',')
+                                health = nums.getOrNull(0)?.toFloatOrNull() ?: 20f
+                                food = nums.getOrNull(1)?.toIntOrNull() ?: 20
+                                air = nums.getOrNull(2)?.toIntOrNull() ?: 300
+                                xp = nums.getOrNull(3)?.toIntOrNull() ?: 0
+                                lvl = nums.getOrNull(4)?.toIntOrNull() ?: 0
+                            }
+                        }
                         val count = inp.readInt()
                         for (i in 0 until count) {
                             val cx = inp.readInt()
@@ -248,7 +286,12 @@ class World(val seed: Long) {
                         val p = com.arena.voxel.player.Player(px, py, pz)
                         p.yaw = yaw
                         p.pitch = pitch
-                        Loaded(world, p, hotbar, selected, !modern)
+                        p.health = health
+                        p.food = food
+                        p.air = air
+                        p.experience = xp.toFloat()
+                        p.level = lvl
+                        Loaded(world, p, hotbar, selected, !modern, invText, health, food, air, xp, lvl)
                     }
                 }
             } catch (t: Throwable) {

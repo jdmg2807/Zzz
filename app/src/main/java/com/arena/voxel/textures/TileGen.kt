@@ -57,7 +57,24 @@ object TileGen {
         "stone_bricks" to 0x7a7a7a, "mossy_cobblestone" to 0x6c7a5f, "deepslate" to 0x4a4a50,
         "andesite" to 0x8a8a8d, "granite" to 0x9a6b58, "diorite" to 0xc4c4ca,
         "tuff" to 0x6d6e63, "calcite" to 0xdfdfda, "clay" to 0x9ea4b4,
-        "netherrack" to 0x6b2b2b, "ice" to 0x9fc7f0, "packed_ice" to 0x8fb6e8
+        "netherrack" to 0x6b2b2b, "ice" to 0x9fc7f0, "packed_ice" to 0x8fb6e8,
+        // v1.7.0
+        "stone_slab" to 0x8a8a8a, "cobblestone_slab" to 0x7d7d7d, "sandstone_slab" to 0xd8cb92,
+        "carpet_red" to 0x9e2a2a,
+        "spruce_planks" to 0x735436, "birch_planks" to 0xc8b78a, "dark_oak_planks" to 0x4b3520,
+        "jungle_planks" to 0xa0704a, "acacia_planks" to 0xb05b2a, "mangrove_planks" to 0x773932,
+        "cherry_planks" to 0xe3b0a5, "bamboo_planks" to 0xc3a44a,
+        "white_wool" to 0xe9ecec, "black_wool" to 0x1d1d21, "red_wool" to 0xa12722,
+        "blue_wool" to 0x35399d, "green_wool" to 0x546d1b, "yellow_wool" to 0xf0c123,
+        "iron_block" to 0xd8d8d8, "gold_block" to 0xf6d743, "diamond_block" to 0x4fd6cf,
+        "emerald_block" to 0x2ecc71, "coal_block" to 0x1a1a1a,
+        "copper_block" to 0xc06a4a, "exposed_copper" to 0xa57a63,
+        "weathered_copper" to 0x6f9a7c, "oxidized_copper" to 0x529f7a,
+        "chiseled_copper" to 0xb86a4a,
+        "crafter_top" to 0x9a7a55, "crafter_side" to 0x8a6a4a, "crafter_bottom" to 0x6d5236,
+        "vault_front" to 0x4d5257, "vault_side" to 0x5b5b5b, "vault_top" to 0x6b6f73,
+        "trial_spawner_side" to 0x39424a, "trial_spawner_top" to 0x2b333a,
+        "deepslate_bricks" to 0x3f4045, "mud_bricks" to 0x89685a, "quartz_block" to 0xe8e3d8
     )
 
     /** Names that exist in several biome variants. */

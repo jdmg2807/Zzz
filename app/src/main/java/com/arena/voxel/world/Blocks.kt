@@ -21,14 +21,23 @@ class Block(
     /** Horizontal inset in blocks, e.g. 1/16 for cactus. 0 = full cube. */
     val inset: Float = 0f,
     /** Vertical cut in blocks, e.g. 1/16 for the 15/16 cactus. 0 = full height. */
-    val heightCut: Float = 0f
+    val heightCut: Float = 0f,
+    /** Collision + mesh boxes. Empty for plants, torches and liquids. */
+    val shape: BlockShape = BlockShape.FULL,
+    /** How long it takes to break bare-handed, in the same units as the wiki. */
+    val hardness: Float = 1f,
+    /** Preferred tool: "pickaxe", "axe", "shovel", "hoe", "" (none). */
+    val tool: String = ""
 ) {
     /**
      * True when the block hides the face of its neighbour. Only full cubes do: an inset block
      * (cactus), a crossed plant or a liquid must never cull the neighbour face, otherwise a
      * 1/16 hole appears around it and you can see through the terrain.
      */
-    val occludes: Boolean get() = opaque && !cross && inset <= 0f && heightCut <= 0f
+    val occludes: Boolean get() = opaque && !cross && inset <= 0f && heightCut <= 0f && shape.isFullCube
+
+    /** True when the block can be walked on / stands in the way. */
+    val collides: Boolean get() = !shape.isEmpty
 }
 
 /**
@@ -109,7 +118,87 @@ object Blocks {
         add("netherrack", "netherrack", "netherrack", "netherrack", color = 0x6b2b2b)
         add("packed_ice", "packed_ice", "packed_ice", "packed_ice", color = 0x8fb6e8)
         add("ice", "ice", "ice", "ice", opaque = false, color = 0x9fc7f0)
+
+        // ---- v1.7.0: non-full shapes (slabs, stairs, fences) -----------------------------
+        add("stone_slab", "stone_slab", "stone_slab", "stone_slab", color = 0x8a8a8a,
+            shape = BlockShape.SLAB_BOTTOM, hardness = 2f, tool = "pickaxe")
+        add("cobblestone_slab", "cobblestone_slab", "cobblestone_slab", "cobblestone_slab",
+            color = 0x7d7d7d, shape = BlockShape.SLAB_BOTTOM, hardness = 2f, tool = "pickaxe")
+        add("oak_slab", "oak_planks", "oak_planks", "oak_planks", color = 0xa9834f,
+            shape = BlockShape.SLAB_BOTTOM, hardness = 2f, tool = "axe")
+        add("sandstone_slab", "sandstone_slab", "sandstone_slab", "sandstone_slab",
+            color = 0xd8cb92, shape = BlockShape.SLAB_BOTTOM, hardness = 2f, tool = "pickaxe")
+        add("stone_brick_slab", "stone_bricks", "stone_bricks", "stone_bricks", color = 0x7a7a7a,
+            shape = BlockShape.SLAB_BOTTOM, hardness = 1.5f, tool = "pickaxe")
+        add("stone_slab_top", "stone_slab", "stone_slab", "stone_slab", color = 0x8a8a8a,
+            shape = BlockShape.SLAB_TOP, hardness = 2f, tool = "pickaxe")
+        add("cobblestone_stairs", "cobblestone", "cobblestone", "cobblestone", color = 0x7d7d7d,
+            shape = BlockShape.STAIRS_NORTH, hardness = 2f, tool = "pickaxe")
+        add("stone_stairs", "stone", "stone", "stone", color = 0x8a8a8a,
+            shape = BlockShape.STAIRS_NORTH, hardness = 1.5f, tool = "pickaxe")
+        add("oak_stairs", "oak_planks", "oak_planks", "oak_planks", color = 0xa9834f,
+            shape = BlockShape.STAIRS_NORTH, hardness = 2f, tool = "axe")
+        add("stone_brick_stairs", "stone_bricks", "stone_bricks", "stone_bricks", color = 0x7a7a7a,
+            shape = BlockShape.STAIRS_NORTH, hardness = 1.5f, tool = "pickaxe")
+        add("oak_fence", "oak_planks", "oak_planks", "oak_planks", opaque = false, color = 0xa9834f,
+            shape = BlockShape.FENCE, hardness = 2f, tool = "axe")
+        add("cobblestone_wall", "cobblestone", "cobblestone", "cobblestone", opaque = false,
+            color = 0x7d7d7d, shape = BlockShape.FENCE, hardness = 2f, tool = "pickaxe")
+        add("carpet_red", "carpet_red", "carpet_red", "carpet_red", opaque = false, color = 0x9e2a2a,
+            shape = BlockShape.LAYER, hardness = 0.1f)
+        add("snow_layer", "snow", "snow", "snow", opaque = false, color = 0xf2f6fa,
+            shape = BlockShape.LAYER, hardness = 0.1f, tool = "shovel")
+
+        // ---- v1.7.0: wood and colour palette (building blocks people expect) ---------------
+        add("spruce_planks", "spruce_planks", "spruce_planks", "spruce_planks", color = 0x735436, hardness = 2f, tool = "axe")
+        add("birch_planks", "birch_planks", "birch_planks", "birch_planks", color = 0xc8b78a, hardness = 2f, tool = "axe")
+        add("dark_oak_planks", "dark_oak_planks", "dark_oak_planks", "dark_oak_planks", color = 0x4b3520, hardness = 2f, tool = "axe")
+        add("jungle_planks", "jungle_planks", "jungle_planks", "jungle_planks", color = 0xa0704a, hardness = 2f, tool = "axe")
+        add("acacia_planks", "acacia_planks", "acacia_planks", "acacia_planks", color = 0xb05b2a, hardness = 2f, tool = "axe")
+        add("mangrove_planks", "mangrove_planks", "mangrove_planks", "mangrove_planks", color = 0x773932, hardness = 2f, tool = "axe")
+        add("cherry_planks", "cherry_planks", "cherry_planks", "cherry_planks", color = 0xe3b0a5, hardness = 2f, tool = "axe")
+        add("bamboo_planks", "bamboo_planks", "bamboo_planks", "bamboo_planks", color = 0xc3a44a, hardness = 2f, tool = "axe")
+
+        add("white_wool", "white_wool", "white_wool", "white_wool", color = 0xe9ecec, hardness = 0.8f)
+        add("black_wool", "black_wool", "black_wool", "black_wool", color = 0x1d1d21, hardness = 0.8f)
+        add("red_wool", "red_wool", "red_wool", "red_wool", color = 0xa12722, hardness = 0.8f)
+        add("blue_wool", "blue_wool", "blue_wool", "blue_wool", color = 0x35399d, hardness = 0.8f)
+        add("green_wool", "green_wool", "green_wool", "green_wool", color = 0x546d1b, hardness = 0.8f)
+        add("yellow_wool", "yellow_wool", "yellow_wool", "yellow_wool", color = 0xf0c123, hardness = 0.8f)
+
+        add("iron_block", "iron_block", "iron_block", "iron_block", color = 0xd8d8d8, hardness = 5f, tool = "pickaxe")
+        add("gold_block", "gold_block", "gold_block", "gold_block", color = 0xf6d743, hardness = 3f, tool = "pickaxe")
+        add("diamond_block", "diamond_block", "diamond_block", "diamond_block", color = 0x4fd6cf, hardness = 5f, tool = "pickaxe")
+        add("emerald_block", "emerald_block", "emerald_block", "emerald_block", color = 0x2ecc71, hardness = 5f, tool = "pickaxe")
+        add("coal_block", "coal_block", "coal_block", "coal_block", color = 0x1a1a1a, hardness = 5f, tool = "pickaxe")
+
+        // 1.21 copper family: normal, exposed, weathered, oxidised (+ chiselled variants).
+        add("copper_block", "copper_block", "copper_block", "copper_block", color = 0xc06a4a, hardness = 3f, tool = "pickaxe")
+        add("exposed_copper", "exposed_copper", "exposed_copper", "exposed_copper", color = 0xa57a63, hardness = 3f, tool = "pickaxe")
+        add("weathered_copper", "weathered_copper", "weathered_copper", "weathered_copper", color = 0x6f9a7c, hardness = 3f, tool = "pickaxe")
+        add("oxidized_copper", "oxidized_copper", "oxidized_copper", "oxidized_copper", color = 0x529f7a, hardness = 3f, tool = "pickaxe")
+        add("chiseled_copper", "chiseled_copper", "chiseled_copper", "chiseled_copper", color = 0xb86a4a, hardness = 3f, tool = "pickaxe")
+        add("waxed_copper_block", "copper_block", "copper_block", "copper_block", color = 0xc97757, hardness = 3f, tool = "pickaxe")
+
+        // 1.21 functional blocks (behaviour hooks arrive with redstone/containers).
+        add("crafter", "crafter_top", "crafter_side", "crafter_bottom", color = 0x8a6a4a, hardness = 1.5f, tool = "pickaxe")
+        add("vault", "vault_front", "vault_side", "vault_top", opaque = false, color = 0x5b5b5b, light = 7, hardness = 50f, tool = "pickaxe")
+        add("trial_spawner", "trial_spawner_side", "trial_spawner_side", "trial_spawner_top",
+            opaque = false, color = 0x39424a, light = 4, hardness = 50f, tool = "pickaxe")
+        add("deepslate_bricks", "deepslate_bricks", "deepslate_bricks", "deepslate_bricks", color = 0x3f4045, hardness = 3.5f, tool = "pickaxe")
+        add("mud_bricks", "mud_bricks", "mud_bricks", "mud_bricks", color = 0x89685a, hardness = 1.5f, tool = "pickaxe")
+        add("quartz_block", "quartz_block", "quartz_block", "quartz_block", color = 0xe8e3d8, hardness = 0.8f, tool = "pickaxe")
     }
+
+    /** Hardness / tool table for the blocks declared before v1.7.0 (used by mining speed). */
+    private val HARDNESS = mapOf(
+        "grass" to 0.6f, "dirt" to 0.5f, "sand" to 0.5f, "gravel" to 0.6f, "clay" to 0.6f,
+        "stone" to 1.5f, "cobblestone" to 2f, "stone_bricks" to 1.5f, "deepslate" to 3f,
+        "obsidian" to 50f, "bedrock" to -1f, "planks" to 2f, "oak_planks" to 2f, "log" to 2f,
+        "leaves" to 0.2f, "glass" to 0.3f, "glowstone" to 0.3f, "snow" to 0.2f, "ice" to 0.5f,
+        "packed_ice" to 0.5f, "coal_ore" to 3f, "iron_ore" to 3f, "gold_ore" to 3f,
+        "diamond_ore" to 3f, "brick" to 2f, "tnt" to 0f, "cactus" to 0.4f, "netherrack" to 0.4f
+    )
 
     /**
      * Makes the palette usable from any thread/screen.
@@ -132,11 +221,12 @@ object Blocks {
         id: String,
         top: String, side: String, bottom: String,
         solid: Boolean = true, opaque: Boolean = true, color: Int, light: Int = 0, inset: Float = 0f,
-        heightCut: Float = 0f
+        heightCut: Float = 0f, shape: BlockShape = BlockShape.FULL, hardness: Float = 1f, tool: String = ""
     ) {
         add(
             id, tile(top), tile(side), tile(bottom), solid, opaque, false, false, color,
-            light = light, inset = inset, heightCut = heightCut
+            light = light, inset = inset, heightCut = heightCut, shape = shape,
+            hardness = hardness, tool = tool
         )
     }
 
@@ -149,30 +239,38 @@ object Blocks {
     ) {
         add(
             id, tile(top), tile(side), tile(bottom), solid, opaque, false, cross, color,
-            tintTop, tintSide, tintBottom
+            tintTop, tintSide, tintBottom,
+            shape = if (cross) BlockShape.EMPTY else BlockShape.FULL
         )
     }
 
     private fun addLiquid(id: String, texture: String, color: Int) {
-        add(id, tile(texture), tile(texture), tile(texture), false, false, true, false, color, true, true, true)
+        add(
+            id, tile(texture), tile(texture), tile(texture), false, false, true, false, color,
+            true, true, true, shape = BlockShape.EMPTY
+        )
     }
 
     private fun addCross(id: String, texture: String, color: Int, light: Int = 0) {
-        add(id, tile(texture), tile(texture), tile(texture), false, false, false, true, color, light = light)
+        add(
+            id, tile(texture), tile(texture), tile(texture), false, false, false, true, color,
+            light = light, shape = BlockShape.EMPTY
+        )
     }
 
     private fun add(
         id: String, top: Int, side: Int, bottom: Int,
         solid: Boolean, opaque: Boolean, liquid: Boolean = false, cross: Boolean = false, color: Int,
         tintTop: Boolean = false, tintSide: Boolean = false, tintBottom: Boolean = false, light: Int = 0,
-        inset: Float = 0f, heightCut: Float = 0f
+        inset: Float = 0f, heightCut: Float = 0f, shape: BlockShape = BlockShape.FULL,
+        hardness: Float = 1f, tool: String = ""
     ) {
         if (byId.containsKey(id)) return
         byId[id] = list.size
         list.add(
             Block(
                 id, top, side, bottom, solid, opaque, liquid, cross,
-                tintTop, tintSide, tintBottom, color, light, inset, heightCut
+                tintTop, tintSide, tintBottom, color, light, inset, heightCut, shape, hardness, tool
             )
         )
     }

@@ -40,7 +40,17 @@ object Textures {
         "torch", "crack_1", "crack_2", "crack_3", "crack_4", "crack_5", "crack_6",
         // Added in v1.6.0 (appended so the palette indices of older saves stay valid).
         "stone_bricks", "mossy_cobblestone", "deepslate", "andesite", "granite", "diorite",
-        "tuff", "calcite", "clay", "netherrack", "ice", "packed_ice"
+        "tuff", "calcite", "clay", "netherrack", "ice", "packed_ice",
+        // v1.7.0 shapes and building palette (appended, indices stay stable)
+        "stone_slab", "cobblestone_slab", "sandstone_slab", "carpet_red",
+        "spruce_planks", "birch_planks", "dark_oak_planks", "jungle_planks",
+        "acacia_planks", "mangrove_planks", "cherry_planks", "bamboo_planks",
+        "white_wool", "black_wool", "red_wool", "blue_wool", "green_wool", "yellow_wool",
+        "iron_block", "gold_block", "diamond_block", "emerald_block", "coal_block",
+        "copper_block", "exposed_copper", "weathered_copper", "oxidized_copper",
+        "chiseled_copper", "crafter_top", "crafter_side", "crafter_bottom",
+        "vault_front", "vault_side", "vault_top", "trial_spawner_side", "trial_spawner_top",
+        "deepslate_bricks", "mud_bricks", "quartz_block"
     )
 
     /** Tiles rendered once per biome. */

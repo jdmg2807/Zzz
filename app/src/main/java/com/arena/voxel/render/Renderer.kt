@@ -313,10 +313,19 @@ class Renderer : GLSurfaceView.Renderer {
                     }
                     w = loaded.world
                     p = loaded.player
-                    Game.hotbar.clear()
-                    Game.hotbar.addAll(loaded.hotbar)
-                    Game.selectedSlot = loaded.selected
-                    Game.initHotbar()
+                    // v1.7: restore the full inventory; older saves only had a hotbar.
+                    if (loaded.inventory.isNotBlank()) {
+                        Game.inventory.load(loaded.inventory)
+                    } else {
+                        Game.inventory.slots.fill(null)
+                        loaded.hotbar.forEachIndexed { i, id ->
+                            if (i < 9 && id != "air") {
+                                Game.inventory.set(i, com.arena.voxel.items.ItemStack(id, 64))
+                            }
+                        }
+                    }
+                    Game.inventory.selected = loaded.selected
+                    Game.syncHotbar()
                 } else {
                     Game.chat("No se encontró partida guardada; mundo nuevo")
                     val seed = System.currentTimeMillis()
@@ -332,11 +341,16 @@ class Renderer : GLSurfaceView.Renderer {
                 p = Player(spawn.first, spawn.second, spawn.third)
             }
 
-            // Drop hotbar slots that point to blocks which no longer exist (removed mods).
-            val validSlots = Game.hotbar.filter { Blocks.index(it) != 0 }
-            Game.hotbar.clear()
-            Game.hotbar.addAll(validSlots)
+            // Drop items that no longer exist (removed mods) and mirror the inventory.
+            for (i in 0 until Game.inventory.size) {
+                val stack = Game.inventory.get(i) ?: continue
+                if (!com.arena.voxel.items.Items.exists(stack.id)) Game.inventory.set(i, null)
+            }
+            Game.creative = !com.arena.voxel.Settings.survival
             Game.initHotbar()
+            Game.syncHotbar()
+            if (!com.arena.voxel.Settings.survival && Game.inventory.isEmpty()) Game.inventory.giveStarterKit()
+            Game.syncHotbar()
 
             world = w
             player = p
@@ -559,7 +573,9 @@ class Renderer : GLSurfaceView.Renderer {
         val id = Game.selectedBlock()
         val blockIndex = Blocks.index(id)
         if (blockIndex == Blocks.AIR) {
-            Game.chat("Ese bloque ya no existe (¿mod desinstalado?)")
+            // Holding a tool, food or an item that is not a block: nothing to place.
+            if (id == "air") return
+            Game.chat("Estás sosteniendo ${com.arena.voxel.items.Items.nameOf(id)} (no es un bloque)")
             return
         }
         if (hitsPlayer(p, x, y, z)) {
@@ -567,6 +583,14 @@ class Renderer : GLSurfaceView.Renderer {
             return
         }
         if (w.set(x, y, z, blockIndex)) {
+            if (!Game.creative) {
+                val slot = Game.inventory.selected
+                val held = Game.inventory.get(slot)
+                if (held != null && held.id == id) {
+                    Game.inventory.shrink(slot, 1)
+                    Game.syncHotbar()
+                }
+            }
             ModLoader.blockPlaced(x, y, z, id)
         }
     }
@@ -578,6 +602,11 @@ class Renderer : GLSurfaceView.Renderer {
             return
         }
         if (w.set(hit.x, hit.y, hit.z, 0)) {
+            if (!Game.creative) {
+                if (id != "air" && com.arena.voxel.items.Items.exists(id)) {
+                    Game.give(id, 1)
+                }
+            }
             ModLoader.blockBroken(hit.x, hit.y, hit.z, id)
         }
     }

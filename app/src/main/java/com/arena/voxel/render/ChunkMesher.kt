@@ -91,6 +91,39 @@ object ChunkMesher {
                         continue
                     }
 
+                    // Partial shapes (slabs, stairs, fences, carpet) are meshed box by box,
+                    // so a slab looks like a slab instead of a full cube.
+                    if (!block.shape.isFullCube && !block.shape.isEmpty) {
+                        val tint = if (block.tintTop) biome else 0
+                        for (box in block.shape.boxes) {
+                            for (f in 0..5) {
+                                val flush = when (f) {
+                                    0 -> box.x1 >= 0.999f
+                                    1 -> box.x0 <= 0.001f
+                                    2 -> box.y1 >= 0.999f
+                                    3 -> box.y0 <= 0.001f
+                                    4 -> box.z1 >= 0.999f
+                                    else -> box.z0 <= 0.001f
+                                }
+                                if (flush) {
+                                    val nb = world.get(wx + DX[f], y + DY[f], wz + DZ[f])
+                                    if (Blocks.get(nb).occludes) continue
+                                }
+                                val baseTile = when (f) {
+                                    2 -> block.tileTop
+                                    3 -> block.tileBottom
+                                    else -> block.tileSide
+                                }
+                                for (i in 0..3) shades[i] = FACE_SHADE[f]
+                                addBoxFace(
+                                    opaque, wx, y, wz, box, f, baseTile + tint, shades,
+                                    sky, blockLight
+                                )
+                            }
+                        }
+                        continue
+                    }
+
                     val liquid = block.liquid
                     val target = if (liquid) water else opaque
                     val aboveIsSame = world.get(wx, y + 1, wz) == b
@@ -273,6 +306,34 @@ object ChunkMesher {
             }
         }
 
+        emit(out, px, py, pz, face, tile, shades, sky, blockLight)
+    }
+
+    /** Emits one face of a shape box. Corner order matches [addQuad] so winding stays valid. */
+    private fun addBoxFace(
+        out: FloatList,
+        x: Int, y: Int, z: Int,
+        box: com.arena.voxel.world.BlockShape.Box,
+        face: Int,
+        tile: Int,
+        shades: FloatArray,
+        sky: Float,
+        blockLight: Float
+    ) {
+        val x0 = x + box.x0; val x1 = x + box.x1
+        val y0 = y + box.y0; val y1 = y + box.y1
+        val z0 = z + box.z0; val z1 = z + box.z1
+        val px = FloatArray(4)
+        val py = FloatArray(4)
+        val pz = FloatArray(4)
+        when (face) {
+            0 -> { px[0] = x1; py[0] = y0; pz[0] = z0; px[1] = x1; py[1] = y1; pz[1] = z0; px[2] = x1; py[2] = y1; pz[2] = z1; px[3] = x1; py[3] = y0; pz[3] = z1 }
+            1 -> { px[0] = x0; py[0] = y0; pz[0] = z1; px[1] = x0; py[1] = y1; pz[1] = z1; px[2] = x0; py[2] = y1; pz[2] = z0; px[3] = x0; py[3] = y0; pz[3] = z0 }
+            2 -> { px[0] = x0; py[0] = y1; pz[0] = z1; px[1] = x1; py[1] = y1; pz[1] = z1; px[2] = x1; py[2] = y1; pz[2] = z0; px[3] = x0; py[3] = y1; pz[3] = z0 }
+            3 -> { px[0] = x0; py[0] = y0; pz[0] = z0; px[1] = x1; py[1] = y0; pz[1] = z0; px[2] = x1; py[2] = y0; pz[2] = z1; px[3] = x0; py[3] = y0; pz[3] = z1 }
+            4 -> { px[0] = x1; py[0] = y0; pz[0] = z1; px[1] = x1; py[1] = y1; pz[1] = z1; px[2] = x0; py[2] = y1; pz[2] = z1; px[3] = x0; py[3] = y0; pz[3] = z1 }
+            else -> { px[0] = x0; py[0] = y0; pz[0] = z0; px[1] = x0; py[1] = y1; pz[1] = z0; px[2] = x1; py[2] = y1; pz[2] = z0; px[3] = x1; py[3] = y0; pz[3] = z0 }
+        }
         emit(out, px, py, pz, face, tile, shades, sky, blockLight)
     }
 

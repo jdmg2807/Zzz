@@ -39,6 +39,19 @@ object Game {
 
     val hotbar = CopyOnWriteArrayList<String>()
 
+    /** Player inventory (0..8 hotbar, 9..35 main), the single source of truth for held items. */
+    val inventory = com.arena.voxel.items.Inventory(36)
+
+    /** Creative mode: infinite blocks, flight allowed, no damage. */
+    @Volatile var creative = true
+
+    /** Currently open container screen: "inventory", "crafting_table", "furnace", "chest", or "". */
+    @Volatile var openScreen = ""
+
+    /** Crafting grid (3x3, row-major) and its result, shared by the UI and the logic. */
+    val craftingGrid = arrayOfNulls<com.arena.voxel.items.ItemStack>(9)
+    @Volatile var craftingResult: com.arena.voxel.items.ItemStack? = null
+
     /** Touch input, written by the UI thread and read by the render thread. */
     val move = FloatArray(2)
     @Volatile var jump = false
@@ -82,11 +95,15 @@ object Game {
     }
 
     fun initHotbar() {
-        if (hotbar.isEmpty()) {
-            hotbar.addAll(
-                listOf("grass", "dirt", "stone", "cobblestone", "planks", "log", "leaves", "sand", "glass")
+        if (inventory.isEmpty()) {
+            // Java's creative default: an empty hotbar you fill from the creative inventory.
+            // Survival worlds start with the tool kit instead (see giveStarterKit).
+            val starter = listOf(
+                "grass", "dirt", "stone", "cobblestone", "oak_planks", "log", "glass", "torch", "crafting_table"
             )
+            starter.forEachIndexed { i, id -> inventory.set(i, com.arena.voxel.items.ItemStack(id, 64)) }
         }
+        syncHotbar()
     }
 
     /** Called by [com.arena.voxel.imports.AutoImport] when the work is done. */
@@ -213,7 +230,39 @@ object Game {
         Log.i(line)
     }
 
-    fun selectedBlock(): String = hotbar.getOrElse(selectedSlot) { "stone" }
+    /** Id of the held item (block or item), or "air". */
+    fun selectedItem(): String = inventory.held()?.id ?: "air"
+
+    /** Held block id, or "air" when holding a non-block item. */
+    fun selectedBlock(): String {
+        val id = selectedItem()
+        return if (id != "air" && Blocks.index(id) != Blocks.AIR) id else "air"
+    }
+
+    /** Mirrors inventory slots 0..8 into the legacy hotbar list (renderer + old saves). */
+    fun syncHotbar() {
+        hotbar.clear()
+        for (i in 0 until 9) {
+            hotbar.add(inventory.get(i)?.id ?: "air")
+        }
+        selectedSlot = inventory.selected.coerceIn(0, 8)
+    }
+
+    /** Gives an item to the player; in creative it always succeeds. */
+    fun give(id: String, count: Int = 1) {
+        if (creative) {
+            inventory.add(com.arena.voxel.items.ItemStack(id, count))
+        } else {
+            inventory.add(com.arena.voxel.items.ItemStack(id, count))
+        }
+        syncHotbar()
+    }
+
+    /** Recomputes the crafting result for the current grid. */
+    fun updateCrafting() {
+        val ids = craftingGrid.map { it?.id }
+        craftingResult = com.arena.voxel.items.Recipes.craft(ids)
+    }
 
     fun addHotbarBlock(id: String) {
         if (!hotbar.contains(id) && hotbar.size < 9) hotbar.add(id)
@@ -224,7 +273,7 @@ object Game {
             val w = world ?: return
             val p = player ?: return
             try {
-                w.save(savesDir, p, hotbar, selectedSlot)
+                w.save(savesDir, p, hotbar, selectedSlot, inventory.serialize())
                 chat("Mundo guardado")
             } catch (t: Throwable) {
                 Log.e("Error guardando", t)
@@ -249,6 +298,9 @@ object Settings {
     /** 0 = automatic (Java formula), 1..4 = fixed GUI scale. */
     var guiScale = 0
 
+    /** Survival disables flight and consumes blocks when placing. */
+    var survival = false
+
     fun load(context: Context) {
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         sensitivity = p.getFloat("sens", 1.0f)
@@ -259,6 +311,7 @@ object Settings {
         useShaders = p.getBoolean("useShaders", true)
         useMods = p.getBoolean("useMods", true)
         guiScale = p.getInt("guiScale", 0).coerceIn(0, 4)
+        survival = p.getBoolean("survival", false)
     }
 
     fun save(context: Context) {
@@ -271,6 +324,7 @@ object Settings {
             .putBoolean("useShaders", useShaders)
             .putBoolean("useMods", useMods)
             .putInt("guiScale", guiScale)
+            .putBoolean("survival", survival)
             .apply()
     }
 }
