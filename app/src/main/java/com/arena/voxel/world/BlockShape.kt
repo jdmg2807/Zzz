@@ -33,6 +33,9 @@ class BlockShape(val boxes: List<Box>) {
         /** Nothing to collide with (air, water, plants, torches). */
         val EMPTY = BlockShape(emptyList())
 
+        /** Anvil: a full-height block inset by 1 px, like Java's `ANVIL` shape. */
+        val ANVIL = BlockShape(listOf(box(0.0625f, 0f, 0.0625f, 0.9375f, 1f, 0.9375f)))
+
         /** Bottom slab: 0.5 high, like Java's `SlabBlock` with `half=bottom`. */
         val SLAB_BOTTOM = BlockShape(listOf(box(0f, 0f, 0f, 1f, 0.5f, 1f)))
 

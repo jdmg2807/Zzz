@@ -48,6 +48,9 @@ object Game {
     /** Currently open container screen: "inventory", "crafting_table", "furnace", "chest", or "". */
     @Volatile var openScreen = ""
 
+    /** Position of the block entity whose screen is open (chest, furnace…), if any. */
+    @Volatile var openScreenPos: Triple<Int, Int, Int>? = null
+
     /** Crafting grid (3x3, row-major) and its result, shared by the UI and the logic. */
     val craftingGrid = arrayOfNulls<com.arena.voxel.items.ItemStack>(9)
     @Volatile var craftingResult: com.arena.voxel.items.ItemStack? = null
@@ -274,6 +277,7 @@ object Game {
             val p = player ?: return
             try {
                 w.save(savesDir, p, hotbar, selectedSlot, inventory.serialize())
+                com.arena.voxel.world.Containers.save(savesDir)
                 chat("Mundo guardado")
             } catch (t: Throwable) {
                 Log.e("Error guardando", t)

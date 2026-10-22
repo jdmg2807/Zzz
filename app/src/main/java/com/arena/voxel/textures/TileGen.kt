@@ -84,6 +84,11 @@ object TileGen {
         "crafter_top" to 0x9a7a55, "crafter_side" to 0x8a6a4a, "crafter_bottom" to 0x6d5236,
         "vault_front" to 0x4d5257, "vault_side" to 0x5b5b5b, "vault_top" to 0x6b6f73,
         "trial_spawner_side" to 0x39424a, "trial_spawner_top" to 0x2b333a,
+        "crafting_table_top" to 0xb08a52, "crafting_table_side" to 0xa9834f,
+        "crafting_table_front" to 0xa9834f, "chest_top" to 0xa4712e, "chest_side" to 0xa4712e,
+        "chest_front" to 0xa4712e, "furnace_top" to 0x7d7d7d, "furnace_side" to 0x7d7d7d,
+        "furnace_front" to 0x767676, "furnace_front_on" to 0x8a6a4a,
+        "anvil_top" to 0x3a3a3f, "anvil_side" to 0x33333a,
         "deepslate_bricks" to 0x3f4045, "mud_bricks" to 0x89685a, "quartz_block" to 0xe8e3d8,
         "lever" to 0x8a7a5a, "redstone_torch_on" to 0xff5a3a, "redstone_torch_off" to 0x6a2a1a,
         "repeater" to 0x9a9a9a, "repeater_on" to 0xb04a3a, "comparator" to 0x9a9a9a,
@@ -136,6 +141,19 @@ object TileGen {
         "iron_ore" -> toBitmap(ore(0xd8b28c, 5, 2))
         "gold_ore" -> toBitmap(ore(0xf5d742, 5, 2))
         "diamond_ore" -> toBitmap(ore(0x6de0d6, 5, 2))
+        // Workstations: a plank body with a darker frame and a hint of the GUI they open.
+        "crafting_table_top" -> toBitmap(craftingTop())
+        "crafting_table_side" -> toBitmap(framed(0xa9834f, 0x6b4f2a, "crafting_table_side"))
+        "crafting_table_front" -> toBitmap(framed(0xa9834f, 0x8a6a3a, "crafting_table_front"))
+        "chest_top" -> toBitmap(framed(0xa4712e, 0x6b4419, "chest_top"))
+        "chest_side" -> toBitmap(framed(0xa4712e, 0x6b4419, "chest_side"))
+        "chest_front" -> toBitmap(chestFront())
+        "furnace_top" -> toBitmap(framed(0x7d7d7d, 0x5a5a5a, "furnace_top"))
+        "furnace_side" -> toBitmap(framed(0x7d7d7d, 0x5a5a5a, "furnace_side"))
+        "furnace_front" -> toBitmap(furnaceFront(false))
+        "furnace_front_on" -> toBitmap(furnaceFront(true))
+        "anvil_top" -> toBitmap(framed(0x3a3a3f, 0x222226, "anvil_top"))
+        "anvil_side" -> toBitmap(framed(0x33333a, 0x1e1e22, "anvil_side"))
         else -> toBitmap(base(name))
     }
 
@@ -147,6 +165,58 @@ object TileGen {
         "tall_grass" -> toBitmap(tallGrass(Biomes.GRASS[biome]))
         "water" -> toBitmap(water(Biomes.WATER[biome]))
         else -> toBitmap(base(name))
+    }
+
+    /** Plank board with a darker 3-px border, reused by every workstation tile. */
+    private fun framed(color: Int, edge: Int, seedName: String): IntArray {
+        val px = noise(color, 12, Random(seedName.hashCode().toLong()))
+        for (y in 0 until S) {
+            for (x in 0 until S) {
+                if (x < 3 || y < 3 || x >= S - 3 || y >= S - 3) px[y * S + x] = rgb((edge shr 16) and 0xff, (edge shr 8) and 0xff, edge and 0xff)
+            }
+        }
+        return px
+    }
+
+    /** Crafting table top: plank board with the 3x3 grid of tool marks, like the vanilla texture. */
+    private fun craftingTop(): IntArray {
+        val px = framed(0xb08a52, 0x6b4f2a, "crafting_top")
+        for (i in 1..3) {
+            val v = (S / 4) * i
+            for (k in 2 until S - 2) {
+                px[k * S + v] = rgb(0x6b, 0x4f, 0x2a)
+                px[v * S + k] = rgb(0x6b, 0x4f, 0x2a)
+            }
+        }
+        return px
+    }
+
+    /** Chest front with the iron latch in the middle. */
+    private fun chestFront(): IntArray {
+        val px = framed(0xa4712e, 0x6b4419, "chest_front")
+        for (y in 0 until S) {
+            for (x in 0 until S) {
+                if (y == S / 2) px[y * S + x] = rgb(0x5a, 0x38, 0x12)
+            }
+        }
+        for (y in S / 2 - 3 until S / 2 + 3) {
+            for (x in S / 2 - 2 until S / 2 + 2) {
+                px[y * S + x] = rgb(0xd8, 0xd8, 0xd8)
+            }
+        }
+        return px
+    }
+
+    /** Furnace front: stone frame, dark mouth and (when lit) an orange fire. */
+    private fun furnaceFront(lit: Boolean): IntArray {
+        val px = framed(0x767676, 0x4a4a4a, if (lit) "furnace_on" else "furnace_off")
+        val top = S / 2 + 2
+        for (y in top until S - 5) {
+            for (x in 6 until S - 6) {
+                px[y * S + x] = if (lit && y > top + 2) rgb(0xf0, 0xa0, 0x20) else rgb(0x2a, 0x2a, 0x2a)
+            }
+        }
+        return px
     }
 
     // ------------------------------------------------------------------ helpers

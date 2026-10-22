@@ -38,6 +38,9 @@ object Recipes {
         // Wood family
         add(Shaped("crafting_table", listOf("##", "##"), mapOf('#' to "oak_planks"), "crafting_table"))
         add(Shaped("chest", listOf("###", "# #", "###"), mapOf('#' to "oak_planks"), "chest"))
+        add(Shaped("furnace", listOf("###", "# #", "###"), mapOf('#' to "cobblestone"), "furnace"))
+        // Anvil: three iron blocks on top, four iron ingots under them (Java 1.21 recipe).
+        add(Shaped("anvil", listOf("BBB", " I ", "III"), mapOf('B' to "iron_block", 'I' to "iron_ingot"), "anvil"))
         add(Shaped("sticks", listOf("#", "#"), mapOf('#' to "oak_planks"), "stick", 4))
         add(Shaped("torches", listOf("C", "S"), mapOf('C' to "coal", 'S' to "stick"), "torch", 4))
         add(Shaped("fence", listOf("#S#", "#S#"), mapOf('#' to "oak_planks", 'S' to "stick"), "oak_fence", 3))

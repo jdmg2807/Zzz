@@ -87,7 +87,17 @@ object Items {
         "waxed_copper_block" to "Cobre encerado", "crafter" to "Crafteador",
         "vault" to "Bóveda", "trial_spawner" to "Generador de pruebas",
         "deepslate_bricks" to "Ladrillos de pizarra", "mud_bricks" to "Ladrillos de barro",
-        "quartz_block" to "Bloque de cuarzo"
+        "quartz_block" to "Bloque de cuarzo",
+        "crafting_table" to "Mesa de trabajo", "chest" to "Cofre", "furnace" to "Horno",
+        "furnace_lit" to "Horno", "anvil" to "Yunque", "redstone_wire_0" to "Redstone",
+        "lever_off" to "Palanca", "lever_on" to "Palanca", "repeater_off" to "Repetidor",
+        "repeater_on" to "Repetidor", "comparator_off" to "Comparador",
+        "comparator_on" to "Comparador", "redstone_lamp_off" to "Lámpara de redstone",
+        "redstone_lamp_on" to "Lámpara de redstone", "piston" to "Pistón",
+        "piston_sticky" to "Pistón pegajoso", "observer" to "Observador",
+        "observer_on" to "Observador", "redstone_block" to "Bloque de redstone",
+        "redstone_torch_on" to "Antorcha de redstone", "redstone_torch_off" to "Antorcha de redstone",
+        "stone_button_off" to "Botón de piedra", "stone_button_on" to "Botón de piedra"
     )
 
     init {
@@ -125,6 +135,8 @@ object Items {
 
         // Materials and food.
         fun item(id: String, name: String, stack: Int = 64, food: Int = 0) {
+            // Never clobber a block definition: chest/furnace/lever/… are placeable blocks first.
+            if (defs.containsKey(id)) return
             defs[id] = Def(id, name, stack, food = food)
         }
         item("stick", "Palo")
@@ -202,8 +214,9 @@ object Items {
             "cactus", "crafter", "vault", "trial_spawner", "tnt"
         ),
         "Redstone" to listOf(
-            "redstone", "redstone_torch", "lever", "repeater", "comparator", "piston",
-            "sticky_piston", "observer", "redstone_lamp", "chest", "furnace", "crafting_table"
+            "redstone", "redstone_torch_on", "lever_off", "repeater_off", "comparator_off",
+            "piston", "observer", "redstone_lamp_off", "redstone_block", "stone_button_off",
+            "redstone_wire_0", "chest", "furnace", "crafting_table", "anvil"
         ),
         "Herramientas" to listOf(
             "wooden_pickaxe", "stone_pickaxe", "iron_pickaxe", "diamond_pickaxe",

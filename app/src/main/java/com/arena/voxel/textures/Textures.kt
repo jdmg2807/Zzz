@@ -59,7 +59,12 @@ object Textures {
         "lever", "redstone_torch_on", "redstone_torch_off", "repeater", "repeater_on",
         "comparator", "comparator_on", "redstone_lamp_off", "redstone_lamp_on",
         "piston_side", "piston_top", "piston_top_extended", "observer_back", "observer_front",
-        "redstone_block", "stone_button", "oak_door_lower", "oak_door_upper"
+        "redstone_block", "stone_button", "oak_door_lower", "oak_door_upper",
+        // v1.9.0: workstations with their own GUI
+        "crafting_table_top", "crafting_table_side", "crafting_table_front",
+        "chest_top", "chest_side", "chest_front",
+        "furnace_top", "furnace_side", "furnace_front", "furnace_front_on",
+        "anvil_top", "anvil_side"
     )
 
     /** Tiles rendered once per biome. */

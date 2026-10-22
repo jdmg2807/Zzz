@@ -270,7 +270,7 @@ private fun CraftingPanel(
 }
 
 /** Shared click logic for the player inventory slots. */
-private fun transfer(
+internal fun transfer(
     inv: Inventory,
     index: Int,
     cursor: ItemStack?,
@@ -296,6 +296,34 @@ private fun transfer(
         cursor != null && current != null -> {
             inv.set(index, cursor)
             onCursor(current)
+        }
+    }
+}
+
+/**
+ * Java's 3x9 main inventory plus the 1x9 hotbar, drawn at ([left], [top]) inside a container
+ * screen. Slot pitch is 18 px, the same as the vanilla texture.
+ */
+@Composable
+internal fun androidx.compose.foundation.layout.BoxScope.PlayerSlots(
+    gui: Gui,
+    inv: Inventory,
+    left: Float,
+    top: Float,
+    cursor: ItemStack?,
+    onCursor: (ItemStack?) -> Unit
+) {
+    for (r in 0 until 3) {
+        for (c in 0 until 9) {
+            val index = 9 + r * 9 + c
+            Slot(gui, left + c * 18f, top + r * 18f, inv.get(index)) { current ->
+                transfer(inv, index, cursor, current, onCursor)
+            }
+        }
+    }
+    for (c in 0 until 9) {
+        Slot(gui, left + c * 18f, top + 58f, inv.get(c)) { current ->
+            transfer(inv, c, cursor, onCursor)
         }
     }
 }
@@ -361,7 +389,7 @@ private fun CreativePanel(gui: Gui, cursor: ItemStack?, onGrab: (ItemStack?) -> 
 
 /** One 18x18 Java slot with a 1 px border; [onClick] receives the slot contents. */
 @Composable
-private fun androidx.compose.foundation.layout.BoxScope.Slot(
+internal fun androidx.compose.foundation.layout.BoxScope.Slot(
     gui: Gui,
     x: Float,
     y: Float,

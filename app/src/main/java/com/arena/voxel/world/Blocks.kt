@@ -119,6 +119,18 @@ object Blocks {
         add("packed_ice", "packed_ice", "packed_ice", "packed_ice", color = 0x8fb6e8)
         add("ice", "ice", "ice", "ice", opaque = false, color = 0x9fc7f0)
 
+        // ---- v1.9.0: workstations (each one opens its own GUI) ---------------------------
+        add("crafting_table", "crafting_table_top", "crafting_table_side", "oak_planks",
+            color = 0xb08a52, hardness = 2.5f, tool = "axe")
+        add("chest", "chest_top", "chest_side", "chest_top", color = 0xa4712e,
+            hardness = 2.5f, tool = "axe")
+        add("furnace", "furnace_top", "furnace_side", "furnace_top", color = 0x7d7d7d,
+            hardness = 3.5f, tool = "pickaxe")
+        add("furnace_lit", "furnace_top", "furnace_front_on", "furnace_top", color = 0x7d7d7d,
+            hardness = 3.5f, tool = "pickaxe", light = 13)
+        add("anvil", "anvil_top", "anvil_side", "anvil_top", color = 0x33333a,
+            shape = BlockShape.ANVIL, hardness = 5f, tool = "pickaxe")
+
         // ---- v1.7.0: non-full shapes (slabs, stairs, fences) -----------------------------
         add("stone_slab", "stone_slab", "stone_slab", "stone_slab", color = 0x8a8a8a,
             shape = BlockShape.SLAB_BOTTOM, hardness = 2f, tool = "pickaxe")

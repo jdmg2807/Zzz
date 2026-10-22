@@ -74,6 +74,7 @@ fun GameScreen(onExit: () -> Unit) {
     var paused by remember { mutableStateOf(false) }
     var picker by remember { mutableStateOf(false) }
     var container by remember { mutableStateOf<ContainerMode?>(null) }
+    var entity by remember { mutableStateOf<Triple<String, Triple<Int, Int, Int>>?>(null) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -84,6 +85,7 @@ fun GameScreen(onExit: () -> Unit) {
 
     BackHandler {
         when {
+            entity != null -> entity = null
             container != null -> container = null
             picker -> picker = false
             else -> paused = true
@@ -101,11 +103,16 @@ fun GameScreen(onExit: () -> Unit) {
                 container = ContainerMode.INVENTORY
                 Game.openScreen = ""
             }
+            "chest", "furnace", "anvil" -> {
+                val pos = Game.openScreenPos
+                if (pos != null) entity = Triple(Game.openScreen, pos)
+                Game.openScreen = ""
+            }
         }
     }
 
-    LaunchedEffect(paused, picker, container) {
-        Game.paused = paused || picker || container != null
+    LaunchedEffect(paused, picker, container, entity) {
+        Game.paused = paused || picker || container != null || entity != null
     }
 
     val lifecycleOwner = context as? LifecycleOwner
@@ -199,6 +206,17 @@ fun GameScreen(onExit: () -> Unit) {
         container?.let { mode ->
             GuiScreen(Settings.guiScale) { gui ->
                 ContainerScreen(gui, mode) { container = null }
+            }
+        }
+
+        // Chest / furnace / anvil GUIs opened by tapping the block with an empty hand.
+        entity?.let { (kind, pos) ->
+            GuiScreen(Settings.guiScale) { gui ->
+                if (kind == "anvil") {
+                    AnvilScreen(gui) { entity = null }
+                } else {
+                    BlockEntityScreen(gui, kind, pos) { entity = null }
+                }
             }
         }
 

@@ -65,6 +65,7 @@ class Renderer : GLSurfaceView.Renderer {
     private var swing = 0f
     private var walkTime = 0f
     private var hostileTimer = 8f
+    private var containerTimer = 0f
     private val mobMeshes = arrayOfNulls<ChunkMesh>(Mobs.TYPES.size)
     private val mobTiles = HashMap<Int, Int>()
     private val visibleMobs = ArrayList<Mob>()
@@ -327,7 +328,10 @@ class Renderer : GLSurfaceView.Renderer {
                     }
                     Game.inventory.selected = loaded.selected
                     Game.syncHotbar()
+                    com.arena.voxel.world.Containers.clear()
+                    com.arena.voxel.world.Containers.load(Game.savesDir)
                 } else {
+                    com.arena.voxel.world.Containers.clear()
                     Game.chat("No se encontró partida guardada; mundo nuevo")
                     val seed = System.currentTimeMillis()
                     w = World(seed)
@@ -565,6 +569,17 @@ class Renderer : GLSurfaceView.Renderer {
     }
 
     private fun placeBlock(w: World, hit: BlockHit) {
+        // Storage blocks open their GUI on a tap with an empty hand, like a right click.
+        if (Game.selectedBlock() == "air") {
+            val id = Blocks.get(w.get(hit.x, hit.y, hit.z)).id
+            if (id == "chest" || id == "furnace" || id == "furnace_lit" ||
+                id == "crafting_table" || id == "anvil"
+            ) {
+                Game.openScreen = id
+                Game.openScreenPos = Triple(hit.x, hit.y, hit.z)
+                return
+            }
+        }
         // Levers and buttons react to the tap itself, like a right click in Java.
         if (com.arena.voxel.world.Redstone.interact(w, hit.x, hit.y, hit.z)) {
             Game.chat("Componente accionado")
@@ -675,6 +690,7 @@ class Renderer : GLSurfaceView.Renderer {
             }
             p.update(dt, w, Game.move[0], Game.move[1], ascend, Game.jump, Game.sprint)
             w.tick(dt)
+            tickContainers(w, dt)
         }
 
         val forward = p.forward()
@@ -1009,6 +1025,36 @@ class Renderer : GLSurfaceView.Renderer {
         mesh.upload(ChunkMesher.buildModelMesh(info.parts) { color -> mobTiles[color] ?: -1 })
         mobMeshes[type] = mesh
         return mesh
+    }
+
+    /** Furnaces: 20 ticks per second, and the lit texture swaps with the burn state. */
+    private fun tickContainers(w: World, dt: Float) {
+        containerTimer += dt
+        if (containerTimer < 0.05f) return
+        containerTimer = 0f
+        val open = Game.openScreenPos
+        for (k in com.arena.voxel.world.Containers.furnaceKeys()) {
+            val f = com.arena.voxel.world.Containers.furnaceOrNull(
+                com.arena.voxel.world.Containers.unkeyX(k),
+                com.arena.voxel.world.Containers.unkeyY(k),
+                com.arena.voxel.world.Containers.unkeyZ(k)
+            ) ?: continue
+            val before = f.burnTime
+            f.tick()
+            val x = com.arena.voxel.world.Containers.unkeyX(k)
+            val y = com.arena.voxel.world.Containers.unkeyY(k)
+            val z = com.arena.voxel.world.Containers.unkeyZ(k)
+            val wasBurning = before > 0
+            val burning = f.isBurning
+            if (wasBurning != burning) {
+                val id = Blocks.get(w.get(x, y, z)).id
+                when {
+                    burning && id == "furnace" -> w.setSilently(x, y, z, Blocks.index("furnace_lit"))
+                    !burning && id == "furnace_lit" -> w.setSilently(x, y, z, Blocks.index("furnace"))
+                }
+            }
+            if (open == Triple(x, y, z)) Game.syncHotbar()
+        }
     }
 
     private fun updateMobs(w: World, dt: Float, p: Player) {
