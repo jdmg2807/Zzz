@@ -38,6 +38,11 @@ object Game {
 
     val hotbar = CopyOnWriteArrayList<String>()
 
+    /** Touch input, written by the UI thread and read by the render thread. */
+    val move = FloatArray(2)
+    @Volatile var jump = false
+    @Volatile var down = false
+
     var world: World? = null
     var player: Player? = null
 

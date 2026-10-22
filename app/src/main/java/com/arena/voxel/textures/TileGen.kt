@@ -329,7 +329,7 @@ object TileGen {
 
     private fun ore(gem: Int, clusters: Int, size: Int): IntArray {
         val px = stone()
-        val rnd = Random(gem)
+        val rnd = Random(gem.toLong())
         repeat(clusters) {
             val cx = 2 + rnd.nextInt(12)
             val cy = 2 + rnd.nextInt(12)

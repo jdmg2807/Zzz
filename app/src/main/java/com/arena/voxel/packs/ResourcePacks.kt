@@ -15,7 +15,7 @@ import java.util.zip.ZipFile
  *  - legacy packs with <code>assets/minecraft/textures/blocks/...</code>
  *  - loose packs with <code>textures/block/...</code> at the root
  *
- * Shaders are picked up from <code>shaders/*.vsh|*.fsh</code> inside a resource pack, or from any
+ * Shaders are picked up from <code>shaders/terrain.vsh</code> style files inside a pack, or from any
  * folder/zip inside the <code>shaderpacks</code> folder.
  */
 object ResourcePacks {

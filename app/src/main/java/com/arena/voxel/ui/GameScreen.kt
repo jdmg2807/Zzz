@@ -279,7 +279,7 @@ private fun Joystick(modifier: Modifier) {
     var knob by remember { mutableStateOf(Offset.Zero) }
     Box(
         modifier.pointerInput(Unit) {
-            val radius = size.minDimension * 0.34f
+            val radius = minOf(size.width, size.height) * 0.34f
             detectDragGestures(
                 onDragStart = { knob = Offset.Zero },
                 onDragEnd = {

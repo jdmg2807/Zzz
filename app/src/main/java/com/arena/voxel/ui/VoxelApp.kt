@@ -292,8 +292,9 @@ private fun ModsScreen(onBack: () -> Unit) {
                     ) {
                         Text(mod.name + "  " + mod.version, color = Color(0xFFE8EDF2), fontWeight = FontWeight.Bold)
                         Text("id: ${mod.id} · por ${mod.author}", color = Color(0xFF7E8A9A), fontSize = 11.sp)
-                        if (mod.error != null) {
-                            Text(mod.error, color = Color(0xFFE57373), fontSize = 11.sp)
+                        val modError = mod.error
+                        if (modError != null) {
+                            Text(modError, color = Color(0xFFE57373), fontSize = 11.sp)
                         } else {
                             Text("Se carga al entrar al mundo", color = Accent, fontSize = 11.sp)
                         }
