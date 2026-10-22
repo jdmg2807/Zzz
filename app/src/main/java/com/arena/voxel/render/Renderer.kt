@@ -70,6 +70,7 @@ class Renderer : GLSurfaceView.Renderer {
     private var hostileTimer = 8f
     private var containerTimer = 0f
     private var fxTimer = 0f
+    private var eatCooldown = 0f
     private val mobMeshes = arrayOfNulls<ChunkMesh>(Mobs.TYPES.size)
     private val itemMeshes = HashMap<String, ChunkMesh>()
     private val mobTiles = HashMap<Int, Int>()
@@ -639,6 +640,29 @@ class Renderer : GLSurfaceView.Renderer {
         }
     }
 
+    /**
+     * Bites the held food. Returns true when the tap was consumed by eating (success or a
+     * "not hungry" refusal), so the same tap does not also place a block.
+     */
+    private fun tryEat(): Boolean {
+        val heldId = Game.selectedItem()
+        val nutrition = com.arena.voxel.items.Items.food(heldId)
+        if (nutrition <= 0) return false
+        if (eatCooldown > 0f) return true
+        val pl = player ?: return true
+        if (!pl.eat(nutrition, com.arena.voxel.items.Items.saturationOf(heldId))) {
+            Game.chat("No tienes hambre")
+            return true
+        }
+        eatCooldown = 1.6f
+        Game.chat("Has comido ${com.arena.voxel.items.Items.nameOf(heldId)}")
+        if (!Game.creative) {
+            Game.inventory.shrink(Game.inventory.selected, 1)
+            Game.syncHotbar()
+        }
+        return true
+    }
+
     private fun breakBlock(w: World, hit: BlockHit) {
         val id = Blocks.get(w.get(hit.x, hit.y, hit.z)).id
         if (id == "bedrock") {
@@ -656,6 +680,17 @@ class Renderer : GLSurfaceView.Renderer {
                         hit.x + 0.5, hit.y + 0.35, hit.z + 0.5
                     )
                 }
+            }
+            if (!Game.creative) {
+                val xp = when (id) {
+                    "coal_ore" -> 1
+                    "diamond_ore", "emerald_ore" -> 4
+                    "redstone_wire_0" -> 2
+                    "iron_ore", "gold_ore" -> 0
+                    "deepslate" -> 1
+                    else -> 0
+                }
+                if (xp > 0) player?.addExperience(xp)
             }
             ModLoader.blockBroken(hit.x, hit.y, hit.z, id)
         }
@@ -726,7 +761,11 @@ class Renderer : GLSurfaceView.Renderer {
 
         if (!Game.paused) {
             when (Game.consumeAction()) {
-                1 -> hit?.let { swing = 1f; placeBlock(w, it) }
+                1 -> {
+                    swing = 1f
+                    // Eating does not need a target block, so it is checked before the raycast use.
+                    if (!tryEat()) hit?.let { placeBlock(w, it) }
+                }
                 2 -> hit?.let { swing = 1f; breakBlock(w, it) }
             }
             if (attackCooldown > 0f) attackCooldown = (attackCooldown - dt * 20f).coerceAtLeast(0f)
@@ -754,6 +793,7 @@ class Renderer : GLSurfaceView.Renderer {
             fpsFrames = 0
         }
 
+        if (eatCooldown > 0f) eatCooldown -= dt
         streamChunks(w)
         updateMobs(w, dt, p)
         com.arena.voxel.world.ItemEntities.update(dt, w, p)
@@ -1300,9 +1340,26 @@ class Renderer : GLSurfaceView.Renderer {
         val speed = com.arena.voxel.items.Items.attackSpeed(held)
         attackCooldown = 20f / speed
         Game.chat(if (crit) "¡Golpe crítico! -${damage.toInt()}" else "Golpe -${damage.toInt()}")
+        com.arena.voxel.world.Particles.hurt(mob.x, mob.y, mob.z)
         if (mob.health <= 0f) {
             Game.chat("${Mobs.typeOf(mob.type).name} derrotado")
-            if (!Game.creative) Game.give("rotten_flesh", 1)
+            if (!Game.creative) {
+                // Java loot tables: zombie → rotten flesh, skeleton → bone (+ arrows), creeper → gunpowder.
+                when (Mobs.typeOf(mob.type).name.lowercase()) {
+                    "zombi", "zombie" -> Game.give("rotten_flesh", 1)
+                    "esqueleto", "skeleton" -> {
+                        Game.give("bone", 1)
+                        if (Math.random() < 0.5) Game.give("arrow", 2)
+                    }
+                    "creeper" -> Game.give("gunpowder", 1)
+                    else -> Unit
+                }
+                val xp = when (Mobs.typeOf(mob.type).name.lowercase()) {
+                    "creeper" -> 5
+                    else -> 5
+                }
+                p.addExperience(xp)
+            }
         }
     }
 

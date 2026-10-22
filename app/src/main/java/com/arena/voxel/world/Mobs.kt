@@ -244,6 +244,23 @@ class Mob(
         val cz = kotlin.math.floor(z).toInt()
         val dist = kotlin.math.sqrt((p.x - x) * (p.x - x) + (p.y - y) * (p.y - y) + (p.z - z) * (p.z - z))
         if (dist < 6.0) p.hurt((28f * (1f - (dist / 6.0).toFloat())).coerceAtLeast(1f))
+        // Explosion plume: grey smoke plus a few orange embers, like `explosion_emitter`.
+        for (i in 0 until 26) {
+            Particles.push(
+                Particles.Particle(
+                    (x + (Math.random() - 0.5) * 2).toFloat(),
+                    (y + Math.random() * 1.5).toFloat(),
+                    (z + (Math.random() - 0.5) * 2).toFloat(),
+                    ((Math.random() - 0.5) * 0.4).toFloat(),
+                    (Math.random() * 0.3).toFloat(),
+                    ((Math.random() - 0.5) * 0.4).toFloat(),
+                    if (i % 3 == 0) 1f else 0.55f,
+                    if (i % 3 == 0) 0.6f else 0.55f,
+                    if (i % 3 == 0) 0.15f else 0.55f,
+                    1f, 0.9f, 9f, 1
+                )
+            )
+        }
         for (bx in cx - 3..cx + 3) {
             for (by in cy - 2..cy + 3) {
                 for (bz in cz - 3..cz + 3) {

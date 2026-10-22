@@ -412,6 +412,36 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
 
     fun isDead(): Boolean = health <= 0f
 
+    /**
+     * Eating, with the Java numbers: a piece of food restores `nutrition` food points and
+     * `nutrition * saturationModifier * 2` saturation, capped at the food level.
+     * Returns false when the player is already full (Java refuses to eat then).
+     */
+    fun eat(nutrition: Int, saturationModifier: Float): Boolean {
+        if (food >= 20) return false
+        food = (food + nutrition).coerceAtMost(20)
+        saturation = (saturation + nutrition * saturationModifier * 2f)
+            .coerceAtMost(food.toFloat())
+        return true
+    }
+
+    /** XP orbs: Java's level curve (7 + 2·level below 16, 9 + 5·level up to 30, 9 + 9·level above). */
+    fun addExperience(amount: Int) {
+        if (amount <= 0) return
+        experience += amount
+        var guard = 0
+        while (guard++ < 200) {
+            val needed = when {
+                level < 16 -> 7 + level * 2
+                level < 31 -> 9 + level * 5
+                else -> 9 + level * 9
+            }
+            if (experience < needed) break
+            experience -= needed
+            level++
+        }
+    }
+
     fun respawn(world: World, sx: Double, sy: Double, sz: Double) {
         x = sx
         y = sy

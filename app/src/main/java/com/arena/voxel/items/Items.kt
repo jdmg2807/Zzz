@@ -190,6 +190,15 @@ object Items {
     fun isBlock(id: String): Boolean = Blocks.index(id) != 0 && id != "air"
     fun maxStack(id: String): Int = defs[id]?.maxStack ?: 64
     fun food(id: String): Int = defs[id]?.food ?: 0
+
+    /** Java's saturation modifier per food (steak 0.8, bread 0.6, apple 0.3, rotten flesh 0.1). */
+    fun saturationOf(id: String): Float = when (id) {
+        "cooked_beef", "cooked_porkchop" -> 0.8f
+        "bread", "porkchop", "raw_beef" -> 0.6f
+        "apple" -> 0.3f
+        "rotten_flesh" -> 0.1f
+        else -> 0.5f
+    }
     fun tier(id: String): Int = defs[id]?.tier ?: 0
     fun toolType(id: String): String = defs[id]?.toolType ?: ""
     /** Item id that a broken block leaves behind (null = nothing). */

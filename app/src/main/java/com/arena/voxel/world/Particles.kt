@@ -32,7 +32,8 @@ object Particles {
     /** Nothing at all to draw? The renderer skips the upload. */
     val isEmpty: Boolean get() = list.isEmpty()
 
-    private fun push(p: Particle) {
+    /** Adds one particle (public so mob explosions can re-use the same pool). */
+    fun push(p: Particle) {
         if (list.size >= MAX) list.removeAt(0)
         list.add(p)
     }
