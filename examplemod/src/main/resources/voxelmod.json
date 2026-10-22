@@ -1,0 +1,7 @@
+{
+  "id": "examplemod",
+  "name": "Example Mod",
+  "version": "1.0.0",
+  "author": "VoxelCraft",
+  "entrypoint": "com.example.voxelmod.ExampleMod"
+}

@@ -1,0 +1,271 @@
+package com.arena.voxel
+
+import android.content.Context
+import com.arena.voxel.core.Ctx
+import com.arena.voxel.core.Logs
+import com.arena.voxel.core.Log
+import com.arena.voxel.mods.ModLoader
+import com.arena.voxel.player.BlockHit
+import com.arena.voxel.player.Player
+import com.arena.voxel.world.Blocks
+import com.arena.voxel.world.World
+import java.io.File
+import java.util.Collections
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
+
+/** Global game state shared between the OpenGL thread and the Compose UI. */
+object Game {
+
+    enum class State { MENU, LOADING, PLAYING }
+
+    const val SAVE_NAME = "mundo1"
+
+    @Volatile var state = State.MENU
+        private set
+    @Volatile var status = ""
+    @Volatile var progress = 0f
+    @Volatile var fps = 0
+
+    @Volatile var targetHit: BlockHit? = null
+    @Volatile var selectedSlot = 0
+    @Volatile var hudText = ""
+    @Volatile var underwater = false
+    @Volatile var shaderPackName = "integrado"
+    @Volatile var packReport = ""
+    @Volatile var modReport = ""
+    @Volatile var chunksReady = 0
+    @Volatile var paused = false
+
+    val hotbar = CopyOnWriteArrayList<String>()
+
+    /** Touch input, written by the UI thread and read by the render thread. */
+    val move = FloatArray(2)
+    @Volatile var jump = false
+    @Volatile var down = false
+    @Volatile var sprint = false
+
+    /** Touch press tracking: a quick tap places a block, holding mines it. */
+    @Volatile var pressActive = false
+    @Volatile var pressSeq = 0
+    @Volatile var mining = false
+    @Volatile var miningProgress = 0f
+
+    var world: World? = null
+    var player: Player? = null
+
+    @Volatile var requestedSeed: Long = 0L
+    @Volatile var pendingStart = false
+        private set
+    @Volatile var pendingLoad = false
+        private set
+
+    @Volatile var importing = false
+        private set
+    @Volatile var importStatus = ""
+        private set
+    @Volatile var importResult: String? = null
+
+    private var lookDX = 0f
+    private var lookDY = 0f
+    private val lookLock = Any()
+    private val action = AtomicInteger(0)
+    private val saveLock = Any()
+
+    val chatLines: MutableList<String> = Collections.synchronizedList(ArrayList<String>())
+
+    val savesDir: File get() = File(Ctx.savesDir, SAVE_NAME)
+    val hasSave: Boolean get() = File(savesDir, "level.dat").isFile
+
+    init {
+        initHotbar()
+    }
+
+    fun initHotbar() {
+        if (hotbar.isEmpty()) {
+            hotbar.addAll(
+                listOf("grass", "dirt", "stone", "cobblestone", "planks", "log", "leaves", "sand", "glass")
+            )
+        }
+    }
+
+    /** Called by [com.arena.voxel.imports.AutoImport] when the work is done. */
+    fun reportImport(message: String) {
+        importing = false
+        importStatus = message
+        importResult = message
+        chat(message.lineSequence().firstOrNull() ?: "Importación terminada")
+    }
+
+    /**
+     * Imports a Minecraft Java world (or, if the file is something else, tells the user what it
+     * is instead of failing with "No encuentro level.dat").
+     */
+    fun importMinecraftWorld(uri: android.net.Uri, onDone: (String, Boolean) -> Unit) {
+        importFile(uri, null) { message, success, _ -> onDone(message, success) }
+    }
+
+    /** Auto-detecting import: world, resource pack, shader pack or mod. */
+    fun importFile(
+        uri: android.net.Uri,
+        hint: com.arena.voxel.imports.AutoImport.Kind?,
+        onDone: (String, Boolean, com.arena.voxel.imports.AutoImport.Kind) -> Unit
+    ) {
+        if (importing) return
+        importing = true
+        importStatus = "Leyendo el archivo..."
+        importResult = null
+        com.arena.voxel.imports.AutoImport.run(uri, hint) { message, success, kind ->
+            if (success && kind == com.arena.voxel.imports.AutoImport.Kind.WORLD) {
+                chat("Mundo importado")
+            }
+            onDone(message, success, kind)
+        }
+    }
+
+    fun startNewWorld(seed: Long) {
+        requestedSeed = seed
+        pendingLoad = false
+        pendingStart = true
+        state = State.LOADING
+        progress = 0f
+        status = "Preparando mundo..."
+        chatLines.clear()
+        chat("Semilla: $seed")
+    }
+
+    fun startLoadedWorld() {
+        pendingLoad = true
+        pendingStart = true
+        state = State.LOADING
+        progress = 0f
+        status = "Cargando mundo..."
+        chatLines.clear()
+    }
+
+    fun onWorldReady() {
+        state = State.PLAYING
+        progress = 1f
+    }
+
+    fun exitToMenu() {
+        paused = false
+        pressActive = false
+        mining = false
+        miningProgress = 0f
+        pendingStart = false
+        pendingLoad = false
+        saveWorld()
+        world = null
+        player = null
+        targetHit = null
+        state = State.MENU
+        status = ""
+    }
+
+    /** Called by the renderer once the GL context is alive. */
+    fun consumePendingStart(): Int {
+        if (!pendingStart) return 0
+        pendingStart = false
+        val mode = if (pendingLoad) 2 else 1
+        pendingLoad = false
+        return mode
+    }
+
+    fun setProgress(p: Float, text: String) {
+        progress = p
+        status = text
+    }
+
+    fun addLook(dx: Float, dy: Float) {
+        synchronized(lookLock) {
+            lookDX += dx
+            lookDY += dy
+        }
+    }
+
+    fun takeLook(out: FloatArray) {
+        synchronized(lookLock) {
+            out[0] = lookDX
+            out[1] = lookDY
+            lookDX = 0f
+            lookDY = 0f
+        }
+    }
+
+    fun requestPlace() {
+        action.set(1)
+    }
+
+    fun requestBreak() {
+        action.set(2)
+    }
+
+    fun consumeAction(): Int = action.getAndSet(0)
+
+    fun chatSnapshot(last: Int = 3): List<String> =
+        synchronized(chatLines) { chatLines.toList().takeLast(last) }
+
+    fun chat(message: String) {
+        val line = message
+        chatLines.add(line)
+        while (chatLines.size > 7) chatLines.removeAt(0)
+        Log.i(line)
+    }
+
+    fun selectedBlock(): String = hotbar.getOrElse(selectedSlot) { "stone" }
+
+    fun addHotbarBlock(id: String) {
+        if (!hotbar.contains(id) && hotbar.size < 9) hotbar.add(id)
+    }
+
+    fun saveWorld() {
+        synchronized(saveLock) {
+            val w = world ?: return
+            val p = player ?: return
+            try {
+                w.save(savesDir, p, hotbar, selectedSlot)
+                chat("Mundo guardado")
+            } catch (t: Throwable) {
+                Log.e("Error guardando", t)
+            }
+        }
+    }
+
+    fun hasBlockPhysics(): Boolean = Blocks.all().isNotEmpty()
+}
+
+/** Persisted user settings. */
+object Settings {
+    private const val PREFS = "voxelcraft"
+    var sensitivity = 1.0f
+    var renderDistance = 4
+    var fov = 70f
+    var showHud = true
+    var usePacks = true
+    var useShaders = true
+    var useMods = true
+
+    fun load(context: Context) {
+        val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        sensitivity = p.getFloat("sens", 1.0f)
+        renderDistance = p.getInt("distance", 4).coerceIn(2, 6)
+        fov = p.getFloat("fov", 70f).coerceIn(50f, 100f)
+        showHud = p.getBoolean("hud", true)
+        usePacks = p.getBoolean("usePacks", true)
+        useShaders = p.getBoolean("useShaders", true)
+        useMods = p.getBoolean("useMods", true)
+    }
+
+    fun save(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putFloat("sens", sensitivity)
+            .putInt("distance", renderDistance)
+            .putFloat("fov", fov)
+            .putBoolean("hud", showHud)
+            .putBoolean("usePacks", usePacks)
+            .putBoolean("useShaders", useShaders)
+            .putBoolean("useMods", useMods)
+            .apply()
+    }
+}
