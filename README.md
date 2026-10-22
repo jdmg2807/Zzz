@@ -225,6 +225,14 @@ Descargas/VoxelCraft/voxelcraft-<fecha>.txt
 Se guarda automáticamente al pausar, al importar algo y ante un crash. También puedes forzarlo
 desde **Ajustes → Guardar log en Descargas** o enviarlo con **Ajustes → Compartir log**.
 
+## Documentación técnica
+
+- `docs/JAVA_PARITY.md` — reglas públicas de luz, tick, física, dureza, generación y color de
+  biomas, con estado ✅/🟡/⬜ de cada una.
+- `docs/REFACTOR_PLAN_1.21.md` — plan de refactorización de los cinco subsistemas (GUI, físicas y
+  redstone, mundo y +700 bloques, IA con A*, pipeline gráfico y mods), hoja de ruta por versiones y
+  riesgos técnicos.
+
 ## Historial de versiones
 
 Ver [CHANGELOG.md](CHANGELOG.md): v1.0 motor + mods/texturas/shaders, v1.1 biomas/vegetación/cielo,

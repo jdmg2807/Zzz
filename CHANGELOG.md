@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.6.1 — GUI Scale de Java, menú principal replicado y plan de refactorización 1.21
+- **Sistema de GUI Scale** (`ui/GuiScale.kt`): la interfaz se dibuja en píxeles virtuales con la
+  fórmula de Java (`clamp(min(ancho/320, alto/240), 1, 4)`). Es la corrección real del bug de
+  maquetación: antes había ~600 dp de contenido (9 botones de 42 dp + título + padding) dentro de
+  un viewport de ~360 dp, con un ancho fijo de 360 dp que además desbordaba en móviles estrechos,
+  y tipografía en `sp` que crecía con la escala de fuente del sistema. Ahora todo encoge de forma
+  uniforme y **no puede salirse de la pantalla**.
+- **Menú principal como Java**: panorámica procedural con parallax y desenfoque, logo en
+  `height/4`, splash aleatoria rotada −20° con pulso y los tres botones de Java (`200×20`, 4 px de
+  separación): **Un jugador**, **Ajustes…**, **Salir del juego** (sin Multijugador ni Realms).
+- **Pantalla «Seleccionar mundo»** al pulsar Un jugador: lista enmarcada, Jugar / Crear mundo
+  nuevo / Cancelar y diálogo **Importar de Java** (mundo, texturas, shaders, mod o autodetección).
+- **Ajustes → Escala de interfaz** (Auto, 1–4) y accesos a «Texturas y shaders instalados» y
+  «Mods instalados», que ya no viven en el menú principal.
+- **`docs/REFACTOR_PLAN_1.21.md`**: análisis del fallo de layout y plan paso a paso de los cinco
+  subsistemas (GUI, físicas/redstone, mundo y +700 bloques, IA/A*, pipeline y mods), con hoja de
+  ruta por versiones, riesgos y límites técnicos (GLSL ES 3.00 frente a packs Iris de escritorio).
+
 ## v1.6.0 — Importaciones arregladas, texturas de Faithful y paridad documentada
 - **Importar mundos vuelve a funcionar de verdad**: la paleta de bloques se prepara antes de
   convertir los chunks. En v1.5.x la paleta estaba vacía al importar desde el menú, así que
