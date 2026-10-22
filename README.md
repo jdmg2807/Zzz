@@ -174,6 +174,11 @@ e impórtalo desde la pantalla **Mods** (o cópialo a `mods/`).
 > Los mods de Forge/Fabric **no** son compatibles: usan código de Minecraft y Mixin. Este
 > motor define su propia API para que puedas escribir mods en Java sin Minecraft.
 
+## Historial de versiones
+
+Ver [CHANGELOG.md](CHANGELOG.md): v1.0 motor + mods/texturas/shaders, v1.1 biomas/vegetación/cielo,
+v1.2 iluminación/antorcha/mano/minado.
+
 ## Compilar tú mismo
 
 Requisitos: JDK 17, Android SDK 34, Gradle 8.7 (o Android Studio, que añade el wrapper).
