@@ -26,6 +26,20 @@ class World(val seed: Long) {
         time += dt
         dayTime += dt / 600f
         if (dayTime > 1f) dayTime -= 1f
+        Fluids.tick(this, dt)
+    }
+
+    /** Marks a block and its neighbours for re-meshing (used by the fluid simulator). */
+    fun markDirtyAround(x: Int, y: Int, z: Int) {
+        val cx = x shr 4
+        val cz = z shr 4
+        chunk(cx, cz)?.dirty = true
+        val lx = x and 15
+        val lz = z and 15
+        if (lx == 0) chunk(cx - 1, cz)?.dirty = true
+        if (lx == 15) chunk(cx + 1, cz)?.dirty = true
+        if (lz == 0) chunk(cx, cz - 1)?.dirty = true
+        if (lz == 15) chunk(cx, cz + 1)?.dirty = true
     }
 
     fun chunk(cx: Int, cz: Int): Chunk? = chunks[keyOf(cx, cz)]
@@ -68,8 +82,11 @@ class World(val seed: Long) {
         if (lx == 15) chunk(cx + 1, cz)?.dirty = true
         if (lz == 0) chunk(cx, cz - 1)?.dirty = true
         if (lz == 15) chunk(cx, cz + 1)?.dirty = true
-        // Redstone reacts to every block change (cheap no-op for unrelated blocks).
-        if (!silent) Redstone.onChanged(this, x, y, z)
+        // Redstone and fluids react to every block change (cheap no-op for unrelated blocks).
+        if (!silent) {
+            Redstone.onChanged(this, x, y, z)
+            Fluids.onBlockChanged(this, x, y, z)
+        }
         return true
     }
 
