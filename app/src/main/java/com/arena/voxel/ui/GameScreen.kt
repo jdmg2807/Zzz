@@ -7,6 +7,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +45,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -125,16 +128,23 @@ fun GameScreen(onExit: () -> Unit) {
                 Modifier
                     .fillMaxSize()
                     .pointerInput(Unit) {
-                        detectDragGestures { change, drag ->
-                            change.consume()
-                            Game.addLook(drag.x, drag.y)
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            Game.pressSeq++
+                            Game.pressActive = true
+                            var last = down.position
+                            down.consume()
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (change.changedToUpIgnoreConsumed()) break
+                                val delta = change.position - last
+                                last = change.position
+                                if (delta.x != 0f || delta.y != 0f) Game.addLook(delta.x, delta.y)
+                                change.consume()
+                            }
+                            Game.pressActive = false
                         }
-                    }
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = { Game.requestPlace() },
-                            onLongPress = { Game.requestBreak() }
-                        )
                     }
             )
 

@@ -36,7 +36,8 @@ object Textures {
         "glass", "snow", "bedrock", "coal_ore", "iron_ore", "gold_ore", "diamond_ore", "brick",
         "obsidian", "tnt_side", "tnt_top", "glowstone", "sandstone", "cactus_side", "cactus_top",
         "dead_bush", "dandelion", "poppy", "spruce_log_side", "spruce_log_top", "spruce_leaves",
-        "birch_log_side", "birch_log_top", "birch_leaves", "sugar_cane"
+        "birch_log_side", "birch_log_top", "birch_leaves", "sugar_cane",
+        "torch", "crack_1", "crack_2", "crack_3", "crack_4", "crack_5", "crack_6"
     )
 
     /** Tiles rendered once per biome. */

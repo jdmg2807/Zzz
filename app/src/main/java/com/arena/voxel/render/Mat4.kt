@@ -45,6 +45,44 @@ object Mat4 {
         return m
     }
 
+    fun scale(x: Float, y: Float, z: Float): FloatArray {
+        val m = identity()
+        m[0] = x
+        m[5] = y
+        m[10] = z
+        return m
+    }
+
+    fun rotationX(deg: Float): FloatArray {
+        val r = Math.toRadians(deg.toDouble())
+        val c = cos(r).toFloat()
+        val s = sin(r).toFloat()
+        val m = identity()
+        m[5] = c; m[6] = s
+        m[9] = -s; m[10] = c
+        return m
+    }
+
+    fun rotationY(deg: Float): FloatArray {
+        val r = Math.toRadians(deg.toDouble())
+        val c = cos(r).toFloat()
+        val s = sin(r).toFloat()
+        val m = identity()
+        m[0] = c; m[2] = -s
+        m[8] = s; m[10] = c
+        return m
+    }
+
+    fun rotationZ(deg: Float): FloatArray {
+        val r = Math.toRadians(deg.toDouble())
+        val c = cos(r).toFloat()
+        val s = sin(r).toFloat()
+        val m = identity()
+        m[0] = c; m[1] = s
+        m[4] = -s; m[5] = c
+        return m
+    }
+
     fun view(eyeX: Float, eyeY: Float, eyeZ: Float, yawDeg: Float, pitchDeg: Float): FloatArray {
         val yaw = Math.toRadians(yawDeg.toDouble())
         val pitch = Math.toRadians(pitchDeg.toDouble())

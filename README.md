@@ -37,6 +37,9 @@ Requisitos: Android 7.0+ (API 24) con OpenGL ES 3.0.
 | 6 biomas (llanura, bosque, nevado, desierto, taiga, jungla) con colores propios | ✅ |
 | Árboles por bioma (roble, abedul, pino, jungla), cactus, caña de azúcar, plantas | ✅ |
 | Oclusión ambiental (AO) por vértice y sombreado por cara | ✅ |
+| Iluminación: luz de cielo (cuevas oscuras) + luz de bloque (antorcha, glowstone) | ✅ |
+| Bloque en la mano con animación de golpe y balanceo al caminar | ✅ |
+| Minado al mantener pulsado con grietas progresivas | ✅ |
 | Cielo con nubes a la deriva, sol, luna con fase y estrellas nocturnas | ✅ |
 | Agua con fresnel, brillo del sol, oleaje y superficie 2/16 más baja | ✅ |
 | Render por chunks con atlas de texturas, niebla suave y culling de caras | ✅ |
@@ -54,8 +57,8 @@ Requisitos: Android 7.0+ (API 24) con OpenGL ES 3.0.
 
 - **Joystick izquierdo**: moverte.
 - **Arrastrar en pantalla**: mirar alrededor.
-- **Toque**: colocar el bloque seleccionado.
-- **Pulsación larga**: romper el bloque apuntado.
+- **Toque corto**: colocar el bloque seleccionado.
+- **Mantener pulsado**: minar el bloque apuntado (grietas y rotura continua).
 - **↥**: saltar / subir volando. **↧**: bajar volando. **✈**: activar vuelo creativo.
 - **⛏ / ■**: romper / colocar (botones dedicados).
 - **»**: esprintar (mantener). **▦**: selector de bloques (incluye los bloques añadidos por mods) para la ranura activa.
@@ -212,7 +215,8 @@ samples/                    pack de texturas y shader de ejemplo
   uniforms `gbuffers_*` no compilan tal cual; adapta el código o usa los integrados como base.
 - Guardado: un solo mundo (`mundo1`). Se puede ampliar a varias ranuras.
 - Sin inventario/crafteo todavía (selector creativo por ahora).
-- Sin luz de bloque propagada: el AO da profundidad pero las cuevas no se oscurecen.
+- La luz es aproximada: cielo por profundidad bajo la superficie y luz de bloque por distancia
+  a las fuentes (no hay propagación BFS de 15 niveles como en Java, ni suavizado completo).
 - Packs de shaders tipo OptiFine/Iris no soportados (ver arriba).
 
 Hecho con cariño para jugar en el móvil. Los PRs con nuevos mods, packs o mejoras del motor

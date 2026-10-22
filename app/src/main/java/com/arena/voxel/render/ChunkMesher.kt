@@ -8,11 +8,9 @@ import com.arena.voxel.world.World
 /**
  * Converts a chunk into triangles.
  *
- * - only faces touching air / transparent blocks are emitted (huge geometry reduction)
- * - ambient occlusion per vertex, baked into the shade attribute
- * - biome tinted tiles: the mesher just adds the biome index to the base tile
- * - water gets its own buffer (blended later) and a lowered surface
- * - plants use crossed quads with alpha test
+ * Per vertex: position, atlas UV, face shade * ambient occlusion, sky light and block light.
+ * Light is baked here (cheap approximation), so the shaders only have to combine it with the
+ * day/night brightness.
  */
 object ChunkMesher {
 
@@ -40,17 +38,36 @@ object ChunkMesher {
     /** Water surface sits 2/16 below a full block, like Minecraft. */
     private const val WATER_DROP = 0.12f
 
-    class Result(val opaque: FloatArray, val water: FloatArray)
-
     private val cornerU = intArrayOf(0, 1, 1, 0)
     private val cornerV = intArrayOf(0, 0, 1, 1)
 
+    class Result(val opaque: FloatArray, val water: FloatArray)
+
+    private const val FLOATS_PER_VERTEX = 8
+
     fun build(world: World, chunk: Chunk, biomes: IntArray): Result {
-        val opaque = FloatList(12288)
+        val opaque = FloatList(16384)
         val water = FloatList(2048)
         val baseX = chunk.cx * 16
         val baseZ = chunk.cz * 16
         val shades = FloatArray(4)
+
+        // Column heightmap for sky light (highest opaque block).
+        val surface = IntArray(256)
+        for (z in 0 until 16) {
+            for (x in 0 until 16) {
+                var top = 0
+                for (y in World.HEIGHT - 1 downTo 0) {
+                    if (Blocks.isOpaque(chunk.get(x, y, z))) {
+                        top = y
+                        break
+                    }
+                }
+                surface[z * 16 + x] = top
+            }
+        }
+
+        val sources = findLightSources(world, chunk)
 
         for (y in 0 until World.HEIGHT) {
             for (z in 0 until 16) {
@@ -62,9 +79,14 @@ object ChunkMesher {
                     val wz = baseZ + z
                     val biome = biomes[z * 16 + x]
 
+                    val surfaceY = surface[z * 16 + x]
+                    val depth = surfaceY - y
+                    val sky = if (depth <= 0) 1f else (1f - depth * 0.11f).coerceAtLeast(0.05f)
+                    val blockLight = if (sources.isEmpty()) 0f else lightFrom(sources, wx, y, wz)
+
                     if (block.cross) {
                         val tint = if (block.tintTop) biome else 0
-                        addCross(opaque, wx, y, wz, block.tileTop + tint, 0.96f)
+                        addCross(opaque, wx, y, wz, block.tileTop + tint, 0.96f, sky, blockLight)
                         continue
                     }
 
@@ -93,7 +115,7 @@ object ChunkMesher {
                         }
                         val tile = baseTile + if (tinted) biome else 0
 
-                        if (liquid || !block.opaque && block.cross) {
+                        if (liquid) {
                             for (i in 0..3) shades[i] = FACE_SHADE[f]
                         } else {
                             for (i in 0..3) {
@@ -103,12 +125,52 @@ object ChunkMesher {
                         }
 
                         val topOff = if (liquid && !aboveIsSame) WATER_DROP else 0f
-                        addQuad(target, wx, y, wz, f, tile, shades, topOff)
+                        addQuad(target, wx, y, wz, f, tile, shades, topOff, sky, blockLight)
                     }
                 }
             }
         }
         return Result(opaque.toArray(), water.toArray())
+    }
+
+    private class LightSource(val x: Int, val y: Int, val z: Int, val level: Int)
+
+    private fun findLightSources(world: World, chunk: Chunk): List<LightSource> {
+        val out = ArrayList<LightSource>(16)
+        val cx = chunk.cx
+        val cz = chunk.cz
+        for (dx in -1..1) {
+            for (dz in -1..1) {
+                val c = world.chunk(cx + dx, cz + dz) ?: continue
+                for (y in 0 until World.HEIGHT) {
+                    for (z in 0 until 16) {
+                        for (x in 0 until 16) {
+                            val b = c.get(x, y, z)
+                            if (b == Blocks.AIR) continue
+                            val light = Blocks.get(b).light
+                            if (light <= 0) continue
+                            out.add(LightSource(c.cx * 16 + x, y, c.cz * 16 + z, light))
+                            if (out.size >= 64) return out
+                        }
+                    }
+                }
+            }
+        }
+        return out
+    }
+
+    private fun lightFrom(sources: List<LightSource>, x: Int, y: Int, z: Int): Float {
+        var best = 0f
+        for (s in sources) {
+            val dx = (s.x - x).toFloat()
+            val dy = (s.y - y).toFloat()
+            val dz = (s.z - z).toFloat()
+            val dist = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+            if (dist > 15f) continue
+            val v = (1f - dist / 15f) * (s.level / 15f)
+            if (v > best) best = v
+        }
+        return best
     }
 
     /** 0..3, where 0 is the most occluded corner. */
@@ -128,13 +190,54 @@ object ChunkMesher {
         return if (s1 == 1 && s2 == 1) 0 else 3 - (s1 + s2 + c)
     }
 
+    // ------------------------------------------------------------------ geometry
+
     private fun addQuad(
         out: FloatList,
         x: Int, y: Int, z: Int,
         face: Int,
         tile: Int,
         shades: FloatArray,
-        topOffset: Float
+        topOffset: Float,
+        sky: Float,
+        blockLight: Float
+    ) {
+        val px = floatArrayOf(
+            (x + OX[face]).toFloat(),
+            (x + OX[face] + UX[face]).toFloat(),
+            (x + OX[face] + UX[face] + VX[face]).toFloat(),
+            (x + OX[face] + VX[face]).toFloat()
+        )
+        val py = floatArrayOf(
+            (y + OY[face]).toFloat(),
+            (y + OY[face] + UY[face]).toFloat(),
+            (y + OY[face] + UY[face] + VY[face]).toFloat(),
+            (y + OY[face] + VY[face]).toFloat()
+        )
+        val pz = floatArrayOf(
+            (z + OZ[face]).toFloat(),
+            (z + OZ[face] + UZ[face]).toFloat(),
+            (z + OZ[face] + UZ[face] + VZ[face]).toFloat(),
+            (z + OZ[face] + VZ[face]).toFloat()
+        )
+
+        if (topOffset != 0f) {
+            if (VERTICAL_UV[face]) {
+                py[1] -= topOffset
+                py[2] -= topOffset
+            } else if (face == 2) {
+                for (i in 0..3) py[i] -= topOffset
+            }
+        }
+
+        emit(out, px, py, pz, face, tile, shades, sky, blockLight)
+    }
+
+    private fun emit(
+        out: FloatList,
+        px: FloatArray, py: FloatArray, pz: FloatArray,
+        face: Int, tile: Int, shades: FloatArray,
+        sky: Float, blockLight: Float
     ) {
         val col = tile % Textures.GRID
         val row = tile / Textures.GRID
@@ -145,36 +248,6 @@ object ChunkMesher {
         // Bitmap row 0 lives at v = 0, so tile rows grow downwards in v.
         val vTop = row * ts + eps
         val vBottom = (row + 1) * ts - eps
-
-        val ox = x + OX[face]
-        val oy = y + OY[face]
-        val oz = z + OZ[face]
-        val ux = UX[face]
-        val uy = UY[face]
-        val uz = UZ[face]
-        val vx = VX[face]
-        val vy = VY[face]
-        val vz = VZ[face]
-
-        val px = floatArrayOf(
-            ox.toFloat(), (ox + ux).toFloat(), (ox + ux + vx).toFloat(), (ox + vx).toFloat()
-        )
-        val py = floatArrayOf(
-            oy.toFloat(), (oy + uy).toFloat(), (oy + uy + vy).toFloat(), (oy + vy).toFloat()
-        )
-        val pz = floatArrayOf(
-            oz.toFloat(), (oz + uz).toFloat(), (oz + uz + vz).toFloat(), (oz + vz).toFloat()
-        )
-
-        if (topOffset != 0f) {
-            if (VERTICAL_UV[face]) {
-                // Vertical quad: corners 1 and 2 are the top edge.
-                py[1] -= topOffset
-                py[2] -= topOffset
-            } else if (face == 2) {
-                for (i in 0..3) py[i] -= topOffset
-            }
-        }
 
         val uu = FloatArray(4)
         val vv = FloatArray(4)
@@ -190,21 +263,20 @@ object ChunkMesher {
             uu[3] = u0; vv[3] = vBottom
         }
 
-        // Split the quad along the diagonal that keeps the AO gradient smooth.
         if (shades[0] + shades[2] > shades[1] + shades[3]) {
-            vertex(out, px, py, pz, uu, vv, shades, 0)
-            vertex(out, px, py, pz, uu, vv, shades, 1)
-            vertex(out, px, py, pz, uu, vv, shades, 2)
-            vertex(out, px, py, pz, uu, vv, shades, 0)
-            vertex(out, px, py, pz, uu, vv, shades, 2)
-            vertex(out, px, py, pz, uu, vv, shades, 3)
+            vertex(out, px, py, pz, uu, vv, shades, 0, sky, blockLight)
+            vertex(out, px, py, pz, uu, vv, shades, 1, sky, blockLight)
+            vertex(out, px, py, pz, uu, vv, shades, 2, sky, blockLight)
+            vertex(out, px, py, pz, uu, vv, shades, 0, sky, blockLight)
+            vertex(out, px, py, pz, uu, vv, shades, 2, sky, blockLight)
+            vertex(out, px, py, pz, uu, vv, shades, 3, sky, blockLight)
         } else {
-            vertex(out, px, py, pz, uu, vv, shades, 1)
-            vertex(out, px, py, pz, uu, vv, shades, 2)
-            vertex(out, px, py, pz, uu, vv, shades, 3)
-            vertex(out, px, py, pz, uu, vv, shades, 1)
-            vertex(out, px, py, pz, uu, vv, shades, 3)
-            vertex(out, px, py, pz, uu, vv, shades, 0)
+            vertex(out, px, py, pz, uu, vv, shades, 1, sky, blockLight)
+            vertex(out, px, py, pz, uu, vv, shades, 2, sky, blockLight)
+            vertex(out, px, py, pz, uu, vv, shades, 3, sky, blockLight)
+            vertex(out, px, py, pz, uu, vv, shades, 1, sky, blockLight)
+            vertex(out, px, py, pz, uu, vv, shades, 3, sky, blockLight)
+            vertex(out, px, py, pz, uu, vv, shades, 0, sky, blockLight)
         }
     }
 
@@ -212,12 +284,15 @@ object ChunkMesher {
         out: FloatList,
         px: FloatArray, py: FloatArray, pz: FloatArray,
         uu: FloatArray, vv: FloatArray,
-        shades: FloatArray, i: Int
+        shades: FloatArray, i: Int,
+        sky: Float, blockLight: Float
     ) {
-        out.add(px[i], py[i], pz[i], uu[i], vv[i], shades[i])
+        out.add(px[i], py[i], pz[i], uu[i], vv[i], shades[i], sky, blockLight)
     }
 
-    private fun addCross(out: FloatList, x: Int, y: Int, z: Int, tile: Int, shade: Float) {
+    private fun addCross(
+        out: FloatList, x: Int, y: Int, z: Int, tile: Int, shade: Float, sky: Float, blockLight: Float
+    ) {
         val col = tile % Textures.GRID
         val row = tile / Textures.GRID
         val ts = 1f / Textures.GRID
@@ -231,24 +306,47 @@ object ChunkMesher {
         val fy = y.toFloat()
         val fz = z.toFloat()
 
+        fun v(a: Float, b: Float, c: Float, u: Float, v2: Float) =
+            out.add(a, b, c, u, v2, shade, sky, blockLight)
+
         fun plane(ax: Float, az: Float, bx: Float, bz: Float) {
-            // front
-            out.add(ax, fy, az, u0, vBottom, shade)
-            out.add(bx, fy, bz, u1, vBottom, shade)
-            out.add(bx, fy + 1f, bz, u1, vTop, shade)
-            out.add(ax, fy, az, u0, vBottom, shade)
-            out.add(bx, fy + 1f, bz, u1, vTop, shade)
-            out.add(ax, fy + 1f, az, u0, vTop, shade)
-            // back
-            out.add(bx, fy, bz, u0, vBottom, shade)
-            out.add(ax, fy, az, u1, vBottom, shade)
-            out.add(ax, fy + 1f, az, u1, vTop, shade)
-            out.add(bx, fy, bz, u0, vBottom, shade)
-            out.add(ax, fy + 1f, az, u1, vTop, shade)
-            out.add(bx, fy + 1f, bz, u0, vTop, shade)
+            v(ax, fy, az, u0, vBottom); v(bx, fy, bz, u1, vBottom); v(bx, fy + 1f, bz, u1, vTop)
+            v(ax, fy, az, u0, vBottom); v(bx, fy + 1f, bz, u1, vTop); v(ax, fy + 1f, az, u0, vTop)
+            v(bx, fy, bz, u0, vBottom); v(ax, fy, az, u1, vBottom); v(ax, fy + 1f, az, u1, vTop)
+            v(bx, fy, bz, u0, vBottom); v(ax, fy + 1f, az, u1, vTop); v(bx, fy + 1f, bz, u0, vTop)
         }
 
         plane(fx, fz, fx + 1f, fz + 1f)
         plane(fx + 1f, fz, fx, fz + 1f)
+    }
+
+    // ------------------------------------------------------------------ standalone cubes
+
+    /**
+     * Unit cube [0,1] with per-face tiles, used for the held block and the mining cracks.
+     * Sky light is forced to [sky]; block light is used for the warm highlight.
+     */
+    fun buildCube(top: Int, side: Int, bottom: Int, sky: Float = 1f, blockLight: Float = 0f): FloatArray {
+        val out = FloatList(512)
+        val shades = FloatArray(4)
+        for (f in 0..5) {
+            val tile = when (f) {
+                2 -> top
+                3 -> bottom
+                else -> side
+            }
+            for (i in 0..3) shades[i] = FACE_SHADE[f]
+            val px = floatArrayOf(
+                OX[f].toFloat(), (OX[f] + UX[f]).toFloat(), (OX[f] + UX[f] + VX[f]).toFloat(), (OX[f] + VX[f]).toFloat()
+            )
+            val py = floatArrayOf(
+                OY[f].toFloat(), (OY[f] + UY[f]).toFloat(), (OY[f] + UY[f] + VY[f]).toFloat(), (OY[f] + VY[f]).toFloat()
+            )
+            val pz = floatArrayOf(
+                OZ[f].toFloat(), (OZ[f] + UZ[f]).toFloat(), (OZ[f] + UZ[f] + VZ[f]).toFloat(), (OZ[f] + VZ[f]).toFloat()
+            )
+            emit(out, px, py, pz, f, tile, shades, sky, blockLight)
+        }
+        return out.toArray()
     }
 }

@@ -12,16 +12,22 @@ object ShaderSources {
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec2 aUV;
 layout(location = 2) in float aShade;
+layout(location = 3) in float aSky;
+layout(location = 4) in float aBlock;
 
 uniform mat4 uMVP;
 
 out vec2 vUV;
 out float vShade;
+out float vSky;
+out float vBlock;
 out vec3 vWorld;
 
 void main() {
     vUV = aUV;
     vShade = aShade;
+    vSky = aSky;
+    vBlock = aBlock;
     vWorld = aPos;
     gl_Position = uMVP * vec4(aPos, 1.0);
 }
@@ -33,6 +39,8 @@ precision mediump float;
 
 in vec2 vUV;
 in float vShade;
+in float vSky;
+in float vBlock;
 in vec3 vWorld;
 
 uniform sampler2D uTex;
@@ -40,13 +48,20 @@ uniform vec3 uCam;
 uniform vec3 uFogColor;
 uniform vec2 uFog;
 uniform vec3 uLightColor;
+uniform float uDay;
 
 out vec4 fragColor;
 
 void main() {
     vec4 t = texture(uTex, vUV);
     if (t.a < 0.5) discard;
-    vec3 c = t.rgb * vShade * uLightColor;
+
+    // Combine moon/ambient, sky light (attenuated by uDay) and warm block light.
+    vec3 light = vec3(0.085, 0.10, 0.19);
+    light = max(light, uLightColor * (vSky * uDay));
+    light = max(light, vec3(1.0, 0.74, 0.46) * vBlock);
+
+    vec3 c = t.rgb * vShade * light;
     float d = distance(vWorld, uCam);
     float f = clamp((d - uFog.x) / max(uFog.y - uFog.x, 0.001), 0.0, 1.0);
     f = f * f * (3.0 - 2.0 * f);
@@ -59,12 +74,16 @@ void main() {
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec2 aUV;
 layout(location = 2) in float aShade;
+layout(location = 3) in float aSky;
+layout(location = 4) in float aBlock;
 
 uniform mat4 uMVP;
 uniform float uTime;
 
 out vec2 vUV;
 out float vShade;
+out float vSky;
+out float vBlock;
 out vec3 vWorld;
 
 void main() {
@@ -73,6 +92,8 @@ void main() {
     p.y += sin(p.x * 0.9 + uTime * 1.4) * 0.035 + cos(p.z * 1.1 + uTime * 1.1) * 0.035;
     vUV = aUV;
     vShade = aShade;
+    vSky = aSky;
+    vBlock = aBlock;
     vWorld = p;
     gl_Position = uMVP * vec4(p, 1.0);
 }
@@ -84,6 +105,8 @@ precision mediump float;
 
 in vec2 vUV;
 in float vShade;
+in float vSky;
+in float vBlock;
 in vec3 vWorld;
 
 uniform sampler2D uTex;
@@ -93,24 +116,30 @@ uniform vec2 uFog;
 uniform vec3 uLightColor;
 uniform vec3 uSunDir;
 uniform float uTime;
+uniform float uDay;
 
 out vec4 fragColor;
 
 void main() {
     vec2 uv = vUV + vec2(sin(uTime * 0.8 + vWorld.z * 0.7) * 0.018, cos(uTime * 0.6 + vWorld.x * 0.7) * 0.018);
     vec4 t = texture(uTex, uv);
-    vec3 base = t.rgb * (0.85 + vShade * 0.25) * uLightColor;
+
+    vec3 light = vec3(0.085, 0.10, 0.19);
+    light = max(light, uLightColor * (vSky * uDay));
+    light = max(light, vec3(1.0, 0.74, 0.46) * vBlock);
+
+    vec3 base = t.rgb * (0.85 + vShade * 0.25) * light;
 
     // Fresnel: water reflects the sky at grazing angles.
     vec3 viewDir = normalize(uCam - vWorld);
     float fres = pow(1.0 - clamp(viewDir.y, 0.0, 1.0), 3.0);
-    vec3 skyTint = uFogColor * 1.15;
+    vec3 skyTint = uFogColor * 1.15 * max(uDay, 0.12);
     vec3 c = mix(base, skyTint, fres * 0.65);
 
     // Specular highlight from the sun.
     vec3 h = normalize(uSunDir + viewDir);
     float spec = pow(max(dot(vec3(0.0, 1.0, 0.0), h), 0.0), 160.0);
-    c += vec3(1.0, 0.96, 0.86) * spec * 0.55;
+    c += vec3(1.0, 0.96, 0.86) * spec * 0.55 * uDay;
 
     float d = distance(vWorld, uCam);
     float f = clamp((d - uFog.x) / max(uFog.y - uFog.x, 0.001), 0.0, 1.0);

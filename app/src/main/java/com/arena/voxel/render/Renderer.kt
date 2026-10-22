@@ -53,6 +53,14 @@ class Renderer : GLSurfaceView.Renderer {
     private var shaderSources: Map<String, String> = emptyMap()
 
     private val failedShaders = ArrayList<String>()
+    private var handMesh: ChunkMesh? = null
+    private var handFor: String = ""
+    private val crackMeshes = arrayOfNulls<ChunkMesh>(6)
+    private var pressSeqSeen = -1
+    private var pressTime = 0f
+    private var mineProgress = 0f
+    private var swing = 0f
+    private var walkTime = 0f
     private var lastNanos = 0L
     private var fpsAccum = 0f
     private var fpsFrames = 0
@@ -474,9 +482,12 @@ class Renderer : GLSurfaceView.Renderer {
 
         if (!Game.paused) {
             when (Game.consumeAction()) {
-                1 -> hit?.let { placeBlock(w, it) }
-                2 -> hit?.let { breakBlock(w, it) }
+                1 -> hit?.let { swing = 1f; placeBlock(w, it) }
+                2 -> hit?.let { swing = 1f; breakBlock(w, it) }
             }
+            updateInteraction(dt, w, hit)
+            if (Math.abs(Game.move[0]) + Math.abs(Game.move[1]) > 0.05f) walkTime += dt * 8f
+            if (swing > 0f) swing = (swing - dt * 3.4f).coerceAtLeast(0f)
             ModLoader.tick(dt)
             Game.hudText = p.hudText
             autosaveTimer += dt
@@ -582,6 +593,7 @@ class Renderer : GLSurfaceView.Renderer {
             terrain.set3f("uFogColor", fogR, fogG, fogB)
             terrain.set2f("uFog", fogNear, fogFar)
             terrain.set3f("uLightColor", lightR, lightG, lightB)
+            terrain.set1f("uDay", brightness)
             terrain.set1i("uTex", 0)
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, atlasTexture)
@@ -616,6 +628,7 @@ class Renderer : GLSurfaceView.Renderer {
             water.set3f("uFogColor", fogR, fogG, fogB)
             water.set2f("uFog", fogNear, fogFar)
             water.set3f("uLightColor", lightR, lightG, lightB)
+            water.set1f("uDay", brightness)
             water.set1f("uTime", w.time)
             water.set3f("uSunDir", sunDir[0], sunDir[1], sunDir[2])
             water.set1i("uTex", 0)
@@ -629,6 +642,85 @@ class Renderer : GLSurfaceView.Renderer {
             GLES20.glDepthMask(true)
             GLES20.glDisable(GLES20.GL_BLEND)
             GLES20.glEnable(GLES20.GL_CULL_FACE)
+        }
+
+        // ------------------------------------------------------------------ cracks + hand
+        val terrainForFx = terrainProg
+        if (terrainForFx != null) {
+            terrainForFx.use()
+            terrainForFx.set1i("uTex", 0)
+            terrainForFx.set3f("uFogColor", fogR, fogG, fogB)
+            terrainForFx.set2f("uFog", 1000f, 1001f)
+            terrainForFx.set3f("uCam", 0f, 0f, 0f)
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, atlasTexture)
+
+            // Mining cracks on the targeted block.
+            if (Game.mining && mineProgress > 0.02f && !Game.paused) {
+                val stage = (mineProgress * 6f).toInt().coerceIn(0, 5)
+                val mesh = crackMesh(stage)
+                if (mesh != null && hit != null) {
+                    val model = Mat4.multiply(
+                        Mat4.multiply(vp, Mat4.translation(hit.x.toFloat(), hit.y.toFloat(), hit.z.toFloat())),
+                        Mat4.multiply(
+                            Mat4.translation(-0.002f, -0.002f, -0.002f),
+                            Mat4.scale(1.004f, 1.004f, 1.004f)
+                        )
+                    )
+                    terrainForFx.setMat4("uMVP", model)
+                    terrainForFx.set3f("uLightColor", 1f, 1f, 1f)
+                    terrainForFx.set1f("uDay", 1f)
+                    GLES20.glEnable(GLES20.GL_BLEND)
+                    GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+                    GLES20.glDepthMask(false)
+                    GLES20.glEnable(GLES20.GL_POLYGON_OFFSET_FILL)
+                    GLES20.glPolygonOffset(-2f, -2f)
+                    GLES20.glDisable(GLES20.GL_CULL_FACE)
+                    mesh.draw()
+                    GLES20.glEnable(GLES20.GL_CULL_FACE)
+                    GLES20.glDisable(GLES20.GL_POLYGON_OFFSET_FILL)
+                    GLES20.glDepthMask(true)
+                    GLES20.glDisable(GLES20.GL_BLEND)
+                }
+            }
+
+            // Held block in first person view.
+            val heldId = Game.selectedBlock()
+            val heldBlock = Blocks.get(Blocks.index(heldId))
+            if (heldBlock.id != "air") {
+                if (handFor != heldId) {
+                    handFor = heldId
+                    val mesh = handMesh ?: ChunkMesh().also { handMesh = it }
+                    mesh.upload(
+                        ChunkMesher.buildCube(heldBlock.tileTop, heldBlock.tileSide, heldBlock.tileBottom)
+                    )
+                }
+                val proj2 = Mat4.perspective(70f, aspect, 0.01f, 8f)
+                val bobX = if (walkTime > 0f) kotlin.math.sin(walkTime) * 0.008f else 0f
+                val bobY = if (walkTime > 0f) kotlin.math.abs(kotlin.math.cos(walkTime)) * -0.012f else 0f
+                val swingCurve = kotlin.math.sin(swing * Math.PI.toFloat())
+                val model = Mat4.multiply(
+                    Mat4.multiply(
+                        Mat4.multiply(
+                            Mat4.translation(
+                                0.30f + bobX + swingCurve * 0.10f,
+                                -0.32f + bobY - swingCurve * 0.06f,
+                                -0.62f
+                            ),
+                            Mat4.rotationY(36f - swingCurve * 55f)
+                        ),
+                        Mat4.multiply(Mat4.rotationX(12f + swingCurve * 30f), Mat4.scale(0.34f, 0.34f, 0.34f))
+                    ),
+                    Mat4.translation(-0.5f, -0.5f, -0.5f)
+                )
+                terrainForFx.setMat4("uMVP", Mat4.multiply(proj2, model))
+                terrainForFx.set3f("uLightColor", lightR, lightG, lightB)
+                terrainForFx.set1f("uDay", 1f)
+                GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT)
+                GLES20.glDisable(GLES20.GL_CULL_FACE)
+                handMesh?.draw()
+                GLES20.glEnable(GLES20.GL_CULL_FACE)
+            }
         }
 
         // ------------------------------------------------------------------ post
@@ -674,6 +766,55 @@ class Renderer : GLSurfaceView.Renderer {
 
     private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
+    private fun crackMesh(stage: Int): ChunkMesh? {
+        crackMeshes[stage]?.let { return it }
+        val tile = Textures.indexOf("crack_${stage + 1}")
+        if (tile < 0) return null
+        val mesh = ChunkMesh()
+        mesh.upload(ChunkMesher.buildCube(tile, tile, tile))
+        crackMeshes[stage] = mesh
+        return mesh
+    }
+
+    /**
+     * Touch semantics: a quick tap places the selected block, holding mines the targeted block
+     * with progressive cracks (creative mining).
+     */
+    private fun updateInteraction(dt: Float, w: World, hit: BlockHit?) {
+        if (Game.pressSeq != pressSeqSeen) {
+            pressSeqSeen = Game.pressSeq
+            pressTime = 0f
+            mineProgress = 0f
+        }
+        if (Game.pressActive) {
+            pressTime += dt
+            if (pressTime > 0.20f) {
+                Game.mining = true
+                if (hit != null) {
+                    mineProgress += dt / 0.32f
+                    if (mineProgress >= 1f) {
+                        breakBlock(w, hit)
+                        mineProgress = 0f
+                        swing = 1f
+                    }
+                } else {
+                    mineProgress = 0f
+                }
+            }
+        } else {
+            if (pressTime > 0f) {
+                if (pressTime <= 0.20f) {
+                    hit?.let { placeBlock(w, it) }
+                    swing = 1f
+                }
+                pressTime = 0f
+                mineProgress = 0f
+                Game.mining = false
+            }
+        }
+        Game.miningProgress = mineProgress
+    }
+
     /** Frees per-chunk buffers when the game screen is destroyed. */
     fun releaseWorld() {
         val w = world ?: return
@@ -686,5 +827,12 @@ class Renderer : GLSurfaceView.Renderer {
         world = null
         player = null
         drawList.clear()
+        handMesh?.release()
+        handMesh = null
+        handFor = ""
+        for (i in crackMeshes.indices) {
+            crackMeshes[i]?.release()
+            crackMeshes[i] = null
+        }
     }
 }

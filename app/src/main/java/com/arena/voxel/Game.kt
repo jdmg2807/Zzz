@@ -44,6 +44,12 @@ object Game {
     @Volatile var down = false
     @Volatile var sprint = false
 
+    /** Touch press tracking: a quick tap places a block, holding mines it. */
+    @Volatile var pressActive = false
+    @Volatile var pressSeq = 0
+    @Volatile var mining = false
+    @Volatile var miningProgress = 0f
+
     var world: World? = null
     var player: Player? = null
 
@@ -103,6 +109,9 @@ object Game {
 
     fun exitToMenu() {
         paused = false
+        pressActive = false
+        mining = false
+        miningProgress = 0f
         pendingStart = false
         pendingLoad = false
         saveWorld()

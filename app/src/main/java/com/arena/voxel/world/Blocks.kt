@@ -15,7 +15,9 @@ class Block(
     val tintTop: Boolean = false,
     val tintSide: Boolean = false,
     val tintBottom: Boolean = false,
-    val color: Int = 0x808080
+    val color: Int = 0x808080,
+    /** Emitted light level 0..15. */
+    val light: Int = 0
 )
 
 /**
@@ -68,7 +70,7 @@ object Blocks {
         add("brick", "brick", "brick", "brick", color = 0xa2432f)
         add("obsidian", "obsidian", "obsidian", "obsidian", color = 0x2a1f3d)
         add("tnt", "tnt_top", "tnt_side", "tnt_top", color = 0xd4462c)
-        add("glowstone", "glowstone", "glowstone", "glowstone", color = 0xc9a13c)
+        add("glowstone", "glowstone", "glowstone", "glowstone", color = 0xc9a13c, light = 15)
         add("cactus", "cactus_top", "cactus_side", "cactus_top", color = 0x2f7a35)
         add("spruce_log", "spruce_log_top", "spruce_log_side", "spruce_log_top", color = 0x3c2a17)
         add("spruce_leaves", "spruce_leaves", "spruce_leaves", "spruce_leaves", opaque = false, color = 0x33502F)
@@ -81,6 +83,7 @@ object Blocks {
         addCross("dandelion", "dandelion", color = 0xF2D21B)
         addCross("poppy", "poppy", color = 0xD02B1C)
         addCross("sugar_cane", "sugar_cane", color = 0x94c96a)
+        addCross("torch", "torch", color = 0xFFC24A, light = 14)
     }
 
     private fun tile(name: String): Int {
@@ -91,9 +94,9 @@ object Blocks {
     private fun add(
         id: String,
         top: String, side: String, bottom: String,
-        solid: Boolean = true, opaque: Boolean = true, color: Int
+        solid: Boolean = true, opaque: Boolean = true, color: Int, light: Int = 0
     ) {
-        add(id, tile(top), tile(side), tile(bottom), solid, opaque, false, false, color)
+        add(id, tile(top), tile(side), tile(bottom), solid, opaque, false, false, color, light = light)
     }
 
     private fun addTinted(
@@ -113,19 +116,19 @@ object Blocks {
         add(id, tile(texture), tile(texture), tile(texture), false, false, true, false, color, true, true, true)
     }
 
-    private fun addCross(id: String, texture: String, color: Int) {
-        add(id, tile(texture), tile(texture), tile(texture), false, false, false, true, color)
+    private fun addCross(id: String, texture: String, color: Int, light: Int = 0) {
+        add(id, tile(texture), tile(texture), tile(texture), false, false, false, true, color, light = light)
     }
 
     private fun add(
         id: String, top: Int, side: Int, bottom: Int,
         solid: Boolean, opaque: Boolean, liquid: Boolean = false, cross: Boolean = false, color: Int,
-        tintTop: Boolean = false, tintSide: Boolean = false, tintBottom: Boolean = false
+        tintTop: Boolean = false, tintSide: Boolean = false, tintBottom: Boolean = false, light: Int = 0
     ) {
         if (byId.containsKey(id)) return
         byId[id] = list.size
         list.add(
-            Block(id, top, side, bottom, solid, opaque, liquid, cross, tintTop, tintSide, tintBottom, color)
+            Block(id, top, side, bottom, solid, opaque, liquid, cross, tintTop, tintSide, tintBottom, color, light)
         )
     }
 

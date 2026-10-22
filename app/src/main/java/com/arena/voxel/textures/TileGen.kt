@@ -87,6 +87,13 @@ object TileGen {
         "birch_log_top" -> toBitmap(birchLogTop())
         "birch_leaves" -> toBitmap(needles(0x7DA34A))
         "sugar_cane" -> toBitmap(sugarCane())
+        "torch" -> toBitmap(torch())
+        "crack_1" -> toBitmap(cracks(1))
+        "crack_2" -> toBitmap(cracks(2))
+        "crack_3" -> toBitmap(cracks(3))
+        "crack_4" -> toBitmap(cracks(4))
+        "crack_5" -> toBitmap(cracks(5))
+        "crack_6" -> toBitmap(cracks(6))
         "coal_ore" -> toBitmap(ore(0x2e2e2e, 6, 3))
         "iron_ore" -> toBitmap(ore(0xd8b28c, 5, 2))
         "gold_ore" -> toBitmap(ore(0xf5d742, 5, 2))
@@ -228,6 +235,44 @@ object TileGen {
                 if (rnd.nextInt(10) < 9) px[y * S + x] = mul(0x94c96a, 0.8f + rnd.nextFloat() * 0.35f)
             }
             for (y in 2 until S step 5) put(px, x + 1, y, mul(0x7cae55, 0.9f))
+        }
+        return px
+    }
+
+    private fun torch(): IntArray {
+        val px = IntArray(S * S) { 0 }
+        for (y in 6 until S) {
+            put(px, 7, y, rgb(140, 100, 52))
+            put(px, 8, y, rgb(108, 76, 38))
+        }
+        // Flame.
+        for (y in 2..5) for (x in 6..9) {
+            val d = abs(x - 7.5f) + abs(y - 3.5f)
+            if (d < 2.6f) put(px, x, y, rgb(255, 170, 40 + (d * 30).toInt()))
+        }
+        put(px, 7, 3, rgb(255, 240, 150))
+        put(px, 8, 3, rgb(255, 226, 120))
+        put(px, 7, 2, rgb(255, 210, 90))
+        return px
+    }
+
+    /** Progressive mining cracks; stage grows from 1 to 6. */
+    private fun cracks(stage: Int): IntArray {
+        val px = IntArray(S * S) { 0 }
+        val rnd = Random((stage * 31 + 7).toLong())
+        val lines = stage * 3
+        repeat(lines) {
+            var x = 2 + rnd.nextInt(12)
+            var y = 2 + rnd.nextInt(12)
+            val steps = 3 + rnd.nextInt(4)
+            for (i in 0 until steps) {
+                if (x in 0 until S && y in 0 until S) {
+                    px[y * S + x] = rgb(20, 20, 20, 210)
+                    if (rnd.nextBoolean()) px[y * S + (x + 1).coerceAtMost(S - 1)] = rgb(30, 30, 30, 150)
+                }
+                x += rnd.nextInt(3) - 1
+                y += rnd.nextInt(3) - 1
+            }
         }
         return px
     }
