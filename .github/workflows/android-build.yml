@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   build:
@@ -49,6 +50,11 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Comprobar Gradle
+        run: |
+          which gradle || true
+          gradle --version || true
+
       - name: Compilar APK y mod de ejemplo
         run: |
           set -o pipefail
@@ -76,6 +82,25 @@ jobs:
               echo "</details>"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar log en un issue (diagnóstico)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Run ${{ github.run_id }} · commit ${{ github.sha }}"
+            echo ""
+            echo '```'
+            tail -n 200 build.log 2>/dev/null || echo "sin build.log"
+            echo '```'
+          } > /tmp/ci.md
+          NUMBER=$(gh issue list --state open --search "CI build log in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$NUMBER" ]; then
+            gh issue comment "$NUMBER" --body-file /tmp/ci.md
+          else
+            gh issue create --title "CI build log (auto)" --body-file /tmp/ci.md
+          fi
 
       - name: Anotar errores de compilación
         if: failure()
