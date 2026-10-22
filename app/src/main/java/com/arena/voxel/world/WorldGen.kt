@@ -1,5 +1,6 @@
 package com.arena.voxel.world
 
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
@@ -147,18 +148,12 @@ class WorldGen(val seed: Long) {
                     chunk.set(lx, y, lz, Blocks.index(block))
                 }
 
-                // Caves: two 3D noise fields, tunnels + wide chambers ("cheese" caves).
+                // Caves: the three 1.18+ noise-cave types (cheese, spaghetti, noodle).
                 for (y in 2 until max(3, h - 3)) {
                     if (y >= H) break
-                    val tunnelNoise = noise3(wx * 0.05f, y * 0.075f + 3f, wz * 0.05f)
-                    val chamberNoise = noise3(
-                        wx * 0.032f + 51f, y * 0.055f - 17f, wz * 0.032f + 23f
-                    )
-                    val tunnel = kotlin.math.abs(tunnelNoise - 0.5f) < 0.043f
-                    val chamber = chamberNoise > 0.795f
-                    if (tunnel || chamber) {
-                        chunk.set(lx, y, lz, Blocks.AIR)
-                    }
+                    if (!caveAt(wx, y, wz)) continue
+                    // Lava lakes fill the deepest part of the world, like y < -54 in Java.
+                    chunk.set(lx, y, lz, if (y <= 8) Blocks.index("lava") else Blocks.AIR)
                 }
 
                 // Ore pockets.
@@ -206,6 +201,33 @@ class WorldGen(val seed: Long) {
         }
         chunk.generated = true
         chunk.dirty = true
+    }
+
+    /**
+     * Minecraft 1.18+ noise caves, rebuilt from the wiki's description:
+     *
+     * * **Cheese** — one low-frequency 3D field; everything above the threshold is carved, giving
+     *   the big blobby caverns.
+     * * **Spaghetti** — two independent fields; a tunnel exists where *both* are close to their
+     *   midpoint, so the intersection is a long thin tube.
+     * * **Noodle** — the same idea with a much higher frequency and a tighter threshold, which
+     *   produces the rare hair-thin passages.
+     *
+     * Thresholds are tuned so roughly 1 block in 90 is cave, close to the overworld density.
+     */
+    fun caveAt(wx: Int, y: Int, wz: Int): Boolean {
+        if (y < 2) return false
+        val fy = y.toFloat()
+        // Cheese caves.
+        if (noise3(wx * 0.021f + 11f, fy * 0.028f - 7f, wz * 0.021f + 5f) > 0.80f) return true
+        // Spaghetti caves.
+        val s1 = noise3(wx * 0.041f - 23f, fy * 0.052f + 31f, wz * 0.041f + 17f)
+        val s2 = noise3(wx * 0.041f + 61f, fy * 0.052f - 13f, wz * 0.041f - 43f)
+        if (abs(s1 - 0.5f) < 0.020f && abs(s2 - 0.5f) < 0.020f) return true
+        // Noodle caves.
+        val n1 = noise3(wx * 0.075f + 91f, fy * 0.095f + 7f, wz * 0.075f - 29f)
+        val n2 = noise3(wx * 0.075f - 53f, fy * 0.095f - 61f, wz * 0.075f + 37f)
+        return abs(n1 - 0.5f) < 0.010f && abs(n2 - 0.5f) < 0.010f
     }
 
     /**

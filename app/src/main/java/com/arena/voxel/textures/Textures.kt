@@ -64,7 +64,9 @@ object Textures {
         "crafting_table_top", "crafting_table_side", "crafting_table_front",
         "chest_top", "chest_side", "chest_front",
         "furnace_top", "furnace_side", "furnace_front", "furnace_front_on",
-        "anvil_top", "anvil_side"
+        "anvil_top", "anvil_side",
+        // v1.9.0: lava for the deep caves
+        "lava"
     )
 
     /** Tiles rendered once per biome. */

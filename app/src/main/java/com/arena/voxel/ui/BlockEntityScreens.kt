@@ -267,24 +267,25 @@ fun AnvilScreen(gui: Gui, onClose: () -> Unit) {
             ) {
                 for (i in 0 until 2) {
                     Slot(gui, 27f + i * 31f, 47f, inputs[i]) { current ->
+                        val held = cursor
                         when {
-                            cursor == null && current != null -> {
+                            held == null && current != null -> {
                                 inputs[i] = null
                                 cursor = current
                             }
-                            cursor != null && current == null -> {
-                                inputs[i] = cursor
+                            held != null && current == null -> {
+                                inputs[i] = held
                                 cursor = null
                             }
-                            cursor != null && current != null && cursor.id == current.id -> {
+                            held != null && current != null && held.id == current.id -> {
                                 val max = com.arena.voxel.items.Items.maxStack(current.id)
-                                val move = minOf(max - current.count, cursor.count)
+                                val move = minOf(max - current.count, held.count)
                                 current.count += move
-                                cursor.count -= move
-                                if (cursor.count <= 0) cursor = null
+                                held.count -= move
+                                if (held.count <= 0) cursor = null
                             }
                             else -> {
-                                inputs[i] = cursor
+                                inputs[i] = held
                                 cursor = current
                             }
                         }
@@ -293,8 +294,9 @@ fun AnvilScreen(gui: Gui, onClose: () -> Unit) {
                 }
                 Slot(gui, 134f, 47f, result) {
                     val res = result ?: return@Slot
-                    if (cursor == null) cursor = res
-                    else if (cursor.id == res.id) cursor.count += res.count
+                    val held = cursor
+                    if (held == null) cursor = res
+                    else if (held.id == res.id) held.count += res.count
                     else return@Slot
                     for (i in 0 until 2) inputs[i] = null
                     Game.player?.experience = (Game.player?.experience ?: 0f) - cost

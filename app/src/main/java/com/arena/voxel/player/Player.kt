@@ -51,6 +51,9 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
     var flying = false
     var onGround = false
     var inWater = false
+
+    /** True when the feet are inside lava (damage + swim rules differ from water). */
+    var inLava = false
     var sneaking = false
     var hudText = ""
 
@@ -192,7 +195,18 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
     /** Water/air counters, damage from drowning and void, run once per frame. */
     private fun tickEnvironment(world: World) {
         val feetBlock = world.get(floor(x).toInt(), floor(y + 0.1).toInt(), floor(z).toInt())
-        inWater = Blocks.isLiquid(feetBlock)
+        val feetId = Blocks.get(feetBlock).id
+        inLava = feetId == "lava"
+        inWater = Blocks.isLiquid(feetBlock) && !inLava
+        // Lava burns: 4 half-hearts every 0.5 s, the vanilla rate.
+        if (inLava) {
+            val now = System.nanoTime()
+            if (now >= lavaNextHit) {
+                lavaNextHit = now + 500_000_000L
+                lastDamage = 4f
+                hurt(4f)
+            }
+        }
         if (inWater) {
             air = (air - 1).coerceAtLeast(-20)
             if (air <= -20) {
@@ -383,6 +397,8 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
     }
 
     // ------------------------------------------------------------------ damage
+
+    private var lavaNextHit = 0L
 
     fun hurt(amount: Float): Boolean {
         if (health <= 0f) return false

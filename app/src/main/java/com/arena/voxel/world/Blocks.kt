@@ -79,6 +79,9 @@ object Blocks {
         add("log", "log_top", "log_side", "log_top", color = 0x6b4f2a)
         addTinted("leaves", "leaves", "leaves", "leaves", opaque = false, tintTop = true, tintSide = true, tintBottom = true, color = 0x59AE30)
         addLiquid("water", "water", color = 0x3F76E4)
+        // Lava: same fluid rules as water but opaque, emissive and lethal.
+        add("lava", tile("lava"), tile("lava"), tile("lava"), false, false, true, false, 0xE25822,
+            light = 15, shape = BlockShape.EMPTY)
         add("glass", "glass", "glass", "glass", opaque = false, color = 0xd7e9f2)
         add("snow", "snow", "snow", "snow", color = 0xf2f6fa)
         add("snow_side", "snow", "snow", "dirt", color = 0xf2f6fa)

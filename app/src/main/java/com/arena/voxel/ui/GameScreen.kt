@@ -74,7 +74,7 @@ fun GameScreen(onExit: () -> Unit) {
     var paused by remember { mutableStateOf(false) }
     var picker by remember { mutableStateOf(false) }
     var container by remember { mutableStateOf<ContainerMode?>(null) }
-    var entity by remember { mutableStateOf<Triple<String, Triple<Int, Int, Int>>?>(null) }
+    var entity by remember { mutableStateOf<BlockEntityUi?>(null) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -105,7 +105,9 @@ fun GameScreen(onExit: () -> Unit) {
             }
             "chest", "furnace", "anvil" -> {
                 val pos = Game.openScreenPos
-                if (pos != null) entity = Triple(Game.openScreen, pos)
+                if (pos != null) {
+                    entity = BlockEntityUi(Game.openScreen, pos.first, pos.second, pos.third)
+                }
                 Game.openScreen = ""
             }
         }
@@ -210,12 +212,12 @@ fun GameScreen(onExit: () -> Unit) {
         }
 
         // Chest / furnace / anvil GUIs opened by tapping the block with an empty hand.
-        entity?.let { (kind, pos) ->
+        entity?.let { open ->
             GuiScreen(Settings.guiScale) { gui ->
-                if (kind == "anvil") {
+                if (open.kind == "anvil") {
                     AnvilScreen(gui) { entity = null }
                 } else {
-                    BlockEntityScreen(gui, kind, pos) { entity = null }
+                    BlockEntityScreen(gui, open.kind, open.pos) { entity = null }
                 }
             }
         }
@@ -274,6 +276,11 @@ fun GameScreen(onExit: () -> Unit) {
             )
         }
     }
+}
+
+/** Which block-entity screen is open, and where the block sits in the world. */
+private data class BlockEntityUi(val kind: String, val x: Int, val y: Int, val z: Int) {
+    val pos: Triple<Int, Int, Int> get() = Triple(x, y, z)
 }
 
 @Composable
