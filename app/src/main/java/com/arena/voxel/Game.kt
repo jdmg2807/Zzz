@@ -302,6 +302,9 @@ object Settings {
     /** 0 = automatic (Java formula), 1..4 = fixed GUI scale. */
     var guiScale = 0
 
+    /** Sound effects on/off (synthesised, so they cost nothing to ship). */
+    var sound = true
+
     /** Survival disables flight and consumes blocks when placing. */
     var survival = false
 
@@ -316,6 +319,7 @@ object Settings {
         useMods = p.getBoolean("useMods", true)
         guiScale = p.getInt("guiScale", 0).coerceIn(0, 4)
         survival = p.getBoolean("survival", false)
+        sound = p.getBoolean("sound", true)
     }
 
     fun save(context: Context) {
@@ -329,6 +333,7 @@ object Settings {
             .putBoolean("useMods", useMods)
             .putInt("guiScale", guiScale)
             .putBoolean("survival", survival)
+            .putBoolean("sound", sound)
             .apply()
     }
 }

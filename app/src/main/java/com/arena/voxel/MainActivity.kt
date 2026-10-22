@@ -14,6 +14,8 @@ class MainActivity : ComponentActivity() {
         Ctx.init(this)
         com.arena.voxel.imports.UriFiles.init(this)
         Settings.load(this)
+        com.arena.voxel.core.Sounds.init(this)
+        com.arena.voxel.core.Sounds.enabled = Settings.sound
         com.arena.voxel.core.Logs.startSession(
             "Inicio · ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} · " +
                 "Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})"

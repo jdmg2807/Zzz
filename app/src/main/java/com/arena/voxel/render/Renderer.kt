@@ -71,6 +71,8 @@ class Renderer : GLSurfaceView.Renderer {
     private var containerTimer = 0f
     private var fxTimer = 0f
     private var eatCooldown = 0f
+    private var stepTimer = 0f
+    private var lastHealth = 20f
     private val mobMeshes = arrayOfNulls<ChunkMesh>(Mobs.TYPES.size)
     private val itemMeshes = HashMap<String, ChunkMesh>()
     private val mobTiles = HashMap<Int, Int>()
@@ -628,6 +630,7 @@ class Renderer : GLSurfaceView.Renderer {
             return
         }
         if (w.set(x, y, z, blockIndex)) {
+            com.arena.voxel.core.Sounds.play("place", 0.6f)
             if (!Game.creative) {
                 val slot = Game.inventory.selected
                 val held = Game.inventory.get(slot)
@@ -655,6 +658,7 @@ class Renderer : GLSurfaceView.Renderer {
             return true
         }
         eatCooldown = 1.6f
+        com.arena.voxel.core.Sounds.play("eat", 0.5f)
         Game.chat("Has comido ${com.arena.voxel.items.Items.nameOf(heldId)}")
         if (!Game.creative) {
             Game.inventory.shrink(Game.inventory.selected, 1)
@@ -671,6 +675,7 @@ class Renderer : GLSurfaceView.Renderer {
         }
         if (w.set(hit.x, hit.y, hit.z, 0)) {
             com.arena.voxel.world.Particles.blockBreak(w, hit.x, hit.y, hit.z, id)
+            com.arena.voxel.core.Sounds.dig(id)
             if (!Game.creative) {
                 // Java drops the block's loot table entry, not the block itself.
                 val drop = com.arena.voxel.items.Items.dropOf(id)
@@ -794,6 +799,29 @@ class Renderer : GLSurfaceView.Renderer {
         }
 
         if (eatCooldown > 0f) eatCooldown -= dt
+        // Damage feedback: hurt sound + red sparks whenever the health bar drops.
+        if (p.health < lastHealth - 0.01f) {
+            com.arena.voxel.core.Sounds.play("hurt", 0.7f)
+            com.arena.voxel.world.Particles.hurt(p.x, p.y, p.z)
+            if (lastHealth - p.health >= 3f) {
+                com.arena.voxel.world.Particles.landing(p.x, p.y, p.z, 4)
+            }
+        }
+        lastHealth = p.health
+        // Footsteps: one every 0.42 s while walking (0.28 s sprinting), silent in the air.
+        if (p.onGround && !Game.paused) {
+            val speed = kotlin.math.hypot(p.vx, p.vz)
+            if (speed > 0.02) {
+                stepTimer -= dt * (if (Game.sprint) 1.5f else 1f)
+                if (stepTimer <= 0f) {
+                    stepTimer = 0.42f
+                    val feet = Blocks.get(w.get(floor(p.x).toInt(), floor(p.y - 0.2).toInt(), floor(p.z).toInt())).id
+                    com.arena.voxel.core.Sounds.dig(feet, 0.18f)
+                }
+            } else {
+                stepTimer = 0.12f
+            }
+        }
         streamChunks(w)
         updateMobs(w, dt, p)
         com.arena.voxel.world.ItemEntities.update(dt, w, p)
@@ -1341,6 +1369,7 @@ class Renderer : GLSurfaceView.Renderer {
         attackCooldown = 20f / speed
         Game.chat(if (crit) "¡Golpe crítico! -${damage.toInt()}" else "Golpe -${damage.toInt()}")
         com.arena.voxel.world.Particles.hurt(mob.x, mob.y, mob.z)
+        com.arena.voxel.core.Sounds.play("hurt", 0.55f, 1.2f)
         if (mob.health <= 0f) {
             Game.chat("${Mobs.typeOf(mob.type).name} derrotado")
             if (!Game.creative) {

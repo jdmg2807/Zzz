@@ -372,6 +372,7 @@ private fun SettingsScreen(onBack: () -> Unit, onMods: () -> Unit = {}, onPacks:
     var usePacks by remember { mutableStateOf(Settings.usePacks) }
     var useShaders by remember { mutableStateOf(Settings.useShaders) }
     var useMods by remember { mutableStateOf(Settings.useMods) }
+    var sound by remember { mutableStateOf(Settings.sound) }
 
     Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -384,6 +385,8 @@ private fun SettingsScreen(onBack: () -> Unit, onMods: () -> Unit = {}, onPacks:
                 Settings.useShaders = useShaders
                 Settings.useMods = useMods
                 Settings.guiScale = guiScale
+                Settings.sound = sound
+                com.arena.voxel.core.Sounds.enabled = sound
                 Settings.save(context)
                 onBack()
             }) { Text("‹ Volver", color = Accent) }
@@ -402,6 +405,7 @@ private fun SettingsScreen(onBack: () -> Unit, onMods: () -> Unit = {}, onPacks:
             Slider(value = fov, onValueChange = { fov = it }, valueRange = 50f..100f)
         }
         ToggleRow("Mostrar HUD", hud) { hud = it }
+        ToggleRow("Sonido", sound) { sound = it }
         // Java's "GUI Scale" option: automatic, or forced 1..4.
         SettingRow(
             "Escala de interfaz",
