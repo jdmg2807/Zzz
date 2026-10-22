@@ -202,6 +202,50 @@ fun GameScreen(onExit: () -> Unit) {
             }
         }
 
+        // Death screen (Java: "You died!" + respawn button).
+        val pl = Game.player
+        if (pl != null && pl.isDead()) {
+            GuiScreen(Settings.guiScale) { gui ->
+                Box(Modifier.fillMaxSize().background(Color(0xCC5A0000))) {
+                    Column(
+                        Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "¡Has muerto!",
+                            color = Color(0xFFFFFFFF),
+                            fontSize = gui.text(16f),
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(gui.px(6f)))
+                        Text(
+                            "Puntuación: ${(pl.experience * 7).toInt()}",
+                            color = Color(0xFFFFE0A0),
+                            fontSize = gui.text(8f),
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(Modifier.height(gui.px(10f)))
+                        GuiButton(gui, "Reaparecer") {
+                            val w = Game.world
+                            val spawn = w?.gen?.spawnPoint()
+                            if (w != null && spawn != null) {
+                                pl.respawn(w, spawn.first, spawn.second, spawn.third)
+                            } else {
+                                pl.health = pl.maxHealth
+                            }
+                            Game.chat("Has reaparecido")
+                        }
+                        Spacer(Modifier.height(gui.px(BUTTON_GAP)))
+                        GuiButton(gui, "Salir al menú", width = gui.px(120f)) {
+                            Game.exitToMenu()
+                            onExit()
+                        }
+                    }
+                }
+            }
+        }
+
         if (paused) {
             PauseOverlay(
                 onResume = { paused = false },

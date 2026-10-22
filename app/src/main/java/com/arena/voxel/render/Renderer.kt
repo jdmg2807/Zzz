@@ -689,6 +689,7 @@ class Renderer : GLSurfaceView.Renderer {
                 1 -> hit?.let { swing = 1f; placeBlock(w, it) }
                 2 -> hit?.let { swing = 1f; breakBlock(w, it) }
             }
+            if (attackCooldown > 0f) attackCooldown = (attackCooldown - dt * 20f).coerceAtLeast(0f)
             updateInteraction(dt, w, hit)
             if (Math.abs(Game.move[0]) + Math.abs(Game.move[1]) > 0.05f) walkTime += dt * 8f
             if (swing > 0f) swing = (swing - dt * 3.4f).coerceAtLeast(0f)
@@ -1050,6 +1051,103 @@ class Renderer : GLSurfaceView.Renderer {
         }
     }
 
+
+    // ------------------------------------------------------------------ combat (1.9+)
+
+    /** Attack cooldown in ticks, from the held item's attack speed. */
+    private var attackCooldown = 0f
+
+    /** Damage multiplier from the 1.9 attack charge: 0.2 at zero charge, 1.0 when full. */
+    private fun chargeMultiplier(): Float {
+        val speed = com.arena.voxel.items.Items.attackSpeed(Game.selectedItem())
+        val full = 20f / speed
+        val charge = (1f - attackCooldown / full).coerceIn(0f, 1f)
+        return 0.2f + charge * charge * 0.8f
+    }
+
+    /** Minecraft's breaking formula: hardness / tool speed, 30x slower without the right tool. */
+    private fun mineSeconds(blockId: String): Float {
+        val hardness = Blocks.hardnessOf(blockId)
+        if (hardness < 0f) return Float.MAX_VALUE
+        val held = Game.selectedItem()
+        val toolType = com.arena.voxel.items.Items.toolType(held)
+        val tier = com.arena.voxel.items.Items.tier(held)
+        val matches = toolType.isNotEmpty() && toolType == Blocks.toolOf(blockId)
+        val speed = if (matches) 1f + tier * 1.6f else 1f
+        return (hardness * 1.5f / speed).coerceAtLeast(0.05f)
+    }
+
+    /** Entity ray test (AABB of the box models) within the 3 block attack reach. */
+    private fun mobUnderCrosshair(w: World): Mob? {
+        val p = player ?: return null
+        val dir = p.forward()
+        val eye = p.eyeY()
+        var best: Mob? = null
+        var bestT = 3.4
+        for (m in visibleMobs) {
+            if (m.health <= 0f) continue
+            val info = Mobs.typeOf(m.type)
+            val half = 0.45
+            val h = info.eyeHeight.toDouble() + 0.3
+            // Ray/AABB slab test.
+            var tmin = 0.0
+            var tmax = bestT
+            var ok = true
+            fun axis(o: Double, d: Double, lo: Double, hi: Double) {
+                if (kotlin.math.abs(d) < 1e-6) {
+                    if (o < lo || o > hi) ok = false
+                    return
+                }
+                var t1 = (lo - o) / d
+                var t2 = (hi - o) / d
+                if (t1 > t2) { val tmp = t1; t1 = t2; t2 = tmp }
+                if (t1 > tmin) tmin = t1
+                if (t2 < tmax) tmax = t2
+                if (tmin > tmax) ok = false
+            }
+            axis(p.x, dir[0].toDouble(), m.x - half, m.x + half)
+            axis(eye, dir[1].toDouble(), m.y, m.y + h)
+            axis(p.z, dir[2].toDouble(), m.z - half, m.z + half)
+            if (ok && tmin in 0.0..bestT) {
+                bestT = tmin
+                best = m
+            }
+        }
+        return best
+    }
+
+    /** Melee attack with the 1.9 cooldown, crit on a fall and sweep for swords. */
+    private fun attackMob(mob: Mob) {
+        val p = player ?: return
+        val charge = chargeMultiplier()
+        if (attackCooldown > 0.02f && charge < 0.2f) {
+            Game.chat("Espera a que se recargue el ataque")
+            return
+        }
+        val held = Game.selectedItem()
+        val base = com.arena.voxel.items.Items.attackDamage(held) + 1f
+        val crit = p.vy < 0 && !p.onGround
+        var damage = base * charge * (if (crit) 1.5f else 1f)
+        if (held.contains("sword") && charge > 0.9f && !crit) {
+            // Sweeping edge: nearby mobs take a small hit too.
+            for (other in visibleMobs) {
+                if (other === mob || other.health <= 0f) continue
+                val dx = other.x - mob.x
+                val dz = other.z - mob.z
+                if (dx * dx + dz * dz < 4.0) other.health -= 1f
+            }
+        }
+        mob.health -= damage
+        mob.vy = 5.2
+        val speed = com.arena.voxel.items.Items.attackSpeed(held)
+        attackCooldown = 20f / speed
+        Game.chat(if (crit) "¡Golpe crítico! -${damage.toInt()}" else "Golpe -${damage.toInt()}")
+        if (mob.health <= 0f) {
+            Game.chat("${Mobs.typeOf(mob.type).name} derrotado")
+            if (!Game.creative) Game.give("rotten_flesh", 1)
+        }
+    }
+
     private fun crackMesh(stage: Int): ChunkMesh? {
         crackMeshes[stage]?.let { return it }
         val tile = Textures.indexOf("crack_${stage + 1}")
@@ -1075,7 +1173,8 @@ class Renderer : GLSurfaceView.Renderer {
             if (pressTime > 0.20f) {
                 Game.mining = true
                 if (hit != null) {
-                    mineProgress += dt / 0.32f
+                    val targetId = Blocks.get(w.get(hit.x, hit.y, hit.z)).id
+                    mineProgress += dt / mineSeconds(targetId)
                     if (mineProgress >= 1f) {
                         breakBlock(w, hit)
                         mineProgress = 0f
@@ -1088,7 +1187,13 @@ class Renderer : GLSurfaceView.Renderer {
         } else {
             if (pressTime > 0f) {
                 if (pressTime <= 0.20f) {
-                    hit?.let { placeBlock(w, it) }
+                    // Java's attack: the crosshair checks entities before blocks.
+                    val mob = mobUnderCrosshair(w)
+                    if (mob != null) {
+                        attackMob(mob)
+                    } else {
+                        hit?.let { placeBlock(w, it) }
+                    }
                     swing = 1f
                 }
                 pressTime = 0f

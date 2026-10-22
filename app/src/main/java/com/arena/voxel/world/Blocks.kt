@@ -544,6 +544,20 @@ object Blocks {
         "lava" to "glowstone"
     )
 
+    /** Hardness in Java units; -1 means unbreakable (bedrock). */
+    fun hardnessOf(id: String): Float {
+        val explicit = byId[id]?.let { list[it].hardness } ?: 1f
+        val fallback = HARDNESS[id]
+        // Blocks declared without a hardness keep the table value (or 1 s as a last resort).
+        return when {
+            fallback != null && explicit == 1f -> fallback
+            else -> explicit
+        }
+    }
+
+    /** Tool family that speeds this block up ("pickaxe", "axe", "shovel", "hoe" or ""). */
+    fun toolOf(id: String): String = byId[id]?.let { list[it].tool } ?: ""
+
     fun ids(): List<String> = list.map { it.id }
 
     fun all(): List<Block> = list
