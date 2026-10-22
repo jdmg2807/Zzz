@@ -4,7 +4,7 @@ import com.arena.voxel.render.ChunkMesh
 
 /** 16 x 16 x HEIGHT column of blocks, stored as palette indexes. */
 class Chunk(val cx: Int, val cz: Int) {
-    val blocks = ByteArray(16 * 16 * World.HEIGHT)
+    val blocks = ShortArray(16 * 16 * World.HEIGHT)
 
     var generated = false
     var dirty = true
@@ -28,11 +28,11 @@ class Chunk(val cx: Int, val cz: Int) {
 
     fun get(x: Int, y: Int, z: Int): Int {
         if (x < 0 || x > 15 || z < 0 || z > 15 || y < 0 || y >= World.HEIGHT) return 0
-        return blocks[index(x, y, z)].toInt() and 0xff
+        return blocks[index(x, y, z)].toInt() and 0xFFFF
     }
 
     fun set(x: Int, y: Int, z: Int, value: Int) {
         if (x < 0 || x > 15 || z < 0 || z > 15 || y < 0 || y >= World.HEIGHT) return
-        blocks[index(x, y, z)] = value.toByte()
+        blocks[index(x, y, z)] = value.toShort()
     }
 }

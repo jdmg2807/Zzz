@@ -101,6 +101,16 @@ object Textures {
             val bmp = TileGen.make(name)
             tiles.add(Tile(name, bmp, average(bmp)))
         }
+        // Tiles required by the generated block palette (dye families, stone variants, ores…).
+        // They are appended after the hand-tuned ones so old saves keep their palette indices.
+        for (name in com.arena.voxel.world.BlockGen.tileNames()) {
+            if (byName.containsKey(name)) continue
+            if (tiles.size >= GRID * GRID) break
+            byName[name] = tiles.size
+            variantCount[name] = 1
+            val bmp = TileGen.make(name)
+            tiles.add(Tile(name, bmp, average(bmp)))
+        }
     }
 
     fun indexOf(name: String): Int = byName[name] ?: -1

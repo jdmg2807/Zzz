@@ -52,7 +52,8 @@ object TileGen {
             val b = (0x08 + (0x20 - 0x08) * f).toInt()
             return noise((r shl 16) or (g shl 8) or b, 10, Random(name.hashCode().toLong()))
         }
-        return noise(BASE_COLORS[name] ?: 0x808080, 12, Random(name.hashCode().toLong()))
+        val baseColor = BASE_COLORS[name] ?: com.arena.voxel.world.BlockGen.colorOf(name)
+        return noise(baseColor, 12, Random(name.hashCode().toLong()))
     }
 
     private val BASE_COLORS = mapOf(

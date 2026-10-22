@@ -146,7 +146,7 @@ class World(val seed: Long) {
             File(dir, "level.dat").outputStream().use { fos ->
                 GZIPOutputStream(fos).use { gz ->
                     DataOutputStream(gz).use { out ->
-                        out.writeInt(MAGIC3)
+                        out.writeInt(MAGIC4)
                         out.writeInt(HEIGHT)
                         out.writeLong(seed)
                         // Palette of block ids, so saves survive palette changes between versions.
@@ -172,7 +172,11 @@ class World(val seed: Long) {
                         for (c in list) {
                             out.writeInt(c.cx)
                             out.writeInt(c.cz)
-                            out.write(c.blocks)
+                            // v4: block ids are shorts, so the palette can hold thousands of blocks.
+                            val bytes = java.nio.ByteBuffer.allocate(c.blocks.size * 2)
+                                .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                            bytes.asShortBuffer().put(c.blocks)
+                            out.write(bytes.array())
                         }
                     }
                 }
@@ -204,6 +208,7 @@ class World(val seed: Long) {
         private const val MAGIC = 0x56435831
         private const val MAGIC2 = 0x56435832
         private const val MAGIC3 = 0x56435833
+        private const val MAGIC4 = 0x56435834
 
         class Loaded(
             val world: World,
@@ -227,7 +232,8 @@ class World(val seed: Long) {
                 GZIPInputStream(f.inputStream()).use { gz ->
                     DataInputStream(gz).use { inp ->
                         val first = inp.readInt()
-                        val v3 = first == MAGIC3
+                        val v4 = first == MAGIC4
+                        val v3 = first == MAGIC3 || v4
                         val modern = v3 || first == MAGIC2 || first == MAGIC
                         var savedHeight = 80
                         if (v3 || first == MAGIC2) savedHeight = inp.readInt()
@@ -283,11 +289,27 @@ class World(val seed: Long) {
                             val cz = inp.readInt()
                             val c = Chunk(cx, cz)
                             if (savedHeight == HEIGHT) {
-                                var read = 0
-                                while (read < c.blocks.size) {
-                                    val r = inp.read(c.blocks, read, c.blocks.size - read)
-                                    if (r <= 0) break
-                                    read += r
+                                if (v4) {
+                                    val rawBytes = ByteArray(c.blocks.size * 2)
+                                    var read = 0
+                                    while (read < rawBytes.size) {
+                                        val r = inp.read(rawBytes, read, rawBytes.size - read)
+                                        if (r <= 0) break
+                                        read += r
+                                    }
+                                    java.nio.ByteBuffer.wrap(rawBytes)
+                                        .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                                        .asShortBuffer()
+                                        .get(c.blocks)
+                                } else {
+                                    val rawBytes = ByteArray(c.blocks.size)
+                                    var read = 0
+                                    while (read < rawBytes.size) {
+                                        val r = inp.read(rawBytes, read, rawBytes.size - read)
+                                        if (r <= 0) break
+                                        read += r
+                                    }
+                                    for (i in rawBytes.indices) c.blocks[i] = (rawBytes[i].toInt() and 0xFF).toShort()
                                 }
                             } else {
                                 // Older saves are shorter: read them and place the data at the
@@ -300,18 +322,18 @@ class World(val seed: Long) {
                                     read += r
                                 }
                                 val copy = minOf(old.size, c.blocks.size)
-                                System.arraycopy(old, 0, c.blocks, 0, copy)
+                                for (i in 0 until copy) c.blocks[i] = (old[i].toInt() and 0xFF).toShort()
                             }
                             remap?.let { map ->
                                 for (i in c.blocks.indices) {
-                                    val old = c.blocks[i].toInt() and 0xff
+                                    val old = c.blocks[i].toInt() and 0xFFFF
                                     val mapped = if (old < map.size) map[old] else 0
-                                    c.blocks[i] = mapped.toByte()
+                                    c.blocks[i] = mapped.toShort()
                                 }
                             }
                             c.generated = true
                             c.dirty = true
-                            c.maxY = c.blocks.indexOfLast { it != 0.toByte() }.let { idx ->
+                            c.maxY = c.blocks.indexOfLast { it != 0.toShort() }.let { idx ->
                                 if (idx < 0) 0 else idx / (16 * 16)
                             }
                             c.lightSources = null

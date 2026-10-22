@@ -244,6 +244,20 @@ object Blocks {
             opaque = false, color = 0x8a8a8a, shape = BlockShape.LAYER, hardness = 0.5f)
         add("stone_button_on", "stone_button", "stone_button", "stone_button", solid = false,
             opaque = false, color = 0x8a8a8a, shape = BlockShape.LAYER, hardness = 0.5f)
+
+        // ---- generated palette: dye families, wood species, stone families, ores, copper,
+        //      1.21 blocks and plants. Anything already declared above keeps its tuned entry.
+        for (spec in BlockGen.specs) registerGenerated(spec)
+    }
+
+    /** Adds a block from the generated palette, ignoring ids that already exist. */
+    internal fun registerGenerated(spec: BlockGen.Spec) {
+        if (byId.containsKey(spec.id)) return
+        add(
+            spec.id, tile(spec.top), tile(spec.side), tile(spec.bottom),
+            spec.solid, spec.opaque, false, spec.cross, spec.color,
+            light = spec.light, shape = spec.shape, hardness = spec.hardness, tool = spec.tool
+        )
     }
 
     /** All ids of a redstone wire power level, index = level. */

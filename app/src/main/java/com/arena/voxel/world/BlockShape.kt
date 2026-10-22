@@ -33,6 +33,9 @@ class BlockShape(val boxes: List<Box>) {
         /** Nothing to collide with (air, water, plants, torches). */
         val EMPTY = BlockShape(emptyList())
 
+        /** Thin plate (glass pane, iron bars): 2/16 wide, full height. */
+        val PANE = BlockShape(listOf(box(0.4375f, 0f, 0f, 0.5625f, 1f, 1f)))
+
         /** Anvil: a full-height block inset by 1 px, like Java's `ANVIL` shape. */
         val ANVIL = BlockShape(listOf(box(0.0625f, 0f, 0.0625f, 0.9375f, 1f, 0.9375f)))
 

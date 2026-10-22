@@ -111,7 +111,7 @@ object McWorldImporter {
                     val cz = scz + dz
                     val chunk = readChunk(regionDir, cx, cz) ?: continue
                     chunks[World.keyOfStatic(cx, cz)] = chunk
-                    val count = chunk.blocks.count { it != 0.toByte() }
+                    val count = chunk.blocks.count { it != 0.toShort() }
                     totalBlocks += count
                     converted++
                 }
@@ -396,7 +396,7 @@ object McWorldImporter {
 
     // ------------------------------------------------------------------ region reading
 
-    private class ChunkData(val blocks: ByteArray, val maxY: Int)
+    private class ChunkData(val blocks: ShortArray, val maxY: Int)
 
     /** Section data holder used while decoding. */
     private class Section(val y: Int, val palette: List<String>, val packed: LongArray, val bits: Int, val legacyIds: ByteArray?)
@@ -444,7 +444,7 @@ object McWorldImporter {
             }
         }
         val nbt = Nbt.parse(DataInputStream(ByteArrayInputStream(raw))) ?: return null
-        val blocks = ByteArray(16 * 16 * World.HEIGHT)
+        val blocks = ShortArray(16 * 16 * World.HEIGHT)
 
         val sections = ArrayList<Section>()
         // 1.18+: root.sections; older: root.Level.Sections
@@ -504,7 +504,7 @@ object McWorldImporter {
                         }
                         val mapped = Blocks.fromMinecraft(blockId, stats)
                         if (mapped == Blocks.AIR) continue
-                        blocks[(targetY * 16 + z) * 16 + x] = mapped.toByte()
+                        blocks[(targetY * 16 + z) * 16 + x] = mapped.toShort()
                         if (targetY > maxY) maxY = targetY
                     }
                 }

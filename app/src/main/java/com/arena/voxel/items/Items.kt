@@ -106,7 +106,9 @@ object Items {
             if (block.id == "air") continue
             defs[block.id] = Def(
                 id = block.id,
-                name = BLOCK_NAMES[block.id] ?: block.id.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                name = BLOCK_NAMES[block.id]
+                    ?: com.arena.voxel.world.BlockGen.names[block.id]
+                    ?: block.id.replace('_', ' ').replaceFirstChar { it.uppercase() },
                 block = block.id
             )
         }
@@ -214,7 +216,41 @@ object Items {
     fun all(): List<Def> = defs.values.toList()
 
     /** Creative inventory categories, in Java's tab order. */
-    fun creativeTabs(): List<Pair<String, List<String>>> = listOf(
+    fun creativeTabs(): List<Pair<String, List<String>>> = buildTabs()
+
+    private fun buildTabs(): List<Pair<String, List<String>>> {
+        val tabs = ArrayList<Pair<String, List<String>>>(BASE_TABS)
+        // Generated families: one tab each so the 45-slot page is not flooded by one category.
+        val gen = com.arena.voxel.world.BlockGen.names
+        fun of(predicate: (String) -> Boolean): List<String> =
+            gen.keys.filter(predicate).filter { exists(it) }.sorted().take(45)
+        tabs.add("Lanas" to of { it.endsWith("_wool") || it.endsWith("_carpet") })
+        tabs.add("Hormigón" to of { it.endsWith("_concrete") || it.endsWith("_terracotta") })
+        tabs.add("Maderas" to of {
+            it.endsWith("_planks") || it.endsWith("_log") || it.endsWith("_stem") ||
+                it.endsWith("_stairs") || it.endsWith("_slab") || it.endsWith("_fence")
+        })
+        tabs.add("Piedra" to of {
+            it.endsWith("_bricks") || it.endsWith("_tiles") || it.contains("stone") ||
+                it.contains("deepslate") || it.contains("tuff") || it.contains("basalt") ||
+                it.contains("quartz") || it.contains("sandstone")
+        })
+        tabs.add("Minerales" to of { it.endsWith("_ore") || it.endsWith("_block") })
+        tabs.add("Cobre" to of { it.contains("copper") })
+        tabs.add("1.21" to of {
+            it == "crafter" || it == "vault" || it == "trial_spawner" || it == "heavy_core" ||
+                it.contains("copper_bulb") || it.contains("copper_grate")
+        })
+        tabs.add("Plantas" to of {
+            it.contains("leaves") || it == "cactus" || it == "bamboo" || it == "sugar_cane" ||
+                it == "dead_bush" || it == "fern" || it.endsWith("_orchid") || it == "allium" ||
+                it == "poppy" || it == "dandelion" || it == "cornflower" || it == "oxeye_daisy" ||
+                it == "azure_bluet" || it == "lily_of_the_valley" || it == "short_grass"
+        })
+        return tabs
+    }
+
+    private val BASE_TABS: List<Pair<String, List<String>>> = listOf(
         "Construcción" to listOf(
             "stone", "cobblestone", "stone_bricks", "andesite", "granite", "diorite", "deepslate",
             "deepslate_bricks", "tuff", "calcite", "dirt", "grass", "sand", "sandstone", "gravel",
