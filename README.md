@@ -144,7 +144,7 @@ public class ExampleMod implements VoxelMod {
 
 La API (`modkit/`) ofrece:
 
-- `ModContext`: `world()`, `player()`, `chat()`, `registerBlock()`, `registerTexture()`, `getLogger()`.
+- `ModContext`: `world()`, `player()`, `chat()`, `registerBlock()`, `registerTexture()`, `readResource()` (archivos dentro del jar), `getLogger()`.
 - `WorldAPI`: `getBlock`, `setBlock`, `fill`, `isSolid`, `getHighestBlockY`, `getSeed`, `getTime`.
 - `PlayerAPI`: posición, `teleport`, `setFlying`, `setHudText`.
 - `ChatAPI`: mensajes en el chat/toast del juego.

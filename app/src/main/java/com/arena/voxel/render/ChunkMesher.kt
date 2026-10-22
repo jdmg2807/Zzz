@@ -76,8 +76,9 @@ object ChunkMesher {
         val eps = 0.5f / Textures.ATLAS
         val u0 = col * ts + eps
         val u1 = (col + 1) * ts - eps
-        val v0 = 1f - (row + 1) * ts + eps
-        val v1 = 1f - row * ts - eps
+        // Bitmap row 0 is uploaded at v = 0, so tile rows grow downwards in v.
+        val vTop = row * ts + eps
+        val vBottom = (row + 1) * ts - eps
 
         val ox = x + OX[face]
         val oy = y + OY[face]
@@ -95,21 +96,21 @@ object ChunkMesher {
         val c3x = (ox + vx).toFloat(); val c3y = (oy + vy).toFloat(); val c3z = (oz + vz).toFloat()
 
         if (verticalUv) {
-            // U axis is vertical: texture "up" is +U.
-            out.add(c0x, c0y, c0z, u0, v0, shade)
-            out.add(c1x, c1y, c1z, u0, v1, shade)
-            out.add(c2x, c2y, c2z, u1, v1, shade)
-            out.add(c0x, c0y, c0z, u0, v0, shade)
-            out.add(c2x, c2y, c2z, u1, v1, shade)
-            out.add(c3x, c3y, c3z, u1, v0, shade)
+            // Side faces: the U axis of the quad is vertical, so map texture V to it.
+            out.add(c0x, c0y, c0z, u0, vBottom, shade)
+            out.add(c1x, c1y, c1z, u0, vTop, shade)
+            out.add(c2x, c2y, c2z, u1, vTop, shade)
+            out.add(c0x, c0y, c0z, u0, vBottom, shade)
+            out.add(c2x, c2y, c2z, u1, vTop, shade)
+            out.add(c3x, c3y, c3z, u1, vBottom, shade)
         } else {
-            // Top/bottom: U axis is horizontal.
-            out.add(c0x, c0y, c0z, u0, v0, shade)
-            out.add(c1x, c1y, c1z, u1, v0, shade)
-            out.add(c2x, c2y, c2z, u1, v1, shade)
-            out.add(c0x, c0y, c0z, u0, v0, shade)
-            out.add(c2x, c2y, c2z, u1, v1, shade)
-            out.add(c3x, c3y, c3z, u0, v1, shade)
+            // Top/bottom faces: the U axis of the quad is horizontal.
+            out.add(c0x, c0y, c0z, u0, vTop, shade)
+            out.add(c1x, c1y, c1z, u1, vTop, shade)
+            out.add(c2x, c2y, c2z, u1, vBottom, shade)
+            out.add(c0x, c0y, c0z, u0, vTop, shade)
+            out.add(c2x, c2y, c2z, u1, vBottom, shade)
+            out.add(c3x, c3y, c3z, u0, vBottom, shade)
         }
     }
 }

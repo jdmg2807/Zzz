@@ -375,11 +375,16 @@ class Renderer : GLSurfaceView.Renderer {
         if (!w.isAir(x, y, z)) return
         val p = player ?: return
         val id = Game.selectedBlock()
+        val blockIndex = Blocks.index(id)
+        if (blockIndex == Blocks.AIR) {
+            Game.chat("Ese bloque ya no existe (¿mod desinstalado?)")
+            return
+        }
         if (hitsPlayer(p, x, y, z)) {
             Game.chat("No puedes colocar el bloque encima de ti")
             return
         }
-        if (w.set(x, y, z, Blocks.index(id))) {
+        if (w.set(x, y, z, blockIndex)) {
             ModLoader.blockPlaced(x, y, z, id)
         }
     }

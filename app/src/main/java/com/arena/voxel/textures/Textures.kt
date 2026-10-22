@@ -102,7 +102,7 @@ object Textures {
         opts.inPreferredConfig = Bitmap.Config.ARGB_8888
         val raw = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts) ?: return null
         if (!scaleToTile || (raw.width == TILE && raw.height == TILE)) return raw
-        val scaled = Bitmap.createScaledBitmap(raw, TILE, TILE, true)
+        val scaled = Bitmap.createScaledBitmap(raw, TILE, TILE, false)
         if (scaled !== raw) raw.recycle()
         return scaled
     }

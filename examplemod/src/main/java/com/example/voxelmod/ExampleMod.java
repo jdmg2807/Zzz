@@ -29,13 +29,18 @@ public class ExampleMod implements VoxelMod {
                 .color(0xFFD966, 0xE8B23A, 0xB07A20)
                 .solid(true)
                 .opaque(true);
-        try (InputStream in = getClass().getResourceAsStream("/assets/example_lamp.png")) {
-            if (in != null) {
-                context.registerTexture("example_lamp", readFully(in));
-                lamp.texture("example_lamp");
+        // A DexClassLoader does not expose jar resources, so ask the game for the file.
+        byte[] png = context.readResource("assets/example_lamp.png");
+        if (png == null) {
+            try (InputStream in = getClass().getResourceAsStream("/assets/example_lamp.png")) {
+                if (in != null) png = readFully(in);
+            } catch (Exception e) {
+                context.getLogger().warning("No se pudo cargar la textura: " + e.getMessage());
             }
-        } catch (Exception e) {
-            context.getLogger().warning("No se pudo cargar la textura: " + e.getMessage());
+        }
+        if (png != null) {
+            context.registerTexture("example_lamp", png);
+            lamp.texture("example_lamp");
         }
         context.registerBlock(lamp);
 

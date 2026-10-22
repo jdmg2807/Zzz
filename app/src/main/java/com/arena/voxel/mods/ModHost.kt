@@ -94,6 +94,18 @@ class ModHost(private val descriptor: ModDescriptor) : ModContext {
         Log.i("Mod ${descriptor.id} registró el bloque ${def.id}")
     }
 
+    override fun readResource(path: String): ByteArray? {
+        return try {
+            java.util.zip.ZipFile(descriptor.file).use { zip ->
+                val entry = zip.getEntry(path.trimStart('/'))
+                if (entry == null) null else zip.getInputStream(entry).use { it.readBytes() }
+            }
+        } catch (t: Throwable) {
+            Log.e("No se pudo leer $path del mod ${descriptor.id}", t)
+            null
+        }
+    }
+
     override fun registerTexture(name: String, pngBytes: ByteArray) {
         val bmp = Textures.decode(pngBytes) ?: throw IllegalArgumentException("PNG invalido para $name")
         Textures.put(name, bmp)

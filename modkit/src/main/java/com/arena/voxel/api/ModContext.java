@@ -24,4 +24,11 @@ public interface ModContext {
      * {@link BlockDef#texture(String)}. Call from {@link VoxelMod#onLoad(ModContext)}.
      */
     void registerTexture(String name, byte[] pngBytes);
+
+    /**
+     * Reads a file bundled inside the mod .jar (for example "assets/texture.png").
+     * Returns null when the entry does not exist. This is needed because a DexClassLoader
+     * does not expose jar resources through {@code getResourceAsStream}.
+     */
+    byte[] readResource(String path);
 }

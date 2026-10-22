@@ -199,7 +199,7 @@ private fun BoxScope.HudInfo(tick: Int) {
         hit?.let { Blocks.get(Game.world?.get(it.x, it.y, it.z) ?: 0).id } ?: ""
     }
     val shaders = remember(tick) { Game.shaderPackName }
-    val chat = remember(tick) { Game.chatLines.toList().takeLast(3) }
+    val chat = remember(tick) { Game.chatSnapshot(3) }
     val hudText = remember(tick) { Game.hudText }
 
     Column(Modifier.padding(14.dp)) {

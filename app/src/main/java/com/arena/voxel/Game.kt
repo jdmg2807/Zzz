@@ -152,6 +152,9 @@ object Game {
 
     fun consumeAction(): Int = action.getAndSet(0)
 
+    fun chatSnapshot(last: Int = 3): List<String> =
+        synchronized(chatLines) { chatLines.toList().takeLast(last) }
+
     fun chat(message: String) {
         val line = message
         chatLines.add(line)
