@@ -6,7 +6,7 @@ import android.util.Log
 /**
  * Background music.
  *
- * The soundtrack lives in `assets/music/*.wav` (synthesised from scratch by
+ * The soundtrack lives in the `assets` folder, one WAV per track (synthesised from scratch by
  * `tools/gen_music.py`, so no Mojang audio is bundled) and is streamed straight from the APK with
  * [MediaPlayer]. A scene picks a random track, loops it and cross-fades by simply swapping
  * players, which is enough for a mobile game and costs no decoding work in the GL thread.
