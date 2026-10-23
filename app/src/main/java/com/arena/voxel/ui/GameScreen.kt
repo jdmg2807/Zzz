@@ -180,7 +180,7 @@ fun GameScreen(onExit: () -> Unit) {
             HudInfo(tick)
             Crosshair()
             GuiScreen(Settings.guiScale) { gui ->
-                GameHud(gui, tick) {
+                JavaHud(gui, tick) {
                     // "E": inventory with the 2x2 crafting grid (creative has the tabs inside).
                     container = if (Game.creative) ContainerMode.CREATIVE else ContainerMode.INVENTORY
                 }
@@ -208,7 +208,9 @@ fun GameScreen(onExit: () -> Unit) {
 
         container?.let { mode ->
             GuiScreen(Settings.guiScale) { gui ->
-                ContainerScreen(gui, mode) { container = null }
+                JavaContainerScreen(gui, mode, onClose = { container = null }, onOpenCrafting = {
+                    container = ContainerMode.CRAFTING_TABLE
+                })
             }
         }
 
