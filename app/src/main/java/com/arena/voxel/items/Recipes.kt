@@ -34,6 +34,61 @@ object Recipes {
         Shaped("$prefix sword", listOf(" M ", " M ", " S "), mapOf('M' to material, 'S' to "stick"), "${prefix}_sword")
     )
 
+    /**
+     * Recipes derived from the generated palette, so every wood/stone family is craftable:
+     * planks → stairs/slab/fence, stone → slab/stairs/bricks, wool → carpet, ingots → blocks.
+     */
+    private fun generatedRecipes(): List<Shaped> = buildList {
+        val gen = com.arena.voxel.world.BlockGen.names.keys.toList()
+        fun has(id: String) = Items.exists(id)
+        for (id in gen) {
+            when {
+                // planks -> stairs / slab / fence, keeping the wood family
+                id.endsWith("_planks") -> {
+                    val family = id.removeSuffix("_planks")
+                    if (has("${family}_stairs")) {
+                        add(Shaped("${family}_stairs", listOf("#  ", "## ", "###"), mapOf('#' to id), "${family}_stairs", 4))
+                    }
+                    if (has("${family}_slab")) {
+                        add(Shaped("${family}_slab", listOf("###"), mapOf('#' to id), "${family}_slab", 6))
+                    }
+                    if (has("${family}_fence")) {
+                        add(Shaped("${family}_fence", listOf("#S#", "#S#"), mapOf('#' to id, 'S' to "stick"), "${family}_fence", 3))
+                    }
+                }
+                // A stone base with its own slab/stairs pair (granite, deepslate, tuff…)
+                has("${id}_slab") && has("${id}_stairs") && !id.endsWith("_planks") -> {
+                    add(Shaped("${id}_stairs", listOf("#  ", "## ", "###"), mapOf('#' to id), "${id}_stairs", 4))
+                    add(Shaped("${id}_slab", listOf("###"), mapOf('#' to id), "${id}_slab", 6))
+                }
+                // Wool -> carpet
+                id.endsWith("_wool") && has(id.removeSuffix("_wool") + "_carpet") -> {
+                    add(
+                        Shaped(
+                            id.removeSuffix("_wool") + "_carpet", listOf("##"), mapOf('#' to id),
+                            id.removeSuffix("_wool") + "_carpet", 3
+                        )
+                    )
+                }
+            }
+        }
+        // Storage blocks from ingots/gems, the way Java crafts them.
+        add(Shaped("iron_block", listOf("###", "###", "###"), mapOf('#' to "iron_ingot"), "iron_block"))
+        add(Shaped("gold_block", listOf("###", "###", "###"), mapOf('#' to "gold_ingot"), "gold_block"))
+        add(Shaped("diamond_block", listOf("###", "###", "###"), mapOf('#' to "diamond"), "diamond_block"))
+        add(Shaped("emerald_block", listOf("###", "###", "###"), mapOf('#' to "emerald"), "emerald_block"))
+        add(Shaped("coal_block", listOf("###", "###", "###"), mapOf('#' to "coal"), "coal_block"))
+        add(Shaped("copper_block", listOf("###", "###", "###"), mapOf('#' to "copper_ingot"), "copper_block"))
+        add(Shaped("stone_bricks", listOf("##", "##"), mapOf('#' to "stone"), "stone_bricks", 4))
+        add(Shaped("glass_pane", listOf("###", "###"), mapOf('#' to "glass"), "glass_pane", 16))
+        add(Shaped("iron_bars", listOf("###", "###"), mapOf('#' to "iron_ingot"), "iron_bars", 16))
+        add(Shaped("bookshelf", listOf("###", "SSS", "###"), mapOf('#' to "oak_planks", 'S' to "wheat"), "bookshelf"))
+        add(Shaped("lantern", listOf(" T ", "TIT", " T "), mapOf('T' to "torch", 'I' to "iron_ingot"), "lantern"))
+        add(Shaped("barrel", listOf("#S#", "# #", "#S#"), mapOf('#' to "oak_planks", 'S' to "oak_slab"), "barrel"))
+        add(Shaped("oak_trapdoor", listOf("###", "###"), mapOf('#' to "oak_planks"), "oak_trapdoor", 2))
+        add(Shaped("oak_door", listOf("##", "##", "##"), mapOf('#' to "oak_planks"), "oak_door", 3))
+    }
+
     val SHAPED: List<Shaped> = buildList {
         // Wood family
         add(Shaped("crafting_table", listOf("##", "##"), mapOf('#' to "oak_planks"), "crafting_table"))
@@ -89,6 +144,8 @@ object Recipes {
         addAll(toolSet("stone", "cobblestone"))
         addAll(toolSet("iron", "iron_ingot"))
         addAll(toolSet("diamond", "diamond"))
+        // Generated families (wood/stone variants, wool, storage blocks).
+        addAll(generatedRecipes())
     }
 
     val SHAPELESS: List<Shapeless> = listOf(
@@ -147,6 +204,11 @@ object Recipes {
         "stone" to ("stone_bricks" to 0.1f),
         "clay" to ("brick" to 0.3f),
         "raw_beef" to ("cooked_beef" to 0.35f),
+        "spruce_log" to ("charcoal" to 0.15f),
+        "birch_log" to ("charcoal" to 0.15f),
+        "oak_log" to ("charcoal" to 0.15f),
+        "cobbled_deepslate" to ("deepslate" to 0.1f),
+        "kelp" to ("dried_kelp" to 0.1f),
         "porkchop" to ("cooked_porkchop" to 0.35f),
         "log" to ("charcoal" to 0.15f)
     )
@@ -175,16 +237,16 @@ object Recipes {
         val filled = grid.filterNotNull()
         if (filled.size == 1) {
             val only = filled[0]
-            val plank = when (only) {
-                "log" -> "oak_planks"
-                "spruce_log" -> "spruce_planks"
-                "birch_log" -> "birch_planks"
-                "dark_oak_log" -> "dark_oak_planks"
-                "jungle_log" -> "jungle_planks"
-                "acacia_log" -> "acacia_planks"
+            // Every log family maps to its own planks (oak_log → oak_planks, …), as in Java.
+            val plank = when {
+                only == "log" -> "oak_planks"
+                only == "planks" -> "oak_planks"
+                only.endsWith("_log") -> only.removeSuffix("_log") + "_planks"
+                only.endsWith("_stem") -> only.removeSuffix("_stem") + "_planks"
                 else -> null
             }
-            if (plank != null) return ItemStack(plank, 4)
+            if (plank != null && Items.exists(plank)) return ItemStack(plank, 4)
+            // Wool block back into four carpet/string style recipes handled by the table below.
         }
 
         // Shapeless
