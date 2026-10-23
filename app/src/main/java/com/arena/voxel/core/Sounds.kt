@@ -33,6 +33,8 @@ object Sounds {
     private var pool: SoundPool? = null
     private var loaded = false
     private val ids = HashMap<String, Int>()
+    /** Stable ids of the OGG variants loaded from the vanilla assets, per event. */
+    private val variantsByEvent = HashMap<String, List<Int>>()
     private val rnd = Random(1234L)
 
     /** Master switch, wired to the settings screen. */
@@ -70,17 +72,70 @@ object Sounds {
                 writeWav(file, data)
                 ids[name] = soundPool.load(file.absolutePath, 1)
             }
-            Log.i("Sonidos sintetizados: ${samples.size}")
+            // Real Minecraft sound effects, bundled from the Java assets (assets/vanilla/sounds).
+            // They replace the synthesised stand-ins whenever the file exists.
+            val vanilla = loadVanilla(soundPool)
+            Log.i("Sonidos sintetizados: ${samples.size} · sonidos de vanilla: $vanilla")
         } catch (t: Throwable) {
             Log.w("No se pudo inicializar el audio: ${t.message}")
         }
+    }
+
+    /**
+     * Loads the OGG effects shipped with the APK.
+     *
+     * Each engine event maps to a *group* of files (for example every `step/stone*.ogg`), and the
+     * group is chosen at random on play, exactly like Java's `sounds.json` does with its variant
+     * lists. Asset files are uncompressed (`noCompress "ogg"` in Gradle), so [SoundPool] can open
+     * them straight from the APK without copying them to the cache.
+     */
+    private fun loadVanilla(pool: SoundPool): Int {
+        if (!VanillaAssets.available()) return 0
+        val groups = mapOf(
+            "dig_stone" to listOf("random/break", "dig/stone", "block/stone/break"),
+            "dig_wood" to listOf("dig/wood", "block/wood/break", "block/bamboo/break"),
+            "dig_soft" to listOf("dig/gravel", "dig/grass", "block/gravel/break", "block/grass/break"),
+            "place" to listOf("block/stone/place", "random/click", "block/wood/place"),
+            "step" to listOf("step/stone", "step/grass", "step/wood"),
+            "hurt" to listOf("damage/hit", "entity/player/hurt"),
+            "eat" to listOf("random/eat", "entity/generic/eat"),
+            "levelup" to listOf("random/levelup", "entity/player/levelup"),
+            "click" to listOf("random/click", "ui/button/click"),
+            "splash" to listOf("random/splash", "entity/generic/splash", "liquid/water")
+        )
+        var count = 0
+        for ((event, folders) in groups) {
+            val files = ArrayList<String>()
+            for (folder in folders) {
+                files.addAll(VanillaAssets.soundFiles(folder))
+                if (files.isNotEmpty()) break
+            }
+            if (files.isEmpty()) continue
+            val variants = files.take(4).mapNotNull { path ->
+                try {
+                    VanillaAssets.open(path)?.let { afd ->
+                        val id = pool.load(afd, 1)
+                        afd.close()
+                        id
+                    }
+                } catch (t: Throwable) {
+                    null
+                }
+            }
+            if (variants.isNotEmpty()) {
+                variantsByEvent[event] = variants
+                count += variants.size
+            }
+        }
+        return count
     }
 
     /** Plays a sound with a random pitch, like Java's `playSound` with a volume/pitch spread. */
     fun play(name: String, volume: Float = 0.7f, pitch: Float = 1f) {
         if (!enabled) return
         val p = pool ?: return
-        val id = ids[name] ?: return
+        val variant = variantsByEvent[name]
+        val id = if (variant != null) variant[rnd.nextInt(variant.size)] else (ids[name] ?: return)
         val rate = (pitch * (0.94f + rnd.nextFloat() * 0.12f)).coerceIn(0.5f, 2f)
         try {
             p.play(id, volume, volume, 1, 0, rate)
@@ -113,6 +168,7 @@ object Sounds {
         pool = null
         loaded = false
         ids.clear()
+        variantsByEvent.clear()
     }
 
     // ------------------------------------------------------------------ synthesis

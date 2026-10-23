@@ -354,7 +354,18 @@ class Renderer : GLSurfaceView.Renderer {
             Game.setProgress(0.12f, "Cargando mods...")
             Blocks.init()
             val report = if (Settings.useMods) ModLoader.loadAll() else "Mods desactivados en ajustes"
-            Game.modReport = report
+            // Content of Java mods (Fabric/Forge/datapacks): textures, item models and recipes.
+            val javaContent = if (Settings.useMods) {
+                try {
+                    com.arena.voxel.mods.JavaModSupport.applyContent()
+                } catch (t: Throwable) {
+                    Log.e("Contenido de mods de Java", t)
+                    ""
+                }
+            } else {
+                ""
+            }
+            Game.modReport = if (javaContent.isEmpty()) report else "$report\n$javaContent"
             Logs.info("SETUP", "Mods: ${report.replace("\n", " | ")}")
 
             // Solid tiles for the animal boxes (registered before the atlas is uploaded).

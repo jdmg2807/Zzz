@@ -286,6 +286,10 @@ object ResourcePacks {
         val applied = ArrayList<String>()
         val builtin = applyBuiltin()
         if (builtin > 0) applied.add("Integrado Faithful 64x ($builtin)")
+        // Vanilla Java assets bundled in the APK (assets/vanilla/block). Real pack files still
+        // override them, because they are applied after this line.
+        val vanilla = applyVanilla()
+        if (vanilla > 0) applied.add("Vanilla Java 1.21 ($vanilla)")
         val files = Ctx.packsDir.listFiles()?.filter {
             it.isDirectory || (it.isFile && it.name.lowercase().endsWith(".zip"))
         }?.sortedBy { it.name.lowercase() } ?: return applied
@@ -357,6 +361,28 @@ object ResourcePacks {
             }
         }
         return applied
+    }
+
+    /** Applies the vanilla block textures that ship inside the APK (assets/vanilla/block). */
+    fun applyVanilla(): Int = try {
+        if (!com.arena.voxel.core.VanillaAssets.available()) 0
+        else com.arena.voxel.core.VanillaAssets.applyBlockTextures(
+            alias = { name -> normalizeVanillaName(name) },
+            replace = { name, bmp -> Textures.replace(name, bmp) }
+        )
+    } catch (t: Throwable) {
+        Log.e("Texturas vanilla", t)
+        0
+    }
+
+    /** `grass_block_top.png` -> `grass_top`, `bricks.png` -> `brick`, … using [ALIASES]. */
+    private fun normalizeVanillaName(raw: String): String? {
+        val name = raw.substringAfterLast('/')
+        ALIASES[name]?.let { return it }
+        if (Textures.isKnown(name)) return name
+        // Log textures are split into side/top tiles in this atlas.
+        if (name.endsWith("_log")) return null
+        return name
     }
 
     /**

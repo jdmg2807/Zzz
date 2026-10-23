@@ -271,8 +271,9 @@ object ItemIcons {
         val bitmap = try {
             val index = com.arena.voxel.world.Blocks.index(id)
             val block = com.arena.voxel.world.Blocks.get(index)
+            // Pack sprites first, then the vanilla assets bundled in the APK.
             val itemSprite = com.arena.voxel.textures.Textures.bitmapNamed("item/$id")
-                ?: com.arena.voxel.textures.Textures.bitmapNamed("item_$id")
+                ?: com.arena.voxel.core.VanillaAssets.itemBitmap(id)
             when {
                 itemSprite != null ->
                     com.arena.voxel.textures.Textures.iconFromBitmap(itemSprite, 64)?.asImageBitmap()

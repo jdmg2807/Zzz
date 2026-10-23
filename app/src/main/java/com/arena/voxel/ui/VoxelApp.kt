@@ -167,6 +167,14 @@ private fun ModsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
     val mods = remember(refresh) { ModLoader.scan() }
+    // Java jars (Fabric/Forge/datapack) are described without loading any class.
+    val javaMods = remember(refresh) {
+        try {
+            com.arena.voxel.mods.JavaModSupport.scanAll()
+        } catch (t: Throwable) {
+            emptyList()
+        }
+    }
 
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -228,6 +236,53 @@ private fun ModsScreen(onBack: () -> Unit) {
                             Text(modError, color = Color(0xFFE57373), fontSize = 11.sp)
                         } else {
                             Text("Se carga al entrar al mundo", color = Accent, fontSize = 11.sp)
+                        }
+                    }
+                }
+                if (javaMods.isNotEmpty()) {
+                    item {
+                        Text(
+                            "MODS DE MINECRAFT JAVA",
+                            color = Color(0xFF7E8A9A),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    items(javaMods) { mod ->
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(PanelColor, RoundedCornerShape(10.dp))
+                                .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(10.dp))
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                "${mod.name}  ${mod.version}",
+                                color = Color(0xFFE8EDF2),
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "${mod.kind.name.lowercase()} · id: ${mod.id} · ${mod.authors}",
+                                color = Color(0xFF7E8A9A),
+                                fontSize = 11.sp
+                            )
+                            if (mod.description.isNotEmpty()) {
+                                Text(mod.description, color = Color(0xFFB8C2CE), fontSize = 11.sp)
+                            }
+                            if (mod.note.isNotEmpty()) {
+                                Text(
+                                    mod.note,
+                                    color = if (mod.runsCode) Accent else Color(0xFFFFCC80),
+                                    fontSize = 11.sp
+                                )
+                            }
+                            if (mod.entrypoints.isNotEmpty() && !mod.runsCode) {
+                                Text(
+                                    "Entrypoint: ${mod.entrypoints.first()}",
+                                    color = Color(0xFF7E8A9A),
+                                    fontSize = 10.sp
+                                )
+                            }
                         }
                     }
                 }

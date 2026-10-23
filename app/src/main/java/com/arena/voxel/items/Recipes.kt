@@ -268,6 +268,13 @@ object Recipes {
             if (ok) return ItemStack(r.result, r.count)
         }
 
+        // Mods and data packs (Fabric/Forge/vanilla JSON recipes converted at load time).
+        try {
+            com.arena.voxel.mods.JavaModSupport.craftFromMods(grid)?.let { return it }
+        } catch (t: Throwable) {
+            // A broken mod recipe must never break crafting.
+        }
+
         // Shaped, with offset + mirror.
         for (recipe in SHAPED) {
             val ph = recipe.pattern.size
@@ -315,5 +322,6 @@ object Recipes {
     }
 
     /** Smelting result for an input id, or null. */
-    fun smelt(input: String): Pair<String, Float>? = SMELTING[input]
+    fun smelt(input: String): Pair<String, Float>? =
+        SMELTING[input] ?: com.arena.voxel.mods.JavaModSupport.dynamicSmelting()[input]
 }

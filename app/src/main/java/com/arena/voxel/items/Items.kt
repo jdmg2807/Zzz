@@ -205,7 +205,15 @@ object Items {
 
     fun def(id: String): Def? = defs[id]
     fun exists(id: String): Boolean = defs.containsKey(id)
-    fun nameOf(id: String): String = defs[id]?.name ?: id.replace('_', ' ')
+    /**
+     * Display name: the mod/engine name first, then the Spanish vanilla name from the bundled
+     * Java language file, then the raw id. This is what makes every vanilla item readable
+     * ("Pico de hierro" instead of "iron_pickaxe").
+     */
+    fun nameOf(id: String): String =
+        defs[id]?.name
+            ?: com.arena.voxel.core.VanillaAssets.displayName(id)
+            ?: id.replace('_', ' ')
     fun isBlock(id: String): Boolean = Blocks.index(id) != 0 && id != "air"
     fun maxStack(id: String): Int = defs[id]?.maxStack ?: 64
     fun food(id: String): Int = defs[id]?.food ?: 0
