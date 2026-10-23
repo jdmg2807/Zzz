@@ -178,3 +178,33 @@ Implementado en `imports/Nbt.kt` + `imports/McWorldImporter.kt`:
 6. **Inventario + crafting** con las recetas JSON públicas.
 7. **HUD y F3** completos, luego menús restantes (selección de mundo, opciones de vídeo).
 8. **Mobs hostiles** con spawn por luz y despawn a 128 bloques.
+
+---
+
+## 11. Estado de paridad al cerrar la v1.7.x
+
+Lo implementado y verificado en esta tanda, con la fuente de cada número:
+
+| Sistema | Detalle | Fuente |
+|---|---|---|
+| GUI | escala `clamp(min(w/320, h/240), 1, 4)`, botón 200×20, hotbar 182×22, corazones 9 px | Minecraft Wiki *GUI* |
+| Inventario | 176×166, rejilla 2×2 en (98,18), resultado (154,28), jugador (8,84), hotbar (8,142) | *Inventory* |
+| Mesa de trabajo | rejilla 3×3 en (30,17), resultado (124,35) | *Crafting table* |
+| Cofre | 176×168, 27 huecos en (8,18), jugador en (8,85) | *Chest* |
+| Horno | 176×166, entrada (56,17), combustible (56,53), salida (116,31), 200 ticks por pieza | *Furnace* |
+| Yunque | coste 1 nivel por renombrar, bono de reparación del 12 %, penalización 2^n | *Anvil mechanics* |
+| Combate 1.9 | carga `0.2 + 0.8·c²`, cooldown `20/velocidad`, crítico ×1,5, barrido 1 | *Damage* |
+| Ruptura | `dureza · 1,5 / velocidad`, niveles de pico por mena | *Breaking* |
+| Durabilidad | 59 / 131 / 250 / 1561 / 2031 | *Durability* |
+| Redstone | 15 niveles, −1 por bloque, −1 al subir, repetidor 1–4 ticks (0,1–0,4 s) | *Redstone circuit* |
+| Agua | manantial 0, flujo 1–7, caída 8, paso cada 5 ticks | *Water* |
+| Gravedad de bloques | 1 bloque por tick (arena, grava) | *Falling block* |
+| Cuevas | cheese (1 campo), spaghetti (2 campos), noodle (2 campos a alta frecuencia) | *Cave* |
+| Explosiones | potencia 4 (TNT) y 3 (creeper), caída lineal, resistencia por material | *Explosion* |
+| Objetos | gravedad 0,04, rozamiento 0,98, recogida a 1 bloque, 6000 ticks | *Item (entity)* |
+| Experiencia | 7+2n / 9+5n / 9+9n | *Experience* |
+| Comida | puntos + saturación con modificador por alimento, 1,6 s por bocado | *Food* |
+
+Pendiente declarado (no forma parte de esta entrega): traducción completa de shaders Iris
+(`#version 330` → GLSL ES 3.00 con gbuffers/composite), estructuras multi-chunk de aldea,
+encantamientos y pociones, y el client-server real (aquí el mundo vive en un solo proceso).

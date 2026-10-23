@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.1 — TNT y explosiones
+- **TNT jugable**: el mechero o una señal de redstone encienden la mecha de 4 s (80 ticks); la
+  textura encendida emite luz 7 y la explosión tiene potencia 4 con caída por distancia.
+- **Motor de explosiones único**: tabla de resistencia (piedra 6, metales 8, madera 3, tierra 0,6),
+  cadena de TNT, 30 % de drops, daño y retroceso al jugador y a los mobs, humo y ascuas.
+- El **creeper** usa el mismo motor con potencia 3, así que ahora rompe según la resistencia real
+  del bloque en vez de un radio fijo.
+- **Mechero** (`flint_and_steel`) con su receta, y `/give` ya puede dar cualquier objeto nuevo.
+
 ## v1.7.0 — Combate 1.9+, contenedores, redstone con retardos, 400 bloques y audio
 
 ### Física y combate
