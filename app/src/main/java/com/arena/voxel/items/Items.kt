@@ -57,7 +57,7 @@ object Items {
         "water" to "Agua", "glass" to "Cristal", "snow" to "Nieve", "bedrock" to "Piedra base",
         "coal_ore" to "Mena de carbón", "iron_ore" to "Mena de hierro", "gold_ore" to "Mena de oro",
         "diamond_ore" to "Mena de diamante", "brick" to "Ladrillos", "obsidian" to "Obsidiana",
-        "tnt" to "TNT", "glowstone" to "Piedra luminosa", "cactus" to "Cactus",
+        "tnt" to "TNT", "tnt_lit" to "TNT", "glowstone" to "Piedra luminosa", "cactus" to "Cactus",
         "sandstone" to "Arenisca", "desert" to "Arena", "spruce_leaves" to "Hojas de abeto",
         "birch_leaves" to "Hojas de abedul", "dead_bush" to "Arbusto muerto",
         "tall_grass" to "Hierba alta", "dandelion" to "Diente de león", "poppy" to "Amapola",

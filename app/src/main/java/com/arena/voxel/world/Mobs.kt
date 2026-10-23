@@ -239,39 +239,8 @@ class Mob(
 
     /** Creeper explosion: damages the player and removes nearby soft blocks in a 3 block radius. */
     private fun explode(world: World, p: com.arena.voxel.player.Player) {
-        val cx = kotlin.math.floor(x).toInt()
-        val cy = kotlin.math.floor(y).toInt()
-        val cz = kotlin.math.floor(z).toInt()
-        val dist = kotlin.math.sqrt((p.x - x) * (p.x - x) + (p.y - y) * (p.y - y) + (p.z - z) * (p.z - z))
-        if (dist < 6.0) p.hurt((28f * (1f - (dist / 6.0).toFloat())).coerceAtLeast(1f))
-        // Explosion plume: grey smoke plus a few orange embers, like `explosion_emitter`.
-        for (i in 0 until 26) {
-            Particles.push(
-                Particles.Particle(
-                    (x + (Math.random() - 0.5) * 2).toFloat(),
-                    (y + Math.random() * 1.5).toFloat(),
-                    (z + (Math.random() - 0.5) * 2).toFloat(),
-                    ((Math.random() - 0.5) * 0.4).toFloat(),
-                    (Math.random() * 0.3).toFloat(),
-                    ((Math.random() - 0.5) * 0.4).toFloat(),
-                    if (i % 3 == 0) 1f else 0.55f,
-                    if (i % 3 == 0) 0.6f else 0.55f,
-                    if (i % 3 == 0) 0.15f else 0.55f,
-                    1f, 0.9f, 9f, 1
-                )
-            )
-        }
-        for (bx in cx - 3..cx + 3) {
-            for (by in cy - 2..cy + 3) {
-                for (bz in cz - 3..cz + 3) {
-                    val d2 = (bx - x) * (bx - x) + (by - y) * (by - y) + (bz - z) * (bz - z)
-                    if (d2 > 9.0) continue
-                    val id = Blocks.get(world.get(bx, by, bz)).id
-                    if (id == "bedrock" || id == "obsidian" || id == "air") continue
-                    world.set(bx, by, bz, 0)
-                }
-            }
-        }
+        // A creeper blast is a power-3 explosion: same falloff, same block resistance table.
+        Explosives.explode(world, x, y + 0.5, z, 3f)
     }
 
     private fun blocked(world: World, px: Double, py: Double, pz: Double): Boolean {

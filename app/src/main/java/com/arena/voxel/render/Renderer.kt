@@ -590,6 +590,16 @@ class Renderer : GLSurfaceView.Renderer {
     }
 
     private fun placeBlock(w: World, hit: BlockHit) {
+        // Flint and steel: light TNT, and leave a fire block on top of a solid block.
+        if (Game.selectedItem() == "flint_and_steel") {
+            val targetId = Blocks.get(w.get(hit.x, hit.y, hit.z)).id
+            if (targetId == "tnt") {
+                com.arena.voxel.world.Explosives.ignite(w, hit.x, hit.y, hit.z)
+                return
+            }
+            Game.chat("El mechero solo enciende TNT en esta versión")
+            return
+        }
         // Buckets: scoop a source or pour one out, like a right click in Java.
         val heldItem = Game.selectedItem()
         if (heldItem == "bucket" || heldItem == "water_bucket" || heldItem == "lava_bucket") {
@@ -892,6 +902,7 @@ class Renderer : GLSurfaceView.Renderer {
         updateMobs(w, dt, p)
         com.arena.voxel.world.ItemEntities.update(dt, w, p)
         com.arena.voxel.world.Particles.update(dt, w)
+        com.arena.voxel.world.Explosives.update(w, dt)
 
         // ------------------------------------------------------------------ camera
         val aspect = width.toFloat() / height.toFloat()

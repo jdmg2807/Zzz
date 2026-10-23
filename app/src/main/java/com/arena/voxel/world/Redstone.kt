@@ -81,7 +81,8 @@ object Redstone {
         id.startsWith("lever") || id.startsWith("stone_button") ||
             id.startsWith("redstone_torch") || id.startsWith("repeater") ||
             id.startsWith("comparator") || id.startsWith("redstone_lamp") ||
-            id.startsWith("piston") || id.startsWith("observer") || id == "redstone_block"
+            id.startsWith("piston") || id.startsWith("observer") || id == "redstone_block" ||
+            id == "tnt"
 
     /** True when a block being placed/removed can influence a circuit. */
     fun isRelevant(id: String): Boolean = isWire(id) || isComponent(id)
@@ -241,6 +242,11 @@ object Redstone {
                 } else {
                     pending.removeAll { it[0] == keyOf(cx, cy, cz) }
                 }
+                return
+            }
+            // Powered TNT lights its fuse (Java: redstone signal ignites TNT).
+            if (id == "tnt" && input > 0) {
+                com.arena.voxel.world.Explosives.ignite(world, cx, cy, cz)
                 return
             }
             val newId = when {

@@ -93,6 +93,8 @@ object Blocks {
         add("brick", "brick", "brick", "brick", color = 0xa2432f)
         add("obsidian", "obsidian", "obsidian", "obsidian", color = 0x2a1f3d)
         add("tnt", "tnt_top", "tnt_side", "tnt_top", color = 0xd4462c)
+        // Lit TNT: same texture, glowing fuse (the countdown lives in Explosives).
+        add("tnt_lit", "tnt_top", "tnt_side", "tnt_top", color = 0xe86a3a, light = 7)
         add("glowstone", "glowstone", "glowstone", "glowstone", color = 0xc9a13c, light = 15)
         add("cactus", "cactus_top", "cactus_side", "cactus_top", color = 0x2f7a35, inset = 1f / 16f, heightCut = 1f / 16f)
         add("spruce_log", "spruce_log_top", "spruce_log_side", "spruce_log_top", color = 0x3c2a17)
