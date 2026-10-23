@@ -414,6 +414,9 @@ object Settings {
     /** Sound effects on/off (synthesised, so they cost nothing to ship). */
     var sound = true
 
+    /** Background music on/off (the soundtrack lives in assets/music). */
+    var music = true
+
     /** Survival disables flight and consumes blocks when placing. */
     var survival = false
 
@@ -429,6 +432,7 @@ object Settings {
         guiScale = p.getInt("guiScale", 0).coerceIn(0, 4)
         survival = p.getBoolean("survival", false)
         sound = p.getBoolean("sound", true)
+        music = p.getBoolean("music", true)
     }
 
     fun save(context: Context) {
@@ -443,6 +447,7 @@ object Settings {
             .putInt("guiScale", guiScale)
             .putBoolean("survival", survival)
             .putBoolean("sound", sound)
+            .putBoolean("music", music)
             .apply()
     }
 }

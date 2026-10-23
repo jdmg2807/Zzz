@@ -157,3 +157,27 @@ jobs:
         with:
           name: keystore
           path: out/voxelcraft.jks
+
+  keystore:
+    name: Keystore de firma (una sola vez)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arena/05bf54c5-zzz
+      - name: Crear y guardar la clave si falta
+        run: |
+          if [ -f keystore/voxelcraft.jks ]; then
+            echo "La clave ya está en el repositorio."
+            exit 0
+          fi
+          mkdir -p keystore
+          keytool -genkeypair -v -keystore keystore/voxelcraft.jks -alias voxelcraft \
+            -keyalg RSA -keysize 2048 -validity 10950 \
+            -storepass voxelcraft -keypass voxelcraft \
+            -dname "CN=VoxelCraft, OU=Arena, O=VoxelCraft, L=Asuncion, C=PY"
+          git config user.name "VoxelCraft CI"
+          git config user.email "voxelcraft@arena.ai"
+          git add keystore/voxelcraft.jks
+          git commit -m "CI: clave de firma estable (misma clave en todas las versiones)"
+          git push origin HEAD:arena/05bf54c5-zzz

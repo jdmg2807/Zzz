@@ -76,6 +76,16 @@ fun VoxelApp() {
         )
     ) {
         var screen by rememberSaveable { mutableStateOf("menu") }
+        // Bedrock-style soundtrack: menu music outside the world, world music inside it.
+        androidx.compose.runtime.LaunchedEffect(screen) {
+            if (!Settings.music) {
+                com.arena.voxel.core.Music.stop()
+            } else if (screen == "game") {
+                com.arena.voxel.core.Music.scene("world")
+            } else {
+                com.arena.voxel.core.Music.scene("menu")
+            }
+        }
         val context = LocalContext.current
         Surface(modifier = Modifier.fillMaxSize(), color = BgDark) {
             when (screen) {
@@ -375,6 +385,7 @@ private fun SettingsScreen(onBack: () -> Unit, onMods: () -> Unit = {}, onPacks:
     var useShaders by remember { mutableStateOf(Settings.useShaders) }
     var useMods by remember { mutableStateOf(Settings.useMods) }
     var sound by remember { mutableStateOf(Settings.sound) }
+    var music by remember { mutableStateOf(Settings.music) }
 
     Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -388,7 +399,10 @@ private fun SettingsScreen(onBack: () -> Unit, onMods: () -> Unit = {}, onPacks:
                 Settings.useMods = useMods
                 Settings.guiScale = guiScale
                 Settings.sound = sound
+                Settings.music = music
                 com.arena.voxel.core.Sounds.enabled = sound
+                com.arena.voxel.core.Music.enabled = music
+                if (music) com.arena.voxel.core.Music.scene("menu") else com.arena.voxel.core.Music.stop()
                 Settings.save(context)
                 onBack()
             }) { Text("‹ Volver", color = Accent) }
@@ -408,6 +422,7 @@ private fun SettingsScreen(onBack: () -> Unit, onMods: () -> Unit = {}, onPacks:
         }
         ToggleRow("Mostrar HUD", hud) { hud = it }
         ToggleRow("Sonido", sound) { sound = it }
+        ToggleRow("Música", music) { music = it }
         // Java's "GUI Scale" option: automatic, or forced 1..4.
         SettingRow(
             "Escala de interfaz",
