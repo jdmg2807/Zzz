@@ -231,10 +231,12 @@ out vec2 texcoord;
 
         fun readInlined(path: String): String? {
             val raw = read(path) ?: return null
-            return inlineIncludes(raw) { inc ->
-                read(inc) ?: find(inc)
+            val loader: (String) -> String? = { inc ->
+                read(inc)
+                    ?: find(inc)
                     ?: entries.firstOrNull { it.endsWith("/shaders/" + inc.removePrefix("/")) }?.let { read(it) }
             }
+            return inlineIncludes(raw, loader)
         }
 
         // ---- vanilla post chain (shaders/post/<name>.json) ---------------------------

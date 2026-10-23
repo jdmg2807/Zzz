@@ -213,6 +213,7 @@ object Items {
     fun nameOf(id: String): String =
         defs[id]?.name
             ?: com.arena.voxel.core.VanillaAssets.displayName(id)
+            ?: com.arena.voxel.mods.JavaModSupport.translatedName(id)
             ?: id.replace('_', ' ')
     fun isBlock(id: String): Boolean = Blocks.index(id) != 0 && id != "air"
     fun maxStack(id: String): Int = defs[id]?.maxStack ?: 64

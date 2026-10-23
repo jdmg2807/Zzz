@@ -1269,8 +1269,8 @@ class Renderer : GLSurfaceView.Renderer {
             var source = target.colorTexture
             for ((i, pass) in javaPasses.withIndex()) {
                 val last = i == javaPasses.size - 1
+                val dest = if (i % 2 == 0) pingA else pingB
                 if (!last) {
-                    val dest = if (i % 2 == 0) pingA else pingB
                     dest.bind()
                 } else {
                     GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
