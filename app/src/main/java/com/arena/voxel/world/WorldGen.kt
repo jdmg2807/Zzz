@@ -191,19 +191,35 @@ class WorldGen(val seed: Long) {
 
     // ------------------------------------------------------------------ clima y altura
 
-    /** Continentalidad: −1 océano profundo, 0 costa, +1 interior. Escala ~1/600 bloques. */
+    /**
+     * Continentalidad normalizada: −1 océano profundo, 0 costa, +1 interior. Escala ~1/600 bloques.
+     *
+     * El ruido Perlin puro sale en ±0,35 (no en ±1), así que se estira ×2,8 y se centra en +0,05:
+     * sin ese ajuste casi todo el mapa quedaba por debajo del nivel del mar (55 % de océano en la
+     * prueba de distribución) porque los umbrales se comparaban con una escala que el ruido nunca
+     * alcanzaba.
+     */
     fun continentalness(wx: Int, wz: Int): Float =
-        fbm(wx * 0.0016f, wz * 0.0016f, 4)
+        (fbm(wx * 0.0016f, wz * 0.0016f, 4) * 2.8f + 0.05f).coerceIn(-1f, 1f)
 
-    /** Erosión: −1 terreno plano (llanuras, océanos poco profundos), +1 terreno quebrado. */
+    /** Erosión normalizada: −1 terreno plano, +1 terreno quebrado. El ruido también se estira. */
     fun erosion(wx: Int, wz: Int): Float =
-        fbm(wx * 0.0032f + 137f, wz * 0.0032f - 71f, 3)
+        (fbm(wx * 0.0032f + 137f, wz * 0.0032f - 71f, 3) * 2.6f).coerceIn(-1f, 1f)
 
-    /** 0 = frío, 1 = cálido (antes del ajuste por altura). */
-    fun temperature(wx: Int, wz: Int): Float = fbm(wx * 0.0011f + 37f, wz * 0.0011f - 19f, 3)
+    /**
+     * 0 = frío, 1 = cálido, ya normalizado y sin el sesgo del ruido.
+     *
+     * Un Perlin crudo tiene media 0 pero este campo, muestreado, sale con media −0,34 (los ocho
+     * gradientes de [grad2] no son perfectamente isótropos). Sin el desplazamiento de +0,17 el
+     * clima daba mundos casi siempre nevados; con él la media queda en 0 y la desviación en 0,4,
+     * que reparte los biomas como el juego.
+     */
+    fun temperature(wx: Int, wz: Int): Float =
+        (fbm(wx * 0.0011f + 37f, wz * 0.0011f - 19f, 3) * 1.4f + 0.67f).coerceIn(0f, 1f)
 
-    /** 0 = seco, 1 = húmedo. */
-    fun humidity(wx: Int, wz: Int): Float = fbm(wx * 0.0014f - 71f, wz * 0.0014f + 53f, 3)
+    /** 0 = seco, 1 = húmedo; el mismo ajuste de sesgo (+0,07, media medida −0,14). */
+    fun humidity(wx: Int, wz: Int): Float =
+        (fbm(wx * 0.0014f - 71f, wz * 0.0014f + 53f, 3) * 1.4f + 0.57f).coerceIn(0f, 1f)
 
     /** Altura del terreno en [wx, wz], en bloques (0..World.HEIGHT-1). */
     fun heightAt(wx: Int, wz: Int): Int {
@@ -216,28 +232,28 @@ class WorldGen(val seed: Long) {
 
         // Altura base por continentalidad: océano profundo -> plataforma -> costa -> interior.
         var h = when {
-            continent < -0.40f -> 18f + (continent + 1f) * 40f          // 18..42
-            continent < -0.12f -> 42f + (continent + 0.40f) * 52f       // 42..57
-            continent < 0.12f -> 57f + (continent + 0.12f) * 42f        // 57..67
-            else -> 67f + (continent - 0.12f) * 26f                     // 67..90
+            continent < -0.50f -> 16f + (continent + 1f) * 44f          // 16..38
+            continent < -0.20f -> 38f + (continent + 0.50f) * 60f       // 38..56
+            continent < 0.12f -> 56f + (continent + 0.20f) * 37f        // 56..68
+            else -> 68f + (continent - 0.12f) * 20f                     // 68..86
         }
-        h += detail * 3.0f
+        h += detail * 2.5f
 
-        // Montañas: solo con continentalidad alta y erosión baja.
-        val landMask = ((continent - 0.06f) / 0.30f).coerceIn(0f, 1f)
-        val eroMask = (1f - ((ero + 1f) * 0.5f)).coerceIn(0f, 1f)
-        val mountain = landMask * eroMask * peaks
-        h += mountain * mountain * 74f
+        // Montañas: solo tierra adentro (continentalidad alta) y donde la erosión es baja.
+        val landMask = ((continent - 0.22f) / 0.45f).coerceIn(0f, 1f)
+        val eroMask = ((0.30f - ero) / 0.85f).coerceIn(0f, 1f)
+        val mountain = landMask * eroMask * max(0f, peaks - 0.30f)
+        h += Math.pow(mountain.toDouble(), 1.4).toFloat() * 135f
 
-        // Mesetas: erosión muy baja y continente alto dan una meseta plana (badlands/mesa).
-        if (ero < -0.55f && continent > 0.25f) h = max(h, 92f + detail * 2f)
+        // Mesetas: erosión muy baja y continente alto dan una meseta plana.
+        if (ero < -0.55f && continent > 0.35f) h = max(h, 92f + detail * 2f)
 
         // Ríos: banda estrecha alrededor de una isolínea del ruido.
         val riverField = abs(noise2(x * 0.0021f - 333f, z * 0.0021f + 771f))
-        val riverWidth = 0.055f
+        val riverWidth = 0.05f
         if (riverField < riverWidth) {
             val t = 1f - riverField / riverWidth
-            h -= t * t * 14f
+            h -= t * t * 13f
         }
 
         return h.toInt().coerceIn(2, World.HEIGHT - 16)
@@ -255,16 +271,17 @@ class WorldGen(val seed: Long) {
         val continent = continentalness(wx, wz)
         // Océano y costa: el bioma visible es el de la orilla (la arena la pone la superficie).
         val altitude = (h - SEA_LEVEL) / 40f
-        val temp = (temperature(wx, wz) - 0.5f) * 2f - altitude * 0.8f
+        // Cada 40 bloques de altura restan 0,45 de temperatura: por eso hay nieve en los picos.
+        val temp = (temperature(wx, wz) - 0.5f) * 2f - altitude * 0.45f
         val humid = (humidity(wx, wz) - 0.5f) * 2f
 
         if (h > SEA_LEVEL + 52) return if (temp < 0f) Biomes.SNOWY else Biomes.TAIGA
         if (continent < -0.30f) return Biomes.PLAINS          // fondo marino
-        if (temp > 0.42f && humid < -0.10f) return Biomes.DESERT
-        if (humid > 0.34f && temp > 0.18f) return Biomes.JUNGLE
-        if (temp < -0.42f) return Biomes.SNOWY
-        if (temp < -0.14f) return Biomes.TAIGA
-        if (humid > 0.06f) return Biomes.FOREST
+        if (temp > 0.45f && humid < -0.15f) return Biomes.DESERT
+        if (humid > 0.35f && temp > 0.20f) return Biomes.JUNGLE
+        if (temp < -0.62f) return Biomes.SNOWY
+        if (temp < -0.28f) return Biomes.TAIGA
+        if (humid > 0.12f) return Biomes.FOREST
         return Biomes.PLAINS
     }
 
@@ -323,15 +340,17 @@ class WorldGen(val seed: Long) {
     // ------------------------------------------------------------------ menas
 
     /**
-     * Bolsas de mena: la celda de 4×4×4 tiene un 16 % de probabilidad de ser una vena, y dentro
-     * solo se llena la esfera central. El tipo se elige por altura con la distribución del juego.
+     * Bolsas de mena: la celda de 4×4×4 tiene un 6 % de probabilidad de ser una vena y dentro solo
+     * se llena la esfera central (la mitad de la celda), así que las menas ocupan ~3 % del volumen
+     * de piedra, el orden de magnitud del juego. El tipo se elige por altura con la distribución
+     * real (carbón hasta y 96, hierro hasta 52, oro hasta 30, diamante solo bajo y 14).
      */
     private fun oreAt(wx: Int, y: Int, wz: Int): String? {
         val cx = Math.floorDiv(wx, 4)
         val cy = Math.floorDiv(y, 4)
         val cz = Math.floorDiv(wz, 4)
         val roll = hash3(cx * 31 + 7, cy * 17 + 3, cz * 53 - 11)
-        if (roll > 0.34f) return null
+        if (roll > 0.06f) return null
         val dx = Math.floorMod(wx, 4) - 1.5f
         val dy = Math.floorMod(y, 4) - 1.5f
         val dz = Math.floorMod(wz, 4) - 1.5f
@@ -371,7 +390,7 @@ class WorldGen(val seed: Long) {
                 val h = heights[lz * 16 + lx]
                 val biome = biomes[lz * 16 + lx]
                 val underwater = h < SEA_LEVEL
-                val beach = !underwater && h <= SEA_LEVEL + 2
+                val beach = !underwater && h <= SEA_LEVEL + 1
                 val peak = h > SEA_LEVEL + 46
                 val snowLine = h > SEA_LEVEL + 38
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## v2.2.0 — Mundo nuevo y propiedades reales de los bloques
+- **Generación de mundo reescrita**: continentalidad, erosión, crestas y ríos como el generador
+  moderno del juego. Ahora hay continentes, océanos de verdad, costas, montañas que llegan a ~150
+  bloques y ríos que bajan el terreno. El nivel del mar pasa a y = 63 (el del juego).
+- **Biomas corregidos**: el clima se normaliza (el ruido salía con media −0,34, por eso el 80 % del
+  mapa era nevado); reparto medido: llanura 35 %, bosque 27 %, taiga 15 %, nevado 9 %, desierto 3 %,
+  jungla 1 % de la tierra.
+- **Cuevas** cheese/spaghetti/noodle con salidas al exterior y 5,75 % de aire subterráneo; **menas**
+  en bolsas con distribución por altura (carbón arriba, diamante bajo y 14) y ≈3 % del volumen.
+- **Superficie por bioma**: hierba+tierra, arena+arenisca, nieve y línea de nieve, grava en fondos
+  profundos, piedra en los picos, deepslate bajo y 8; hielo en el agua de los biomas fríos.
+- **1165 bloques con sus propiedades reales** (`blocks.json` desde `minecraft-data`): dureza,
+  resistencia a explosiones, luz emitida, herramienta y nivel mínimo, apilado. El tiempo de picado
+  usa la fórmula del juego (dureza × 1,5 s con la herramienta correcta, × 5 s sin ella) y los
+  multiplicadores reales (madera 2, piedra 4, hierro 6, diamante 8, netherita 9).
+- **Pantalla "Mundos" reconstruida con el diseño de Bedrock**: barra superior con flecha y título,
+  panel oscuro con tarjetas de mundo (miniatura, nombre, datos y botón Jugar) y barra inferior de
+  acciones; los diálogos de importación y de resultado usan el mismo lenguaje visual.
+
 ## v2.1.2 — 1660 recetas de vanilla
 - **Tabla de recetas completa**: se generan 1660 recetas (con forma y sin forma) desde los datos
   públicos de `minecraft-data` (MIT) con `tools/gen_recipes.py`. Antes había un puñado escritas a

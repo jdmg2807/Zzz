@@ -9,9 +9,9 @@ usarlos y redistribuirlos, citando la fuente.
 | Fuente | Licencia | Qué se toma | Cómo se usa |
 |---|---|---|---|
 | **`InventivetalentDev/minecraft-assets`** (rama `1.21.9`) | Assets de Minecraft, publicados por ese repositorio | Texturas de bloque e ítem, modelos de ítem, `lang/es_es` y `en_us`, efectos de sonido | Se copian a `app/src/main/assets/vanilla/` y el motor los lee con `VanillaAssets` |
-| **`PrismarineJS/minecraft-data`** | MIT | Tabla de recetas (patrón y resultado), datos de ítems | `tools/gen_recipes.py` genera `assets/vanilla/recipes.json`; el cliente Kotlin no incluye código de terceros |
+| **`PrismarineJS/minecraft-data`** | MIT | Tabla de recetas, propiedades de los 1165 bloques (dureza, resistencia, luz, herramienta, apilado) | `tools/gen_recipes.py` y `tools/gen_blocks.py` generan `assets/vanilla/recipes.json` y `blocks.json`; el cliente Kotlin no incluye código de terceros |
 | **`PrismarineJS/prismarine-physics`** | MIT | Modelo de movimiento del jugador (aceleración, inercia, salto, agua, escaleras) | Se usó como referencia de comportamiento; la implementación (`Player.kt`) es Kotlin propio |
-| **Minecraft Wiki / wiki.vg** | Documentación pública | Fórmulas, constantes, formatos de archivo (región, `level.dat`, redstone, encantamientos) | Documentadas en `docs/JAVA_PARITY.md` |
+| **Minecraft Wiki / wiki.vg** | Documentación pública | Fórmulas, constantes, formatos de archivo (región, `level.dat`, redstone, encantamientos), esquema de generación (continentalidad, erosión, crestas, ríos, cuevas, menas) | Documentadas en `docs/JAVA_PARITY.md` §12-14 |
 
 Ninguna de estas fuentes contiene código de Mojang. Las tres primeras son redistribuibles con su
 aviso; si en algún momento se incorpora código de una librería, hay que añadir aquí su LICENSE

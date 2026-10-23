@@ -242,3 +242,63 @@ esprintando y 1,295 b/s agachado, las de Java Edition.
 código, y copiarlo a este repositorio sería redistribuir código de Mojang. Este proyecto
 sigue siendo limpio: los números vienen de la wiki, de mediciones de la comunidad y de
 implementaciones libres como `prismarine-physics`.
+
+---
+
+## 13. Generación de mundo (v2.2)
+
+La generación anterior era un único FBM de cuatro octavas: el terreno salía con la misma forma en
+todas partes, el nivel del mar estaba en y = 32 y los biomas se elegían por altura, así que no
+había continentes, ni costas, ni ríos, ni montañas de verdad. Se reescribió con la estructura por
+capas del generador moderno, tal como la describe la Minecraft Wiki (*World generation*, *Noise
+router*, *Carver*, *Ore*):
+
+| Capa | Ruido | Rango | Qué controla |
+|---|---|---|---|
+| Continentalidad | Perlin 4 octavas, 1/625 bloques | −1..1 | océano profundo → plataforma → costa → interior |
+| Erosión | Perlin 3 octavas, 1/312 bloques | −1..1 | terreno plano o quebrado; solo con erosión baja hay montañas |
+| Crestas | Perlin en valor absoluto, 4 octavas | 0..1 | picos afilados (no colinas redondas) |
+| Detalle | Perlin 3 octavas | −1..1 | rugosidad local de 2-3 bloques |
+| Ríos | Perlin 1 octava, 1/476 bloques | banda 0,05 | valle de río de hasta 13 bloques de profundidad |
+| Clima | Perlin (temperatura y humedad) | 0..1 | bioma, corregido por altura |
+
+Ajuste de escala y sesgo: el ruido Perlin crudo sale en ±0,35 con media distinta de cero según el
+campo (continentalidad +0,05, temperatura −0,34, humedad −0,14). Sin normalizar, el 55 % del mapa
+quedaba bajo el agua y el 80 % de la tierra era nevada; con los factores medidos
+(×2,8 / ×2,6 / +0,17 / +0,07) el reparto queda como en la tabla siguiente.
+
+**Distribución medida** (muestreo de 65 536 columnas alrededor del origen):
+océano 38 %, tierra 62 %; de la tierra: llanura 35 %, bosque 27 %, taiga 15 %, nevado 9 %,
+desierto 3 %, jungla 1 %. Alturas de 13 a 154 bloques, media 69.
+
+**Cuevas**: *cheese* (una cavidad), *spaghetti* (dos campos que se cruzan) y *noodle* (frecuencia
+alta). Se ensanchan hacia la superficie para que haya simas, y no se carva a menos de 6 bloques
+del lecho marino para que el agua no se vacíe dentro. Fracción de aire subterráneo medida: 5,75 %.
+
+**Menas**: bolsas en celdas de 4×4×4 (6 % de celdas, esfera central), ≈3 % del volumen de piedra,
+con la distribución por altura del juego: carbón hasta y 96, cobre 56, hierro 52, lapislázuli 34,
+oro 30, redstone 18 y diamante 14. Lava en las cuevas por debajo de y 9.
+
+**Superficie**: hierba + tierra en clima templado, arena + arenisca en desierto y playa (una sola
+columna sobre el mar), nieve en los biomas fríos y sobre la línea de nieve (y > 101), grava en los
+fondos marinos profundos, piedra desnuda en los picos y deepslate por debajo de y 8.
+
+**Estructuras**: ruinas, mazmorra con spawner y cofres, y casa de aldea con cimiento de piedra,
+muros de tablón, ventanas de cristal, tejado a dos aguas y muebles. Se colocan por regiones
+deterministas, así que no dependen del orden en que se generen los chunks.
+
+## 14. Propiedades de los bloques
+
+`assets/vanilla/blocks.json` (generado con `tools/gen_blocks.py` desde `minecraft-data`, MIT)
+trae 1165 bloques con dureza, resistencia a explosiones, luz emitida, luz filtrada, apilado,
+herramienta y nivel mínimo de herramienta. `BlockData` lo aplica a la paleta al arrancar.
+
+Con eso el tiempo de picado es el del juego:
+
+    con la herramienta correcta:  tiempo = dureza × 1,5 / velocidad
+    sin la herramienta correcta:  tiempo = dureza × 5   / velocidad
+
+donde la velocidad es 2 (madera), 4 (piedra), 6 (hierro), 8 (diamante) o 9 (netherita), y 1 a mano.
+Ejemplos: piedra 1,5 s con pico de madera, 0,38 s con diamante; obsidiana 50 s con diamante;
+antorcha instantánea; bedrock indestructible (−1). El drop exige además el nivel mínimo: hierro
+necesita pico de piedra, diamante pico de hierro, obsidiana pico de diamante.

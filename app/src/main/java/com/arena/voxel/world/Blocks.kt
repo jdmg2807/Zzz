@@ -617,6 +617,9 @@ object Blocks {
 
     /** Hardness in Java units; -1 means unbreakable (bedrock). */
     fun hardnessOf(id: String): Float {
+        // The vanilla table wins: the hand-written HARDNESS map was a stopgap and is full of
+        // 1.0f placeholders that a "hardness == 1f" fallback cannot tell apart from real data.
+        BlockData.info(id)?.let { return it.hardness }
         val explicit = byId[id]?.let { list[it].hardness } ?: 1f
         val fallback = HARDNESS[id]
         // Blocks declared without a hardness keep the table value (or 1 s as a last resort).
@@ -627,7 +630,11 @@ object Blocks {
     }
 
     /** Tool family that speeds this block up ("pickaxe", "axe", "shovel", "hoe" or ""). */
-    fun toolOf(id: String): String = byId[id]?.let { list[it].tool } ?: ""
+    fun toolOf(id: String): String {
+        val data = BlockData.info(id)?.tool
+        if (!data.isNullOrEmpty()) return data
+        return byId[id]?.let { list[it].tool } ?: ""
+    }
 
     /** Minimum tool tier for a drop: from the vanilla table, with the old hand-written fallback. */
     fun tierOf(id: String): Int = BlockData.info(id)?.tier ?: 0
