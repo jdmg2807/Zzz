@@ -480,7 +480,7 @@ object JavaModSupport {
                                 }
                             } else {
                                 val wanted = recipe.key[expected]
-                                if (wanted == null || !sameIngredient(actual, wanted)) {
+                                if (wanted == null || actual == null || !sameIngredient(actual, wanted)) {
                                     match = false
                                     break@outer
                                 }
