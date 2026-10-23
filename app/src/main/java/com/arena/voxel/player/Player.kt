@@ -67,6 +67,7 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
     var level = 0
 
     private var accumulator = 0f
+    private var unstickTimer = 0
     private var jumpCooldown = 0
     private var tickCounter = 0
 
@@ -139,28 +140,69 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
         return false
     }
 
-    /** Highest ground under the player at this position (used for step-up). */
+    /**
+     * Highest block top around the player's feet column.
+     *
+     * The scan goes from just below the feet up to one step height above them, so the function
+     * serves both callers: landing (snap down to the surface) and step-up (a slab or a stair one
+     * step high). The old version started at `py`, which made every result equal to `py`: the
+     * player could never step up a slab and — worse — never snapped to the ground, so spawning
+     * inside a block left it permanently stuck.
+     */
     private fun groundHeight(world: World, px: Double, py: Double, pz: Double): Double {
         val hw = WIDTH / 2.0
         val minX = floor(px - hw).toInt()
         val maxX = floor(px + hw).toInt()
         val minZ = floor(pz - hw).toInt()
         val maxZ = floor(pz + hw).toInt()
+        val ceiling = py + STEP_HEIGHT
         var top = py
+        val y0 = floor(py - 1.2).toInt()
+        val y1 = floor(ceiling).toInt()
         for (bx in minX..maxX) {
             for (bz in minZ..maxZ) {
-                val y0 = floor(py - 0.6).toInt()
-                for (by in y0..floor(py).toInt()) {
+                for (by in y0..y1) {
                     val block = Blocks.get(world.get(bx, by, bz))
                     if (block.shape.isEmpty) continue
                     for (box in block.shape.boxes) {
                         val yTop = by + box.y1.toDouble()
-                        if (yTop <= py + 0.001 && yTop > top) top = yTop
+                        if (yTop <= ceiling && yTop > top) top = yTop
                     }
                 }
             }
         }
         return top
+    }
+
+    /**
+     * Pushes the player out of a solid block.
+     *
+     * Worlds imported from Java (and worldgen with structures) can put the spawn point inside
+     * terrain; without this the AABB is embedded, every axis collides and the player cannot move
+     * at all, which is exactly the "no puedo moverme" report.
+     */
+    fun unstick(world: World) {
+        if (!collides(world, x, y, z)) return
+        var lift = 0.05
+        while (lift <= 6.0) {
+            if (!collides(world, x, y + lift, z)) {
+                y += lift
+                vy = 0.0
+                return
+            }
+            lift += 0.05
+        }
+        // Still embedded: give up on this column and search upwards for free space.
+        lift = 0.5
+        while (lift <= 12.0) {
+            if (!collides(world, x + lift, y + lift, z)) {
+                x += lift
+                y += lift
+                vy = 0.0
+                return
+            }
+            lift += 0.5
+        }
     }
 
     // ------------------------------------------------------------------ update
@@ -181,6 +223,14 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
         sneak: Boolean = false
     ) {
         sneaking = sneak && !flying
+        // Spawning or teleporting inside terrain used to freeze the AABB forever. Checked a few
+        // times per second instead of every frame so the collision scan stays cheap.
+        if (unstickTimer <= 0) {
+            unstickTimer = 10
+            unstick(world)
+        } else {
+            unstickTimer--
+        }
         accumulator += dt.coerceIn(0f, 0.25f)
         var guard = 0
         while (accumulator >= TICK && guard < 10) {
@@ -454,6 +504,7 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
         air = 300
         experience = 0f
         level = 0
+        unstickTimer = 0
     }
 
     /** True when the player is inside a liquid (used by the renderer for the water overlay). */

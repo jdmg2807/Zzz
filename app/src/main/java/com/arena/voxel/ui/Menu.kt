@@ -12,6 +12,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -171,7 +172,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.hills(
 }
 
 /**
- * A Java-flavoured button: 200x20 GUI px, dark outline, light top edge, white shadowed label.
+ * Stone plate button, Bedrock style (the signature every screen shares: menu, pause, containers).
  */
 @Composable
 fun GuiButton(
@@ -179,62 +180,29 @@ fun GuiButton(
     text: String,
     modifier: Modifier = Modifier,
     width: androidx.compose.ui.unit.Dp = gui.px(BUTTON_W),
-    height: androidx.compose.ui.unit.Dp = gui.px(BUTTON_H),
+    height: androidx.compose.ui.unit.Dp = gui.px(24f),
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
-    var pressed by remember { mutableStateOf(false) }
-    val base = when {
-        !enabled -> Color(0xFF353535)
-        pressed -> Color(0xFF565656)
-        else -> Color(0xFF6F6F6F)
-    }
-    Box(
-        modifier
-            .width(width)
-            .height(height)
-            .background(
-                Brush.verticalGradient(
-                    listOf(base.copy(alpha = 1f), base.copy(alpha = 0.88f))
-                )
-            )
-            .border(gui.px(1), Color(0xFF000000))
-            .pointerInput(enabled) {
-                detectTapGestures(
-                    onPress = {
-                        if (!enabled) return@detectTapGestures
-                        pressed = true
-                        tryAwaitRelease()
-                        pressed = false
-                    },
-                    onTap = { if (enabled) onClick() }
-                )
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        // Java signature highlight: one lighter row at the very top of the button.
-        Box(
-            Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .height(gui.px(1))
-                .background(if (enabled) Color(0x55FFFFFF) else Color(0x22FFFFFF))
-        )
-        Text(
-            text = text,
-            color = if (enabled) Color(0xFFF2F2F2) else Color(0xFF8C8C8C),
-            fontSize = gui.text(8f),
-            fontWeight = FontWeight.Medium,
-            fontFamily = FontFamily.Monospace,
-            maxLines = 1,
-            style = TextStyle(shadow = McTextShadow)
-        )
-    }
+    BedrockButton(
+        gui = gui,
+        label = text,
+        modifier = modifier,
+        width = width,
+        height = height,
+        enabled = enabled,
+        fontSize = 8f,
+        onClick = onClick
+    )
 }
 
 /**
- * Main menu: "Un jugador", "Ajustes...", "Salir del juego".
- * Multijugador and Realms are intentionally absent (singleplayer engine).
+ * Bedrock Edition main menu.
+ *
+ * Bedrock's phone menu is not Java's flat grey column: the logo is a chunky 3D wordmark at the
+ * top, the splash arrow is rotated next to it, and the buttons are stone plates with a light top
+ * bevel over a blurred world panorama. The world list lives in the "Jugar" screen, exactly like
+ * Bedrock's Play screen.
  */
 @Composable
 fun MainMenu(
@@ -242,6 +210,8 @@ fun MainMenu(
     onSettings: () -> Unit,
     onQuit: () -> Unit,
     onPlay: () -> Unit = {},
+    onMods: () -> Unit = {},
+    onPacks: () -> Unit = {},
     forcedScale: Int = Settings.guiScale
 ) {
     GuiScreen(forcedScale) { gui ->
@@ -251,92 +221,117 @@ fun MainMenu(
             val splash = remember { SPLASHES.random() }
             val pulse = rememberInfiniteTransition(label = "splash")
             val splashScale by pulse.animateFloat(
-                initialValue = 0.92f,
-                targetValue = 1.0f,
-                animationSpec = infiniteRepeatable(
-                    tween(520, easing = LinearEasing),
-                    RepeatMode.Reverse
-                ),
+                initialValue = 0.94f,
+                targetValue = 1.04f,
+                animationSpec = infiniteRepeatable(tween(560, easing = LinearEasing), RepeatMode.Reverse),
                 label = "splashPulse"
             )
 
-            // ---- Title block, positioned like Java (top edge at height / 4) ----------------
-            val titleTop = gui.px(gui.height / 4f)
-            Box(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = titleTop)
-            ) {
-                Text(
-                    "VOXELCRAFT",
-                    fontSize = gui.text(38f),
-                    fontWeight = FontWeight.Black,
-                    fontFamily = FontFamily.Monospace,
-                    color = Color(0xFFEDEDED),
-                    maxLines = 1,
-                    style = TextStyle(shadow = Shadow(Color(0xFF1A1A1A), Offset(4f, 5f), 0f))
-                )
-            }
-            // Splash text, rotated -20° at the right end of the logo, like Java.
-            Box(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = titleTop + gui.px(30f))
-                    .offset(x = gui.px(78f))
-                    .graphicsLayer {
-                        rotationZ = -20f
-                        scaleX = splashScale
-                        scaleY = splashScale
-                    }
-            ) {
-                Text(
-                    splash,
-                    fontSize = gui.text(9f),
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFFFF00),
-                    maxLines = 1,
-                    style = TextStyle(shadow = Shadow(Color(0xFF3F3F00), Offset(2f, 3f), 0f))
-                )
-            }
-
-            // ---- Button column: 200x20, 4 px apart, centred -------------------------------
+            // ---- Wordmark: dark extrusion behind a light face (Bedrock's 3D logo) ----------
             Column(
                 Modifier
-                    .align(Alignment.Center)
+                    .align(Alignment.TopCenter)
                     .padding(top = gui.px(gui.height * 0.10f)),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                GuiButton(gui, "Un jugador", onClick = onSingleplayer)
-                Spacer(Modifier.height(gui.px(BUTTON_GAP)))
-                GuiButton(gui, "Ajustes...", onClick = onSettings)
-                Spacer(Modifier.height(gui.px(BUTTON_GAP)))
-                GuiButton(gui, "Salir del juego", onClick = onQuit)
+                Box {
+                    Text(
+                        "VOXELCRAFT",
+                        fontSize = gui.text(34f),
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.SansSerif,
+                        color = Color(0xFF2B2B2B),
+                        maxLines = 1,
+                        modifier = Modifier.offset(x = gui.px(1.6f), y = gui.px(2.2f))
+                    )
+                    Text(
+                        "VOXELCRAFT",
+                        fontSize = gui.text(34f),
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.SansSerif,
+                        color = Color(0xFF9E9E9E),
+                        maxLines = 1,
+                        modifier = Modifier.offset(x = gui.px(0.7f), y = gui.px(1f))
+                    )
+                    Text(
+                        "VOXELCRAFT",
+                        fontSize = gui.text(34f),
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.SansSerif,
+                        color = Color(0xFFF4F4F4),
+                        maxLines = 1
+                    )
+                }
+                Box(
+                    Modifier
+                        .offset(x = gui.px(58f), y = gui.px(-2f))
+                        .graphicsLayer {
+                            rotationZ = -14f
+                            scaleX = splashScale
+                            scaleY = splashScale
+                        }
+                ) {
+                    Text(
+                        splash,
+                        fontSize = gui.text(8f),
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.Bold,
+                        color = Bedrock.gold,
+                        maxLines = 1,
+                        style = TextStyle(shadow = Shadow(Color(0xFF3F3F00), Offset(2f, 2f), 0f))
+                    )
+                }
+                Spacer(Modifier.height(gui.px(6f)))
+                BedrockText(gui, "Edición Bedrock · Mecánica Java", size = 7.5f, color = Color(0xFFD8D8D8))
             }
 
-            // ---- Footer: version left, disclaimer right (Java shows the same two corners) ---
+            // ---- Button column, centred like the Bedrock menu -----------------------------
+            Column(
+                Modifier
+                    .align(Alignment.Center)
+                    .padding(top = gui.px(gui.height * 0.14f)),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                BedrockButton(gui, "Jugar", width = gui.px(210f), height = gui.px(28f), fontSize = 10f) {
+                    onSingleplayer()
+                }
+                Spacer(Modifier.height(gui.px(6f)))
+                BedrockButton(gui, "Ajustes", width = gui.px(210f), height = gui.px(22f)) { onSettings() }
+                Spacer(Modifier.height(gui.px(5f)))
+                Row {
+                    BedrockButton(gui, "Mods", width = gui.px(102f), height = gui.px(22f)) { onMods() }
+                    Spacer(Modifier.width(gui.px(6f)))
+                    BedrockButton(gui, "Paquetes", width = gui.px(102f), height = gui.px(22f)) { onPacks() }
+                }
+                Spacer(Modifier.height(gui.px(5f)))
+                BedrockButton(gui, "Salir del juego", width = gui.px(210f), height = gui.px(20f), fontSize = 7.5f) {
+                    onQuit()
+                }
+            }
+
+            // ---- Corner labels ------------------------------------------------------------
             Text(
                 "VoxelCraft ${BuildConfig.VERSION_NAME}  ·  Java 1.21",
                 color = Color(0xFFE8E8E8),
-                fontSize = gui.text(7.5f),
-                fontFamily = FontFamily.Monospace,
+                fontSize = gui.text(7f),
+                fontFamily = FontFamily.SansSerif,
                 maxLines = 1,
                 style = TextStyle(shadow = McTextShadow),
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(gui.px(3f))
+                    .padding(gui.px(4f))
             )
             Text(
                 "No es Minecraft oficial · sin assets de Mojang",
                 color = Color(0xFFE8E8E8),
-                fontSize = gui.text(7.5f),
-                fontFamily = FontFamily.Monospace,
+                fontSize = gui.text(7f),
+                fontFamily = FontFamily.SansSerif,
                 maxLines = 1,
                 textAlign = TextAlign.End,
                 style = TextStyle(shadow = McTextShadow),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(gui.px(3f))
+                    .padding(gui.px(4f))
             )
         }
     }

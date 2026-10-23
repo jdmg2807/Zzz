@@ -824,11 +824,13 @@ class Renderer : GLSurfaceView.Renderer {
             if (p.yaw < -360f) p.yaw += 360f
 
             val ascend = when {
+                Game.flyUp -> 1f
+                Game.flyDown -> -1f
                 Game.jump -> 1f
                 Game.down -> -1f
                 else -> 0f
             }
-            p.update(dt, w, Game.move[0], Game.move[1], ascend, Game.jump, Game.sprint)
+            p.update(dt, w, Game.move[0], Game.move[1], ascend, Game.jump, Game.sprint, Game.sneak)
             w.tick(dt)
             tickContainers(w, dt)
         }

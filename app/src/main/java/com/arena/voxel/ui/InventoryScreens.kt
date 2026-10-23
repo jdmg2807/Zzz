@@ -72,7 +72,7 @@ fun ContainerScreen(
                     ContainerMode.CRAFTING_TABLE -> "Mesa de trabajo"
                     ContainerMode.CREATIVE -> "Bloques"
                 },
-                color = Color(0xFF404040),
+                color = Color(0xFFFFFFFF),
                 fontSize = gui.text(8f),
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
@@ -83,7 +83,7 @@ fun ContainerScreen(
                 Modifier
                     .width(gui.px(panelW))
                     .height(gui.px(panelH))
-                    .background(Color(0xFFC6C6C6))
+                    .background(Bedrock.panel)
                     .border(gui.px(1f), Color(0xFF000000))
             ) {
                 when (mode) {
@@ -355,7 +355,7 @@ private fun CreativePanel(gui: Gui, cursor: ItemStack?, onGrab: (ItemStack?) -> 
                 ) {
                     Text(
                         pair.first.take(6),
-                        color = Color(0xFF303030),
+                        color = Color(0xFFFFFFFF),
                         fontSize = gui.text(6f),
                         fontFamily = FontFamily.Monospace
                     )
@@ -400,8 +400,8 @@ internal fun androidx.compose.foundation.layout.BoxScope.Slot(
         Modifier
             .offset(x = gui.px(x), y = gui.px(y))
             .size(gui.px(18f))
-            .background(Color(0xFF8B8B8B))
-            .border(gui.px(1f), Color(0xFF373737))
+            .background(Bedrock.slot)
+            .border(gui.px(1f), Bedrock.slotBorder)
             .pointerInput(stack?.id, stack?.count) { detectTapGestures { onClick(stack) } },
         contentAlignment = Alignment.Center
     ) {

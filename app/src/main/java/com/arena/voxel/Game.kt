@@ -60,6 +60,22 @@ object Game {
     @Volatile var jump = false
     @Volatile var down = false
     @Volatile var sprint = false
+    @Volatile var sneak = false
+    @Volatile var flyUp = false
+    @Volatile var flyDown = false
+
+    /** True while a Compose panel (inventory, pause menu, chat) owns the touch screen. */
+    @Volatile var uiBlocking = false
+
+    /** Requested panel, polled by [com.arena.voxel.ui.GameScreen]: "pause", "inventory", "chat". */
+    @Volatile var uiRequest = ""
+
+    /** Joystick visual state, written by the touch controller and read by the HUD. */
+    @Volatile var joyActive = false
+    @Volatile var joyAnchorX = 0f
+    @Volatile var joyAnchorY = 0f
+    @Volatile var joyKnobX = 0f
+    @Volatile var joyKnobY = 0f
 
     /** Touch press tracking: a quick tap places a block, holding mines it. */
     @Volatile var pressActive = false

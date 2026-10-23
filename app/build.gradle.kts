@@ -11,19 +11,53 @@ android {
         applicationId = "com.arena.voxel"
         minSdk = 24
         targetSdk = 34
-        versionCode = 12
-        versionName = "1.7.1"
+        versionCode = 13
+        versionName = "2.0.0"
+    }
+
+    /**
+     * Stable signing key, committed to the repository.
+     *
+     * Before this the release APK was signed with the AGP debug key, which each CI runner
+     * generates at random: Android then refuses to install the new APK over the previous one
+     * (INSTALL_FAILED_UPDATE_INCOMPATIBLE) and every build looked like a "package conflict".
+     * One fixed key = every future APK installs as an update.
+     */
+    val stableKeystore = rootProject.file("keystore/voxelcraft.jks")
+    signingConfigs {
+        if (stableKeystore.exists()) {
+            create("stable") {
+                storeFile = stableKeystore
+                storePassword = "voxelcraft"
+                keyAlias = "voxelcraft"
+                keyPassword = "voxelcraft"
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Signed with the CI debug keystore so the artifact is directly installable.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (stableKeystore.exists()) {
+                signingConfigs.getByName("stable")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
         debug {
-            applicationIdSuffix = ".debug"
+            // Same applicationId as release on purpose: debug and release are the same app, so
+            // one installs over the other instead of showing two icons on the launcher.
+            signingConfig = if (stableKeystore.exists()) {
+                signingConfigs.getByName("stable")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
+    }
+
+    androidResources {
+        // WAV music must stay uncompressed so MediaPlayer can open it straight from the APK.
+        noCompress.addAll(listOf("wav", "mp3", "ogg"))
     }
 
     compileOptions {

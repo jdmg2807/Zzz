@@ -78,7 +78,7 @@ fun BlockEntityScreen(
         ) {
             Text(
                 if (isChest) "Cofre" else "Horno",
-                color = Color(0xFF404040),
+                color = Color(0xFFFFFFFF),
                 fontSize = gui.text(8f),
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
@@ -88,7 +88,7 @@ fun BlockEntityScreen(
                 Modifier
                     .width(gui.px(panelW))
                     .height(gui.px(panelH))
-                    .background(Color(0xFFC6C6C6))
+                    .background(Bedrock.panel)
                     .border(gui.px(1f), Color(0xFF000000))
             ) {
                 if (isChest) {
@@ -171,8 +171,8 @@ private fun androidx.compose.foundation.layout.BoxScope.FurnaceBody(
             .offset(x = gui.px(57f), y = gui.px(37f))
             .width(gui.px(14f))
             .height(gui.px(14f))
-            .background(Color(0xFF8B8B8B))
-            .border(gui.px(1f), Color(0xFF373737))
+            .background(Bedrock.slot)
+            .border(gui.px(1f), Bedrock.slotBorder)
     ) {
         val fraction = if (furnace.burnTotal > 0) furnace.burnTime / furnace.burnTotal.toFloat() else 0f
         if (burning && fraction > 0f) {
@@ -192,8 +192,8 @@ private fun androidx.compose.foundation.layout.BoxScope.FurnaceBody(
             .offset(x = gui.px(79f), y = gui.px(35f))
             .width(gui.px(24f))
             .height(gui.px(16f))
-            .background(Color(0xFF8B8B8B))
-            .border(gui.px(1f), Color(0xFF373737))
+            .background(Bedrock.slot)
+            .border(gui.px(1f), Bedrock.slotBorder)
     ) {
         Box(
             Modifier
@@ -207,7 +207,7 @@ private fun androidx.compose.foundation.layout.BoxScope.FurnaceBody(
     if (furnace.inventory.get(2) != null) {
         Text(
             "Listo",
-            color = Color(0xFF3A6B2A),
+            color = Color(0xFF9BE05B),
             fontSize = gui.text(6f),
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.offset(x = gui.px(112f), y = gui.px(52f))
@@ -217,7 +217,7 @@ private fun androidx.compose.foundation.layout.BoxScope.FurnaceBody(
     Row(Modifier.offset(x = gui.px(6f), y = gui.px(6f))) {
         Text(
             "Entrada / Combustible",
-            color = Color(0xFF505050),
+            color = Color(0xFFBDBDBD),
             fontSize = gui.text(6f),
             fontFamily = FontFamily.Monospace
         )
@@ -252,7 +252,7 @@ fun AnvilScreen(gui: Gui, onClose: () -> Unit) {
         ) {
             Text(
                 "Yunque",
-                color = Color(0xFF404040),
+                color = Color(0xFFFFFFFF),
                 fontSize = gui.text(8f),
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
@@ -262,7 +262,7 @@ fun AnvilScreen(gui: Gui, onClose: () -> Unit) {
                 Modifier
                     .width(gui.px(176f))
                     .height(gui.px(166f))
-                    .background(Color(0xFFC6C6C6))
+                    .background(Bedrock.panel)
                     .border(gui.px(1f), Color(0xFF000000))
             ) {
                 for (i in 0 until 2) {

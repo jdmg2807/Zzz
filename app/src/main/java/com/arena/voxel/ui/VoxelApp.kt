@@ -87,6 +87,8 @@ fun VoxelApp() {
                         (context as? android.app.Activity)?.finish()
                     },
                     onPlay = { screen = "game" },
+                    onMods = { screen = "mods" },
+                    onPacks = { screen = "packs" },
                     forcedScale = Settings.guiScale
                 )
                 "singleplayer" -> SingleplayerScreen(
