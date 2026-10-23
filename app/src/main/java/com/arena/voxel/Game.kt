@@ -186,6 +186,9 @@ object Game {
 
     fun exitToMenu() {
         paused = false
+        uiBlocking = false
+        uiRequest = ""
+        joyActive = false
         pressActive = false
         mining = false
         miningProgress = 0f

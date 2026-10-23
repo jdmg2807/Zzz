@@ -4,6 +4,9 @@ Un motor de Minecraft **hecho desde cero para Android** (Kotlin + OpenGL ES 3.0)
 **resource packs de texturas de Minecraft Java**, **shaders GLSL** y **mods en Java** propios.
 GitHub Actions compila el APK automáticamente.
 
+**La interfaz es la de Bedrock Edition** (menú, HUD, controles táctiles, inventario) y la
+**mecánica es la de Java** (física por ticks, generación, redstone, crafteo, contenedores, mobs).
+
 > No es Minecraft oficial ni contiene código ni assets de Mojang. Es un motor independiente
 > con estética voxel que *lee* los packs que ya tengas en tu teléfono.
 
@@ -16,8 +19,9 @@ Cada push a este repositorio compila el juego:
 1. Abre la pestaña **Actions** → workflow **Build Android APK**.
 2. Entra a la ejecución más reciente y descarga el artefacto **VoxelCraft-APK**.
 3. Dentro hay dos APK:
-   - `VoxelCraft-<n>-release.apk` → el juego (firmado con debug key, instalable directamente).
-   - `VoxelCraft-<n>-debug.apk` → variante debug (se instala en paralelo, package `.debug`).
+   - `VoxelCraft-<n>-release.apk` → el juego (~57 MB, incluye la banda sonora).
+   - `VoxelCraft-<n>-debug.apk` → misma app (`com.arena.voxel`) con la misma clave de firma, así
+     que **se instala como actualización** de la versión anterior, sin duplicar el icono.
    - `examplemod.jar` → mod de ejemplo listo para importar desde el juego.
 
 También puedes crear un tag (`v1.0.0`) y el APK se publica como **GitHub Release**.
@@ -28,6 +32,22 @@ adb install -r VoxelCraft-release.apk
 ```
 
 Requisitos: Android 7.0+ (API 24) con OpenGL ES 3.0.
+
+## Controles táctiles (estilo Bedrock)
+
+| Acción | Gesto |
+|---|---|
+| Moverse | Joystick en la esquina inferior izquierda (aparece donde apoyas el dedo) |
+| Esprintar | Doble toque adelante en el joystick |
+| Mirar | Arrastrar cualquier zona libre de la pantalla |
+| Saltar | Botón ▲ (doble toque en creativo = volar) |
+| Agacharse / bajar volando | Botón ▼ |
+| Subir / bajar volando | Botones ⤒ / ⤓ en creativo |
+| Colocar bloque | Toque rápido en el mundo |
+| Minar | Mantener pulsado |
+| Inventario | Botón `···` a la derecha de la hotbar |
+| Chat / comandos | Botón `T` |
+| Pausa | Botón `II` |
 
 ## Qué incluye
 

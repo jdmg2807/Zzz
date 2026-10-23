@@ -1,5 +1,62 @@
 # Changelog
 
+## v2.0.0 — Interfaz de Bedrock, controles táctiles nuevos, arreglo del movimiento y APK completo
+
+> **Cambio de rumbo**: la interfaz deja de imitar Java y pasa a ser la de **Bedrock Edition**.
+> La **mecánica sigue siendo la de Java** (física por ticks, generación, redstone, crafteo,
+> contenedores, mobs, formato de mundos/mods/texturas de Java).
+
+### Arreglo crítico: ya se puede mover
+- **La causa real**: el `GLSurfaceView` (un `AndroidView` dentro de Compose) tenía
+  `setOnTouchListener { _, _ -> true }`, así que se tragaba *todos* los toques de la pantalla del
+  juego antes de que llegaran a Compose. El joystick dibujado nunca recibía el dedo.
+- **Solución**: los toques del juego ahora viven en `GameSurfaceView` (un `GLSurfaceView` propio
+  que hace `onTouchEvent` con multitoque real). Cuando hay un panel abierto devuelve `false` y el
+  panel de Compose recupera el control.
+- **Colisión**: `groundHeight()` arrancaba en `py`, por lo que el jugador nunca se apoyaba en el
+  suelo ni podía subir una losa, y si el spawn caía dentro de un bloque el AABB quedaba atascado
+  para siempre. Ahora el barrido mira un escalón por encima y por debajo, y `Player.unstick()`
+  saca al jugador del terreno.
+- Zona de joystick = toda la esquina inferior izquierda (no un cuadro de 150 dp), así que el dedo
+  nunca "falla" el control.
+
+### Controles táctiles de Bedrock
+- **Joystick** con marco y perilla que aparece donde apoyas el dedo (doble toque adelante =
+  esprintar).
+- **Girar la cámara** arrastrando cualquier punto libre de la pantalla, con multitoque real
+  (mover y mirar a la vez).
+- **Botones de acción** abajo a la derecha: saltar (▲), agacharse (▼) y volar (✈); en creativo
+  aparecen también subir (⤒) y bajar (⤓). Doble toque en saltar = volar, como en Bedrock.
+- **Tocar** el mundo coloca el bloque; **mantener** lo mina con grietas progresivas.
+- **Hotbar de 9 ranuras** abajo al centro con el botón `···` del inventario a su derecha y los
+  botones de chat y pausa arriba a la derecha.
+
+### Interfaz Bedrock
+- **Menú principal** con logotipo en 3D, texto splash amarillo rotado, botones de piedra con
+  bisel (`Jugar`, `Ajustes`, `Mods`, `Paquetes`, `Salir del juego`) y panorama animado.
+- **HUD Bedrock**: corazones, muslos de pollo, burbujas de aire, barra de XP verde, hotbar oscura
+  con marco blanco en la ranura elegida y punto de mira.
+- **Inventario Bedrock**: panel oscuro con barra de título, esquina de crafteo 2×2 con resultado,
+  modelo del personaje, rejilla 3×9 y fila de hotbar separada; el modo creativo usa pestañas
+  laterales con icono y página de 9×5.
+- **Menú de pausa y pantalla de muerte** con placas de piedra; cofre, horno y yunque con el mismo
+  lenguaje visual.
+- Todos los textos de la interfaz pasan a tipografía sans (Bedrock) con sombra dura.
+
+### Instalación como actualización
+- **Clave de firma fija** en `keystore/voxelcraft.p12` (PKCS12, alias `voxelcraft`): antes cada
+  runner de CI generaba una clave de depuración distinta y Android rechazaba instalar la nueva
+  versión encima (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`); ahora todos los APK comparten clave.
+- `applicationId` único `com.arena.voxel` también para el APK de depuración (ya no aparece una
+  segunda app `.debug` en el lanzador).
+- `versionCode` 13 / `versionName` 2.0.0.
+
+### APK de ~57 MB con contenido real
+- **Banda sonora propia**: 6 pistas ambientales (~54 MB) sintetizadas desde cero con
+  `tools/gen_music.py` (sin audio de Mojang), en `assets/music`. Se reproducen con `MediaPlayer`
+  desde el APK: menú, mundo y cuevas.
+- Nuevo ajuste **Música** en Ajustes y pausa automática al salir de la app.
+
 ## v1.7.1 — TNT y explosiones
 - **TNT jugable**: el mechero o una señal de redstone encienden la mecha de 4 s (80 ticks); la
   textura encendida emite luz 7 y la explosión tiene potencia 4 con caída por distancia.

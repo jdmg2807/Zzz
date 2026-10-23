@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -151,7 +154,9 @@ fun GameScreen(onExit: () -> Unit) {
         if (Game.state == Game.State.LOADING) {
             LoadingOverlay(tick, onCancel = { Game.exitToMenu(); onExit() })
         } else {
-            // Draw-only HUD: the view owns the gameplay touches.
+            // Fallback input path: if the interop GL view does not receive the events on this
+            // device, this layer drives the very same controller. Draw-only HUD on top.
+            BedrockTouchLayer()
             BedrockHud(tick)
         }
 
@@ -241,6 +246,42 @@ fun GameScreen(onExit: () -> Unit) {
 
 private data class BlockEntityUi(val kind: String, val x: Int, val y: Int, val z: Int) {
     val pos: Triple<Int, Int, Int> get() = Triple(x, y, z)
+}
+
+/**
+ * Compose twin of [GameSurfaceView]'s touch handling.
+ *
+ * The GL view is a child View of the Compose host, and depending on the Compose version it either
+ * receives the touches first or not at all. Both this layer and the view feed [BedrockInput], so
+ * the joystick works in either case and only one of them ever sees a given gesture.
+ */
+@Composable
+private fun BedrockTouchLayer() {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (Game.uiBlocking || Game.state != Game.State.PLAYING) continue
+                        val m = BedrockMetrics(size.width.toFloat(), size.height.toFloat())
+                        val now = System.currentTimeMillis()
+                        for (change in event.changes) {
+                            val id = change.id.value
+                            when {
+                                change.changedToDownIgnoreConsumed() ->
+                                    BedrockInput.down(m, id, change.position.x, change.position.y, now)
+                                change.changedToUpIgnoreConsumed() -> BedrockInput.up(id)
+                                change.position != change.previousPosition ->
+                                    BedrockInput.move(m, id, change.position.x, change.position.y, now)
+                            }
+                            change.consume()
+                        }
+                    }
+                }
+            }
+    )
 }
 
 @Composable
