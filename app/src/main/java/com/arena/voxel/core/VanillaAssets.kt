@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
  * vanilla/item/<name>.png         item sprites        (768 files)
  * vanilla/models_item/<name>.json item models         (textures.layer0 -> sprite)
  * vanilla/lang/es_es.json         display names
- * vanilla/sounds/**.ogg           sound effects
+ * vanilla/sounds/ (recursivo)      sound effects (OGG)
  * ```
  *
  * Using real assets is what makes the inventory icons, the block textures and the sound effects

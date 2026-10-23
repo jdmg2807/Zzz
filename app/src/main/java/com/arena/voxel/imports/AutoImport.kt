@@ -116,7 +116,7 @@ object AutoImport {
                 "No reconozco '$name'.\n" +
                     "Acepta: mundos (zip con level.dat + region/), resource packs de texturas " +
                     "(zip con assets/minecraft/textures o textures/block), shader packs " +
-                    "(zip con shaders/*.vsh/.fsh) y mods (.jar con voxelmod.json)."
+                    "(zip con shaders .vsh/.fsh) y mods (.jar con voxelmod.json)."
             )
         }
     }

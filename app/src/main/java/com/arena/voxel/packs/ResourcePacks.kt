@@ -302,7 +302,7 @@ object ResourcePacks {
                     var itemCount = 0
                     val seen = HashSet<String>()
                     for (entry in src.entries()) {
-                        // ---- item sprites (Java: assets/minecraft/textures/item/*.png) ----------
+                        // ---- item sprites (Java: assets/minecraft/textures/item/<name>.png) ------
                         if (isItemTexture(entry)) {
                             val itemName = normalizeItem(entry)
                             if (itemName != null && seen.add("item/$itemName")) {
@@ -375,7 +375,7 @@ object ResourcePacks {
         0
     }
 
-    /** `grass_block_top.png` -> `grass_top`, `bricks.png` -> `brick`, … using [ALIASES]. */
+    /** `grass_block_top.png` -> `grass_top`, `bricks.png` -> `brick`, etc. using [ALIASES]. */
     private fun normalizeVanillaName(raw: String): String? {
         val name = raw.substringAfterLast('/')
         ALIASES[name]?.let { return it }

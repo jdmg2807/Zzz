@@ -12,8 +12,8 @@ import com.arena.voxel.core.Log
  * shaders/composite.vsh/.fsh  fullscreen passes that read colortex0..7
  * shaders/composite1.fsh ...
  * shaders/final.vsh/.fsh      last pass, writes to the screen
- * shaders/lib/*.glsl          #include files
- * shaders/post/*.json         vanilla post chain (targets + passes)
+ * shaders/lib/<name>.glsl     #include files
+ * shaders/post/<name>.json    vanilla post chain (targets + passes)
  * ```
  *
  * This class turns that into something a phone GPU can run:
@@ -237,7 +237,7 @@ out vec2 texcoord;
             }
         }
 
-        // ---- vanilla post chain (shaders/post/*.json) -------------------------------
+        // ---- vanilla post chain (shaders/post/<name>.json) ---------------------------
         val postJson = find("shaders/post/color_convolve.json")
             ?: entries.firstOrNull { it.lowercase().contains("shaders/post/") && it.lowercase().endsWith(".json") }
                 ?.let { it }
@@ -303,7 +303,7 @@ out vec2 texcoord;
 }
 
 /**
- * Vanilla `shaders/post/*.json` chains.
+ * Vanilla `shaders/post` JSON chains.
  *
  * Format (from the wiki): a list of `targets` (extra framebuffers, usually `"swap"`) and a list of
  * `passes`, each with an `intarget`, an `outtarget` and the name of an effect program. The program

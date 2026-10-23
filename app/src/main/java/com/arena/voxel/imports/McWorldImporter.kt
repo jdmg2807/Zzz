@@ -345,7 +345,7 @@ object McWorldImporter {
             hasTextures -> "parece un RESOURCE PACK de texturas"
             hasShaders -> "parece un SHADER PACK"
             entries.any { it.endsWith("level.dat") } -> "tiene level.dat pero no carpeta region/"
-            else -> "no contiene level.dat ni region/*.mca"
+            else -> "no contiene level.dat ni archivos .mca de region"
         }
         return "No es un mundo de Minecraft Java: $detected.\n" +
             "Usa «Importar texturas», «Importar shaders» o «Importar mod» según corresponda."
