@@ -55,14 +55,14 @@ class GameSurfaceView(context: Context) : GLSurfaceView(context) {
             }
             MotionEvent.ACTION_MOVE -> {
                 for (i in 0 until event.pointerCount) {
-                    BedrockInput.move(m, event.getPointerId(i), event.getX(i), event.getY(i), event.eventTime)
+                    BedrockInput.move(m, event.getPointerId(i).toLong(), event.getX(i), event.getY(i), event.eventTime)
                 }
             }
             MotionEvent.ACTION_POINTER_UP -> {
-                BedrockInput.up(event.getPointerId(event.actionIndex))
+                BedrockInput.up(event.getPointerId(event.actionIndex).toLong())
             }
             MotionEvent.ACTION_UP -> {
-                BedrockInput.up(event.getPointerId(0))
+                BedrockInput.up(event.getPointerId(0).toLong())
                 performClick()
             }
             MotionEvent.ACTION_CANCEL -> {
