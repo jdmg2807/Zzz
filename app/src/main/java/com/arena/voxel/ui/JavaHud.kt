@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -138,9 +140,9 @@ fun JavaHud(gui: Gui, tick: Int, onOpenInventory: () -> Unit) {
                 .background(Color(0x88000000))
                 .border(gui.px(1f), Color(0xFF8B8B8B))
                 .pointerInput(tick) {
-                    detectTapGestures { offset ->
+                    detectTapGestures { point ->
                         val slotW = size.width / 9f
-                        val index = (offset.x / slotW).toInt().coerceIn(0, 8)
+                        val index = (point.x / slotW).toInt().coerceIn(0, 8)
                         Game.inventory.selected = index
                         Game.selectedSlot = index
                         Game.syncHotbar()
@@ -151,7 +153,6 @@ fun JavaHud(gui: Gui, tick: Int, onOpenInventory: () -> Unit) {
                 for (i in 0 until 9) {
                     Box(
                         Modifier
-                            .width(gui.px(20f))
                             .size(gui.px(20f))
                             .border(
                                 gui.px(if (i == selected) 2f else 0f),
