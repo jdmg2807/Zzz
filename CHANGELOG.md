@@ -1,5 +1,52 @@
 # Changelog
 
+## v1.7.0 — Combate 1.9+, contenedores, redstone con retardos, 400 bloques y audio
+
+### Física y combate
+- **Combate de la 1.9**: cooldown por velocidad del arma, multiplicador de carga `0.2 + 0.8·carga²`
+  (carga completa = `20 / velocidad` ticks), crítico ×1,5 al golpear en caída, barrido de espada
+  con 1 de daño a los mobs a menos de 2 bloques y retroceso.
+- **Minado con la fórmula real**: `dureza · 1,5 / velocidad` según herramienta y nivel; cada mena
+  exige su pico (`hierro→piedra`, `oro/redstone/diamante→hierro`, `obsidiana/restos→diamante`) y
+  sin el pico correcto no hay drop.
+- **Durabilidad**: 59/131/250/1561 usos, desgaste solo con la herramienta adecuada y rotura al
+  llegar al límite.
+- **Caída y muerte**: HUD de daño, pantalla de muerte con puntuación, reaparición en el spawn y
+  suelta de todo el inventario como entidades de objeto.
+
+### Contenedores
+- **Cofre, horno y yunque jugables**: pantallas de 176×168 y 176×166 con la geometría vanilla,
+  horno a 20 Hz (200 ticks por pieza, tabla de combustibles, textura encendida con luz 13),
+  persistencia en `containers.dat` junto al mundo.
+- **Reglas del yunque**: combinación de durabilidad con el bono del 12 %, coste de niveles y
+  penalización por trabajos previos.
+- **Inventario y HUD con las medidas de Java**: corazones 10×9, hambre espejada, XP 182×5 con la
+  curva real de niveles, hotbar 182×22, rejilla 2×2/3×3 y creativo 195×136 con pestañas.
+
+### Mundo
+- **Cuevas de ruido 1.18+**: cheese, spaghetti y noodle, más lava en el fondo.
+- **Agua con 8 niveles** (manantial 0, flujo 1–7, caída 8, paso cada 5 ticks, secado del flujo no
+  alimentado) y **arena/grava que caen** al quitar el bloque de debajo.
+- **Estructuras**: mazmorra de adoquín musgoso con generador y cofres; casa de aldea con mesa de
+  trabajo, horno, cofre y tejado con alero.
+- **Paleta de ~400 bloques** generada con dureza, herramienta, luz y forma reales: 16 tintes × 5
+  familias, 8 maderas completas, 30 familias de piedra, menas normales y de pizarra, la escalera
+  de oxidación del cobre con 8 formas × 4 estados y los bloques de 1.21 (crafter, vault, trial
+  spawner, copper bulb/grate, heavy core). Almacenamiento de bloques en 16 bits (formato VCX4).
+- **Redstone**: cable con 16 niveles, antorchas inversoras, lámparas, pistones, observadores y
+  **repetidores con retardo 1–4 ticks** (se cicla tocándolos), con cola temporal real.
+
+### Sistemas
+- **Entidades de objeto**: los bloques rotos caen, flotan, se atraen y se recogen; desaparición a
+  los 6000 ticks.
+- **Partículas**: polvo al romper/minar, nube al aterrizar, chispas de daño, humo de explosión.
+- **Audio procedural**: pasos, minar, colocar, comer, daño y subida de nivel sintetizados al
+  arrancar y mezclados con `SoundPool` (ajuste de sonido en Ajustes).
+- **Chat y comandos**: `/give`, `/time`, `/tp`, `/heal`, `/gamemode`, `/help` y comandos de mods.
+- **API de mods ampliada**: `registerItem`, `registerCommand`, `ItemDef`, `CommandHandler`.
+- **Recetas derivadas de toda la paleta**: cada madera y cada familia de piedra tiene sus
+  escaleras/losas/vallas, lana → alfombra, lingotes → bloques, cubos, tijeras y mechero.
+
 ## v1.6.1 — GUI Scale de Java, menú principal replicado y plan de refactorización 1.21
 - **Sistema de GUI Scale** (`ui/GuiScale.kt`): la interfaz se dibuja en píxeles virtuales con la
   fórmula de Java (`clamp(min(ancho/320, alto/240), 1, 4)`). Es la corrección real del bug de

@@ -33,10 +33,21 @@ Requisitos: Android 7.0+ (API 24) con OpenGL ES 3.0.
 
 | Sistema | Estado |
 |---|---|
-| Mundo infinito por chunks (16×16×80) con ruido procedural | ✅ |
+| Mundo infinito por chunks (16×16×256 bloques) con ruido procedural | ✅ |
 | 6 biomas (llanura, bosque, nevado, desierto, taiga, jungla) con colores propios | ✅ |
-| Cuevas 3D (túneles y cámaras) y ruinas con antorchas | ✅ |
+| **Cuevas de ruido 1.18+** (cheese, spaghetti, noodle) y lava en el fondo | ✅ |
+| **Estructuras**: ruinas con antorcha, mazmorra con generador y cofre, casa de aldea | ✅ |
 | Animales: cerdos, ovejas, vacas y gallinas con IA de deambular | ✅ |
+| **Mobs hostiles**: zombi, esqueleto y creeper con A*, daño y explosión | ✅ |
+| **Combate 1.9**: cooldown, carga, crítico, barrido y retroceso | ✅ |
+| **Durabilidad de herramientas** y nivel de pico exigido por mena | ✅ |
+| **~400 bloques** con dureza, herramienta, luz y forma reales (incluidos los de 1.21) | ✅ |
+| **Cofre, horno y yunque** con sus pantallas y persistencia | ✅ |
+| **Redstone**: cable de 16 niveles, repetidores con retardo 1–4, lámparas, pistones, observadores | ✅ |
+| **Agua con 8 niveles de flujo** y arena/grava que caen | ✅ |
+| **Entidades de objeto**: los drops caen y se recogen | ✅ |
+| **Partículas y audio procedural** (pasos, minar, colocar, comer, daño, nivel) | ✅ |
+| **Chat y comandos** (`/give`, `/time`, `/tp`, `/heal`, `/gamemode`, `/help`, comandos de mods) | ✅ |
 | Árboles por bioma (roble, abedul, pino, jungla), cactus, caña de azúcar, plantas | ✅ |
 | Oclusión ambiental (AO) por vértice y sombreado por cara | ✅ |
 | Iluminación: luz de cielo (cuevas oscuras) + luz de bloque (antorcha, glowstone) | ✅ |
@@ -235,8 +246,10 @@ desde **Ajustes → Guardar log en Descargas** o enviarlo con **Ajustes → Comp
 
 ## Historial de versiones
 
-Ver [CHANGELOG.md](CHANGELOG.md): v1.0 motor + mods/texturas/shaders, v1.1 biomas/vegetación/cielo,
-v1.2 iluminación/antorcha/mano/minado.
+Ver [CHANGELOG.md](CHANGELOG.md). La versión actual es la **v1.7.0**, que reúne el trabajo de
+paridad con Java 1.21: GUI con escala real, HUD e inventarios con la geometría vanilla, combate
+1.9, contenedores, redstone con retardos, cuevas de ruido, estructuras, ~400 bloques, física de
+fluidos y entidades de objeto, partículas, audio y comandos.
 
 ## Compilar tú mismo
 
