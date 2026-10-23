@@ -1,5 +1,29 @@
 # Changelog
 
+## v2.1.1 — Física real de Java Edition
+- **Movimiento reescrito con el modelo del juego**: la velocidad ya no persigue un objetivo, se
+  suma aceleración (0,1 andando / 0,13 esprintando en suelo, 0,02 en el aire) y después se aplica
+  la inercia (0,546 en suelo, 0,91 en el aire). Resultado: 4,317 / 5,612 / 1,295 b/s y la misma
+  sensación de arranque y frenada que en Java.
+- **Salto correcto**: 0,42 hacia arriba (ápice 1,252 bloques) y el impulso de 0,2 horizontal solo
+  al esprintar; antes se sumaba a la altura y el salto esprintando era más alto que el normal.
+- **Agua, lava y escaleras** con los valores del juego (inercia 0,8 / 0,5, flotación −0,02,
+  subir +0,04, clamp 0,15 y trepada 0,2).
+- **Agacharse ya no bloquea**: el guardia de borde estaba invertido (anulaba la velocidad si *no*
+  había pared), ahora retrocede 0,05 bloques por paso como el juego.
+- **Colisión por subpasos de 0,4 bloques**: al caer a 3,92 b/tick el jugador podía atravesar un
+  suelo de un bloque de grosor.
+- Velocidades por debajo de 0,003 b/tick se anulan, como en el juego.
+
+## v2.1.0 — Assets de Minecraft Java, sonidos, mods y toques
+- **Sonidos reales**: 514 efectos de `minecraft-assets` (romper, colocar, pasos, daño, comer,
+  subir de nivel, salpicaduras y clics) con variantes aleatorias.
+- **Toque para colocar arreglado**: el micro-movimiento del dedo cancelaba la colocación y la
+  ventana de toque (0,20 s) era más corta que un toque real; ahora 0,30 s y umbral de arrastre.
+- **Assets de vanilla** consumidos por el motor: texturas de bloque e ítem, modelos de ítem y
+  nombres en español.
+- Índice de sonidos cacheado y atribución en `assets/vanilla/README.md`.
+
 ## v2.0.1 — Ajustes de los controles táctiles
 - **Los botones de acción tienen prioridad sobre la hotbar**: en vertical el botón de agacharse
   se solapaba con el extremo derecho de la hotbar y la pulsación seleccionaba una ranura en vez
