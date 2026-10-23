@@ -590,8 +590,13 @@ class Renderer : GLSurfaceView.Renderer {
     }
 
     private fun placeBlock(w: World, hit: BlockHit) {
-        // Holding a tool, a food or any other non-block item: nothing to place.
+        // Buckets: scoop a source or pour one out, like a right click in Java.
         val heldItem = Game.selectedItem()
+        if (heldItem == "bucket" || heldItem == "water_bucket" || heldItem == "lava_bucket") {
+            useBucket(w, hit, heldItem)
+            return
+        }
+        // Holding a tool, a food or any other non-block item: nothing to place.
         if (Game.selectedBlock() == "air" && heldItem != "air") return
 
         // Storage blocks open their GUI on a tap with an empty hand, like a right click.
@@ -648,6 +653,41 @@ class Renderer : GLSurfaceView.Renderer {
     }
 
     /**
+     * Bucket logic: an empty bucket picks up a fluid source, and a full one pours it into the
+     * targeted face. Water and lava are both `liquid` blocks, so the same code covers both.
+     */
+    private fun useBucket(w: World, hit: BlockHit, held: String) {
+        val targetId = Blocks.get(w.get(hit.x, hit.y, hit.z)).id
+        val slot = Game.inventory.selected
+        when {
+            held == "bucket" -> {
+                if (targetId != "water" && targetId != "lava") {
+                    Game.chat("El cubo solo recoge agua o lava")
+                    return
+                }
+                w.set(hit.x, hit.y, hit.z, Blocks.AIR)
+                if (!Game.creative) Game.inventory.set(slot, com.arena.voxel.items.ItemStack("${targetId}_bucket"))
+                com.arena.voxel.core.Sounds.play("splash", 0.5f)
+                Game.chat("Cubo lleno de ${com.arena.voxel.items.Items.nameOf("${targetId}_bucket")}")
+            }
+            else -> {
+                val fluid = if (held == "water_bucket") "water" else "lava"
+                val x = hit.x + hit.nx
+                val y = hit.y + hit.ny
+                val z = hit.z + hit.nz
+                if (!w.isAir(x, y, z)) return
+                w.set(x, y, z, Blocks.index(fluid))
+                if (fluid == "water") com.arena.voxel.world.Fluids.markSource(w, x, y, z)
+                if (!Game.creative) {
+                    Game.inventory.set(slot, com.arena.voxel.items.ItemStack("bucket"))
+                }
+                com.arena.voxel.core.Sounds.play("splash", 0.6f)
+            }
+        }
+        Game.syncHotbar()
+    }
+
+    /**
      * Bites the held food. Returns true when the tap was consumed by eating (success or a
      * "not hungry" refusal), so the same tap does not also place a block.
      */
@@ -677,12 +717,17 @@ class Renderer : GLSurfaceView.Renderer {
             Game.chat("La bedrock no se puede romper")
             return
         }
+        val heldTool = Game.selectedItem()
+        val harvest = Game.creative || com.arena.voxel.items.Items.canHarvest(id, heldTool)
         if (w.set(hit.x, hit.y, hit.z, 0)) {
             com.arena.voxel.world.Particles.blockBreak(w, hit.x, hit.y, hit.z, id)
             com.arena.voxel.core.Sounds.dig(id)
-            if (!Game.creative) {
+            if (!harvest && !Game.creative) {
+                Game.chat("Necesitas una herramienta mejor para ${com.arena.voxel.items.Items.nameOf(id)}")
+            }
+            if (!Game.creative && harvest) {
                 // Java drops the block's loot table entry, not the block itself.
-                val drop = com.arena.voxel.items.Items.dropOf(id)
+                val drop = com.arena.voxel.items.Items.dropOf(id, heldTool)
                 if (drop != null) {
                     com.arena.voxel.world.ItemEntities.spawn(
                         drop, 1,
@@ -690,7 +735,7 @@ class Renderer : GLSurfaceView.Renderer {
                     )
                 }
             }
-            if (!Game.creative) {
+            if (!Game.creative && harvest) {
                 val xp = when (id) {
                     "coal_ore" -> 1
                     "diamond_ore", "emerald_ore" -> 4
@@ -701,8 +746,25 @@ class Renderer : GLSurfaceView.Renderer {
                 }
                 if (xp > 0) player?.addExperience(xp)
             }
+            // Java only wears the tool when it is the correct one for the block.
+            if (!Game.creative && com.arena.voxel.items.Items.toolType(heldTool) == Blocks.toolOf(id)) {
+                wearTool()
+            }
             ModLoader.blockBroken(hit.x, hit.y, hit.z, id)
         }
+    }
+
+    /** Applies one point of wear to the held tool and breaks it at its limit (Java durability). */
+    private fun wearTool() {
+        val stack = Game.inventory.held() ?: return
+        val max = com.arena.voxel.items.Items.maxDamage(stack.id)
+        if (max <= 0) return
+        stack.damage += 1
+        if (stack.damage >= max) {
+            Game.inventory.set(Game.inventory.selected, null)
+            Game.chat("${com.arena.voxel.items.Items.nameOf(stack.id)} se ha roto")
+        }
+        Game.syncHotbar()
     }
 
     private fun hitsPlayer(p: Player, bx: Int, by: Int, bz: Int): Boolean {
@@ -1369,6 +1431,7 @@ class Renderer : GLSurfaceView.Renderer {
         }
         mob.health -= damage
         mob.vy = 5.2
+        if (!Game.creative) wearTool()
         val speed = com.arena.voxel.items.Items.attackSpeed(held)
         attackCooldown = 20f / speed
         Game.chat(if (crit) "¡Golpe crítico! -${damage.toInt()}" else "Golpe -${damage.toInt()}")

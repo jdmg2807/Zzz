@@ -169,6 +169,8 @@ object Items {
         item("porkchop", "Chuleta", food = 3)
         item("cooked_porkchop", "Chuleta asada", food = 8)
         item("bucket", "Cubo", 16)
+        item("shears", "Tijeras", 1)
+        item("flint_and_steel", "Mechero", 1)
         item("water_bucket", "Cubo de agua", 1)
         item("lava_bucket", "Cubo de lava", 1)
         item("wooden_door", "Puerta de madera", 64)
@@ -208,10 +210,54 @@ object Items {
     fun tier(id: String): Int = defs[id]?.tier ?: 0
     fun toolType(id: String): String = defs[id]?.toolType ?: ""
     /** Item id that a broken block leaves behind (null = nothing). */
-    fun dropOf(blockId: String): String? = when {
+    fun dropOf(blockId: String): String? = dropOf(blockId, "")
+
+    /**
+     * Loot of a block given the held item. Shears are special: they collect leaves, grass and
+     * wool that bare hands destroy, exactly like Java.
+     */
+    fun dropOf(blockId: String, held: String): String? = when {
+        held == "shears" && (blockId.contains("leaves") || blockId == "tall_grass" ||
+            blockId == "short_grass" || blockId == "fern" || blockId.endsWith("_wool")) ->
+            if (exists(blockId)) blockId else null
         Recipes.NO_DROP.contains(blockId) -> null
         Recipes.DROPS.containsKey(blockId) -> Recipes.DROPS[blockId]
         else -> if (exists(blockId)) blockId else null
+    }
+
+    /**
+     * Minimum tool tier needed for a block to drop anything (Java's `needs_iron_tool` etc.):
+     * 1 = wood, 2 = stone, 3 = iron, 4 = diamond. 0 = bare hands are enough.
+     */
+    fun requiredTier(blockId: String): Int = when (blockId) {
+        "iron_ore", "deepslate_iron_ore", "copper_ore", "deepslate_copper_ore",
+        "lapis_ore", "deepslate_lapis_ore" -> 2
+        "gold_ore", "deepslate_gold_ore", "redstone_ore", "deepslate_redstone_ore",
+        "diamond_ore", "deepslate_diamond_ore", "emerald_ore", "deepslate_emerald_ore" -> 3
+        "ancient_debris", "obsidian" -> 4
+        else -> 0
+    }
+
+    /** True when the held tool is good enough for the block to drop its loot. */
+    fun canHarvest(blockId: String, held: String): Boolean {
+        val tool = Blocks.toolOf(blockId)
+        val required = requiredTier(blockId)
+        if (required == 0) return true
+        return toolType(held) == tool && tier(held) >= required
+    }
+
+    /** Durability of a tool id (0 = unbreakable, like blocks and food). */
+    fun maxDamage(id: String): Int {
+        val def = defs[id] ?: return 0
+        if (def.toolType.isEmpty()) return 0
+        return when (def.tier) {
+            1 -> 59
+            2 -> 131
+            3 -> 250
+            4 -> 1561
+            5 -> 2031
+            else -> 0
+        }
     }
 
     fun attackSpeed(id: String): Float = defs[id]?.attackSpeed ?: 4f

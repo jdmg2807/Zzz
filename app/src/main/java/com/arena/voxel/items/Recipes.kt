@@ -87,6 +87,9 @@ object Recipes {
         add(Shaped("barrel", listOf("#S#", "# #", "#S#"), mapOf('#' to "oak_planks", 'S' to "oak_slab"), "barrel"))
         add(Shaped("oak_trapdoor", listOf("###", "###"), mapOf('#' to "oak_planks"), "oak_trapdoor", 2))
         add(Shaped("oak_door", listOf("##", "##", "##"), mapOf('#' to "oak_planks"), "oak_door", 3))
+        add(Shaped("bucket", listOf("I I", " I "), mapOf('I' to "iron_ingot"), "bucket"))
+        add(Shaped("shears", listOf(" I", "I "), mapOf('I' to "iron_ingot"), "shears"))
+        add(Shaped("flint_and_steel", listOf("I ", " F"), mapOf('I' to "iron_ingot", 'F' to "flint"), "flint_and_steel"))
     }
 
     val SHAPED: List<Shaped> = buildList {
