@@ -37,10 +37,26 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
         const val DRAG_GROUND = 0.546
         const val DRAG_ICE = 0.98
         const val STEP_HEIGHT = 0.6
-        const val WALK = 0.1
-        const val SPRINT = 0.13
-        const val SNEAK = 0.03
-        const val SWIM = 0.02
+        /**
+         * Target horizontal speeds in blocks **per tick** (20 ticks/s), taken from the movement
+         * speeds of Java Edition:
+         *
+         *   walk   4.317 b/s = 0.21585 b/tick
+         *   sprint 5.612 b/s = 0.28060 b/tick
+         *   sneak  1.295 b/s = 0.06475 b/tick
+         *   swim   2.2   b/s = 0.11    b/tick
+         *   fly    10.9  b/s = 0.545   b/tick (creative, double-tap jump)
+         *
+         * The old numbers (0.1 / 0.13) were half of the real speed and, worse, were multiplied by
+         * the ground friction afterwards, which left 0.034 b/tick — the "joystick feels stuck"
+         * of the previous build.
+         */
+        const val WALK = 0.21585
+        const val SPRINT = 0.28060
+        const val SNEAK = 0.06475
+        const val SWIM = 0.11
+        const val FLY = 0.28
+        const val FLY_FAST = 0.545
     }
 
     var yaw = 0f
@@ -297,46 +313,53 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
 
         val sprinting = sprint && hasInput && !sneak
         val speed = when {
-            flying -> if (sprinting) 0.22 else 0.11
-            inWater -> SWIM * 2f
+            flying -> if (sprinting) FLY_FAST else FLY
+            inWater -> SWIM
             sneak -> SNEAK
             sprinting -> SPRINT
             else -> WALK
         }
 
-        // Target horizontal velocity, then exponential approach: this reproduces the Java
-        // feel (quick but not instant acceleration, long slide on ice).
+        // Target horizontal velocity for this tick.
         val tx = if (hasInput) dx * speed else 0.0
         val tz = if (hasInput) dz * speed else 0.0
 
-        val groundFriction = if (onGround) groundBlockFriction(world) else DRAG_AIR
+        val slippery = onGround && groundBlockFriction(world) > 0.6
 
         if (flying) {
             vx = tx
             vz = tz
             vy = when {
-                jump -> 0.4
-                ascend < -0.1f -> -0.4
-                ascend > 0.1f -> 0.4
+                jump -> FLY
+                ascend < -0.1f -> -FLY
+                ascend > 0.1f -> FLY
                 else -> 0.0
             }
         } else if (inWater) {
-            vx += (tx - vx) * 0.12
-            vz += (tz - vz) * 0.12
-            vy -= GRAVITY * 0.35
-            if (jump || ascend > 0.1f) vy = SWIM * 2.2
-            if (ascend < -0.1f) vy = -SWIM * 1.6
+            vx += (tx - vx) * 0.16
+            vz += (tz - vz) * 0.16
+            vy -= GRAVITY * 0.32
+            if (jump || ascend > 0.1f) vy = SWIM * 1.9
+            if (ascend < -0.1f) vy = -SWIM * 1.4
             vy *= 0.8
         } else {
+            // Exponential approach towards the target: full speed in ~5 ticks on ground, quick
+            // but floaty in the air — the Java feel without the old double friction.
             val accel = if (onGround) 0.42 else 0.08
             vx += (tx - vx) * accel
             vz += (tz - vz) * accel
-            if (!onGround) {
-                vx *= DRAG_AIR
-                vz *= DRAG_AIR
-            } else {
-                vx *= if (groundFriction > 0.6) DRAG_ICE else DRAG_GROUND
-                vz *= if (groundFriction > 0.6) DRAG_ICE else DRAG_GROUND
+            if (!hasInput) {
+                // Releasing the stick slides to a stop (0.546 ground / 0.91 air, the game values).
+                if (slippery) {
+                    vx *= DRAG_ICE
+                    vz *= DRAG_ICE
+                } else if (onGround) {
+                    vx *= DRAG_GROUND
+                    vz *= DRAG_GROUND
+                } else {
+                    vx *= DRAG_AIR
+                    vz *= DRAG_AIR
+                }
             }
             // Gravity, exactly the Java constants.
             vy -= GRAVITY
@@ -421,6 +444,35 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
         vz = 0.0
     }
 
+    /**
+     * Highest block top under the player's footprint that is at or below [py] (+1 mm).
+     *
+     * Used to land exactly on the surface instead of leaving the AABB a few floating point units
+     * inside the block, which used to make every axis collide and froze the character in place.
+     */
+    private fun topSurface(world: World, px: Double, py: Double, pz: Double): Double {
+        val hw = WIDTH / 2.0
+        val minX = floor(px - hw).toInt()
+        val maxX = floor(px + hw).toInt()
+        val minZ = floor(pz - hw).toInt()
+        val maxZ = floor(pz + hw).toInt()
+        val ceiling = py + 0.001
+        var top = Double.NEGATIVE_INFINITY
+        for (bx in minX..maxX) {
+            for (bz in minZ..maxZ) {
+                for (by in (floor(py).toInt() - 3)..floor(py).toInt()) {
+                    val block = Blocks.get(world.get(bx, by, bz))
+                    if (block.shape.isEmpty) continue
+                    for (box in block.shape.boxes) {
+                        val yTop = by + box.y1.toDouble()
+                        if (yTop <= ceiling && yTop > top) top = yTop
+                    }
+                }
+            }
+        }
+        return top
+    }
+
     private fun moveYAxis(world: World, amount: Double) {
         if (amount == 0.0) return
         if (!collides(world, x, y + amount, z)) {
@@ -430,8 +482,16 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
         }
         if (amount < 0) {
             // Land exactly on top of the highest box below us.
-            val top = groundHeight(world, x, y, z)
-            if (top < y) y = top
+            val top = topSurface(world, x, y, z)
+            if (top == Double.NEGATIVE_INFINITY) {
+                // Fully blocked in a way the surface scan cannot explain: stop falling.
+                vy = 0.0
+                onGround = true
+                return
+            }
+            // Snap up when the AABB was a hair inside the surface (or a block was placed at our
+            // feet): landing always leaves the player exactly on top of the block.
+            y = top
             onGround = true
             // Fall damage: every block above 3 deals one heart of damage.
             if (fallDistance > 3.0 && !inWater) {

@@ -44,6 +44,13 @@ class Renderer : GLSurfaceView.Renderer {
     private var waterProg: ShaderProgram? = null
     private var skyProg: ShaderProgram? = null
     private var postProg: ShaderProgram? = null
+
+    /** Java shader-pack passes (OptiFine/Iris composite chain or vanilla post chain). */
+    private var javaPasses: List<ShaderProgram> = emptyList()
+    private var javaPassNames: List<String> = emptyList()
+    private val pingA = RenderTarget()
+    private val pingB = RenderTarget()
+    private var javaPackName = ""
     private var lineProg: ShaderProgram? = null
 
     private var atlasTexture = 0
@@ -238,7 +245,49 @@ class Renderer : GLSurfaceView.Renderer {
             GLES20.GL_ARRAY_BUFFER, particleData.size * 4, null, GLES20.GL_DYNAMIC_DRAW
         )
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
+        compileJavaShaderPack()
         Gl.checkError("programas")
+    }
+
+    /**
+     * Compiles the passes of a Minecraft Java shader pack (OptiFine/Iris `composite`/`final`
+     * chain or a vanilla `shaders/post` chain) and enables it instead of the built-in post pass.
+     * Packs are read from shaderpacks/ and resourcepacks/ by [ResourcePacks.loadJavaShaderPack].
+     */
+    private fun compileJavaShaderPack() {
+        // Programs are plain GL objects; dropping the references is enough for a reload.
+        javaPasses = emptyList()
+        javaPassNames = emptyList()
+        javaPackName = ""
+        if (!Settings.useShaders) return
+        val loaded = try {
+            ResourcePacks.loadJavaShaderPack()
+        } catch (t: Throwable) {
+            Log.e("Leyendo shader packs de Java", t)
+            null
+        } ?: return
+        val programs = ArrayList<ShaderProgram>()
+        val names = ArrayList<String>()
+        for (pass in loaded.passes) {
+            try {
+                programs.add(ShaderProgram.create("java_${pass.name}", pass.vertexSource, pass.fragmentSource))
+                names.add(pass.name)
+            } catch (t: Throwable) {
+                Log.e("Pasada '${pass.name}' del shader pack no compiló", t)
+                // Keep the passes that did compile: a partial chain still beats a black screen.
+                break
+            }
+        }
+        if (programs.isEmpty()) {
+            Log.w("Shader pack '${loaded.packName}' sin pasadas utilizables")
+            return
+        }
+        javaPasses = programs
+        javaPassNames = names
+        javaPackName = loaded.packName
+        Game.shaderPackName = loaded.packName
+        for (n in loaded.notes) Log.i("Shader pack ${loaded.packName}: $n")
+        Log.i("Shader pack Java activo: ${loaded.packName} (${names.joinToString()})")
     }
 
     private fun uploadAtlas() {
@@ -453,13 +502,31 @@ class Renderer : GLSurfaceView.Renderer {
         Game.chunksReady = w.chunks.size
     }
 
+    /**
+     * Rebuilds one chunk.
+     *
+     * The new geometry is uploaded into **new** buffers and only then swapped in, releasing the
+     * old ones. Re-uploading into the same VBO (what the old code did) left the chunk with an
+     * empty buffer for a frame when the rebuild produced no vertices, which is the "a piece of
+     * the ground goes invisible for an instant" glitch after breaking or placing a block.
+     */
     private fun buildMesh(w: World, c: Chunk) {
         val biomes = c.biomes ?: w.gen.biomes(c.cx, c.cz).also { c.biomes = it }
-        val result = ChunkMesher.build(w, c, biomes)
-        val mesh = c.mesh ?: ChunkMesh().also { c.mesh = it }
-        mesh.upload(result.opaque)
-        val water = c.waterMesh ?: ChunkMesh().also { c.waterMesh = it }
-        water.upload(result.water)
+        val result = try {
+            ChunkMesher.build(w, c, biomes)
+        } catch (t: Throwable) {
+            Log.e("Mesh del chunk ${c.cx},${c.cz} falló", t)
+            c.dirty = false
+            return
+        }
+        val mesh = ChunkMesh().also { it.upload(result.opaque) }
+        val water = ChunkMesh().also { it.upload(result.water) }
+        val oldMesh = c.mesh
+        val oldWater = c.waterMesh
+        c.mesh = mesh
+        c.waterMesh = water
+        oldMesh?.release()
+        oldWater?.release()
         c.dirty = false
     }
 
@@ -489,17 +556,26 @@ class Renderer : GLSurfaceView.Renderer {
                 c.mesh?.release()
                 c.waterMesh?.release()
                 iterator.remove()
-            } else if (d > radius + 2 && c.mesh != null) {
-                c.mesh?.release()
-                c.waterMesh?.release()
-                c.mesh = null
-                c.waterMesh = null
-                c.dirty = true
             }
         }
 
+        // Chunks touched by an edit are rebuilt first and without a time budget: the block the
+        // player just broke or placed has to be right in the very next frame. Nearest first, so
+        // the terrain around the player never waits behind the generation of far chunks.
         var generated = 0
         var meshed = 0
+        val dirty = ArrayList<Pair<Int, Chunk>>()
+        for (c in w.chunks.values) {
+            if (!c.dirty) continue
+            val d = maxOf(abs(c.cx - pcx), abs(c.cz - pcz))
+            if (d <= radius) dirty.add(d to c)
+        }
+        dirty.sortBy { it.first }
+        for ((_, c) in dirty) {
+            if (meshed >= 6) break
+            buildMesh(w, c)
+            meshed++
+        }
         // Nearest chunks first: generate and mesh inside a per-frame time budget so the frame
         // rate stays stable instead of stuttering on chunk creation.
         for (ring in 0..radius) {
@@ -951,7 +1027,9 @@ class Renderer : GLSurfaceView.Renderer {
             fogFar = (Settings.renderDistance * 16f - 4f).coerceAtLeast(32f)
         }
 
-        val useTarget = postProg != null && target.ensure(width, height)
+        val useJavaChain = javaPasses.isNotEmpty() && Settings.useShaders &&
+            target.ensure(width, height) && pingA.ensure(width, height) && pingB.ensure(width, height)
+        val useTarget = useJavaChain || (postProg != null && target.ensure(width, height))
         if (useTarget) target.bind() else GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
         GLES20.glViewport(0, 0, width, height)
         GLES20.glClearColor(fogR, fogG, fogB, 1f)
@@ -1173,7 +1251,59 @@ class Renderer : GLSurfaceView.Renderer {
         }
 
         // ------------------------------------------------------------------ post
-        if (useTarget) {
+        if (useJavaChain) {
+            // Ping-pong between two targets; the last pass writes to the screen.
+            GLES20.glDisable(GLES20.GL_DEPTH_TEST)
+            GLES20.glDepthMask(false)
+            var source = target.colorTexture
+            for ((i, pass) in javaPasses.withIndex()) {
+                val last = i == javaPasses.size - 1
+                if (!last) {
+                    val dest = if (i % 2 == 0) pingA else pingB
+                    dest.bind()
+                } else {
+                    GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+                    GLES20.glViewport(0, 0, width, height)
+                }
+                pass.use()
+                GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, source)
+                pass.set1i("colortex0", 0)
+                pass.set1i("colortex1", 0)
+                pass.set1i("depthtex0", 0)
+                pass.set1i("DiffuseSampler", 0)
+                pass.set1f("viewWidth", width.toFloat())
+                pass.set1f("viewHeight", height.toFloat())
+                pass.set2f("OutSize", width.toFloat(), height.toFloat())
+                pass.set2f("InSize", width.toFloat(), height.toFloat())
+                pass.set1f("aspectRatio", width.toFloat() / height.toFloat())
+                pass.set1f("frameTimeCounter", w.time)
+                pass.set1f("Time", w.time)
+                pass.set1f("frameTime", dt)
+                pass.set1f("sunAngle", (w.dayTime % 1.0).toFloat())
+                pass.set1f("rainStrength", 0f)
+                pass.set1f("wetness", 0f)
+                pass.set1f("nightVision", 0f)
+                pass.set1f("blindness", 0f)
+                pass.set1f("darknessFactor", 0f)
+                pass.set1f("screenBrightness", 0f)
+                pass.set1i("isEyeInWater", if (underwater) 1 else 0)
+                pass.set1i("worldTime", (w.dayTime * 24000).toInt())
+                pass.set1i("frameCounter", fpsFrames)
+                pass.set3f("cameraPosition", p.x.toFloat(), p.eyeY().toFloat(), p.z.toFloat())
+                pass.set3f("fogColor", fogR, fogG, fogB)
+                pass.set1f("near", 0.08f)
+                pass.set1f("far", 420f)
+                pass.set1i("uScene", 0)
+                pass.set1f("uTime", w.time)
+                pass.set1f("uResolution", width.toFloat())
+                pass.set1f("uUnderwater", if (underwater) 1f else 0f)
+                drawFullscreen()
+                if (!last) source = dest.colorTexture
+            }
+            GLES20.glDepthMask(true)
+            GLES20.glEnable(GLES20.GL_DEPTH_TEST)
+        } else if (useTarget) {
             val post = postProg
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
             GLES20.glViewport(0, 0, width, height)

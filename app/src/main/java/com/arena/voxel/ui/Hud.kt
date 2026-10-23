@@ -254,15 +254,34 @@ fun ItemIcon(id: String, gui: Gui, size: androidx.compose.ui.unit.Dp) {
 object ItemIcons {
     private val cache = HashMap<String, androidx.compose.ui.graphics.ImageBitmap?>()
 
+    /**
+     * Icon for a block or item id, cached by (id, 64x64).
+     *
+     * Three sources, in this order:
+     *
+     *  1. a real Java item sprite (`assets/minecraft/textures/item/<id>.png`) if a resource pack
+     *     installed it — that is what Java shows in the hotbar,
+     *  2. the isometric cube for full blocks,
+     *  3. the flat texture for cross/thin blocks (torch, flowers, carpet, wire…): drawing those as
+     *     a cube is what made the torch icon look broken,
+     *  4. a procedural glyph for items with no texture at all.
+     */
     fun icon(id: String): androidx.compose.ui.graphics.ImageBitmap? {
         cache[id]?.let { return it }
         val bitmap = try {
-            val block = com.arena.voxel.world.Blocks.get(com.arena.voxel.world.Blocks.index(id))
-            if (block.id != "air") {
-                com.arena.voxel.textures.Textures.blockIcon(block.tileTop, block.tileSide, 32)
-                    ?.asImageBitmap()
-            } else {
-                itemGlyph(id)
+            val index = com.arena.voxel.world.Blocks.index(id)
+            val block = com.arena.voxel.world.Blocks.get(index)
+            val itemSprite = com.arena.voxel.textures.Textures.bitmapNamed("item/$id")
+                ?: com.arena.voxel.textures.Textures.bitmapNamed("item_$id")
+            when {
+                itemSprite != null ->
+                    com.arena.voxel.textures.Textures.iconFromBitmap(itemSprite, 64)?.asImageBitmap()
+                block.id != "air" && (block.cross || !block.shape.isFullCube) ->
+                    com.arena.voxel.textures.Textures.spriteIcon(block.tileSide, 64)?.asImageBitmap()
+                block.id != "air" ->
+                    com.arena.voxel.textures.Textures.blockIcon(block.tileTop, block.tileSide, 64)
+                        ?.asImageBitmap()
+                else -> itemGlyph(id)
             }
         } catch (t: Throwable) {
             null

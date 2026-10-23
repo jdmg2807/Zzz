@@ -243,6 +243,38 @@ object ResourcePacks {
         return Regex("\"description\"\\s*:\\s*\"([^\"]*)\"").find(text)?.groupValues?.get(1) ?: ""
     }
 
+    /** Java item sprite path, any pack layout (`textures/item/`, `textures/items/`). */
+    private fun isItemTexture(entry: String): Boolean {
+        val lower = entry.lowercase()
+        if (!lower.endsWith(".png")) return false
+        if (!(lower.contains("textures/item/") || lower.contains("textures/items/"))) return false
+        // GUI icons, armour layers and animated strips are not item sprites.
+        val file = lower.substringAfterLast('/')
+        return !file.contains("_layer") && !file.contains("empty") && !file.startsWith("gui")
+    }
+
+    /**
+     * Normalises a Java item texture path to the engine's item id.
+     *
+     * Packs name the torch `torch.png`, the iron pickaxe `iron_pickaxe.png`, and 1.13+ vanilla
+     * uses the same ids as the game, so the file name *is* the id. Legacy `items/` folders and
+     * the `item/` folder are accepted, and a few old names are translated.
+     */
+    private fun normalizeItem(entry: String): String? {
+        var name = entry.substringAfterLast('/')
+        if (!name.lowercase().endsWith(".png")) return null
+        name = name.substring(0, name.length - 4)
+        if (name.isEmpty()) return null
+        return when (name) {
+            "apple_golden" -> "golden_apple"
+            "bread" -> "bread"
+            "seeds_wheat" -> "wheat_seeds"
+            "door_wood" -> "oak_door"
+            "boat" -> "oak_boat"
+            else -> name
+        }
+    }
+
     /** Plant tiles drawn as crossed quads: they must keep transparency. */
     private val PLANTS = setOf("tall_grass", "dead_bush", "poppy", "dandelion", "sugar_cane", "torch")
 
@@ -263,14 +295,29 @@ object ResourcePacks {
                 PackSource(file).use { src ->
                     var appliedCount = 0
                     var skipped = 0
+                    var itemCount = 0
                     val seen = HashSet<String>()
                     for (entry in src.entries()) {
+                        // ---- item sprites (Java: assets/minecraft/textures/item/*.png) ----------
+                        if (isItemTexture(entry)) {
+                            val itemName = normalizeItem(entry)
+                            if (itemName != null && seen.add("item/$itemName")) {
+                                val bytes = src.read(entry) ?: continue
+                                val bmp = Textures.decode(bytes, scaleToTile = false) ?: continue
+                                Textures.putImage("item/$itemName", bmp)
+                                itemCount++
+                            }
+                            continue
+                        }
                         if (!isBlockTexture(entry)) continue
                         val name = normalize(entry) ?: continue
-                        // Only tiles the engine uses: keeps the atlas tiny and avoids the pack's
-                        // thousands of unrelated textures pushing real ones out.
+                        // Unknown names are still stored: mod blocks, 1.21 blocks the palette
+                        // does not use yet and the built-in palette can pick them up by name.
                         if (!Textures.isKnown(name)) {
-                            skipped++
+                            if (!seen.add("raw/$name")) continue
+                            val bytes = src.read(entry) ?: continue
+                            val bmp = Textures.decode(bytes) ?: continue
+                            if (Textures.putImage("block/$name", bmp) >= 0) appliedCount++
                             continue
                         }
                         if (!seen.add(name)) continue
@@ -299,7 +346,10 @@ object ResourcePacks {
                             bmp.recycle()
                         }
                     }
-                    applied.add("${src.name} ($appliedCount)")
+                    applied.add(
+                        if (itemCount > 0) "${src.name} ($appliedCount bloques, $itemCount ítems)"
+                        else "${src.name} ($appliedCount)"
+                    )
                     Log.i("Pack aplicado: ${src.name} ($appliedCount texturas, $skipped ignoradas)")
                 }
             } catch (t: Throwable) {
@@ -307,6 +357,40 @@ object ResourcePacks {
             }
         }
         return applied
+    }
+
+    /**
+     * Loads the first usable **Minecraft Java shader pack** (OptiFine/Iris or vanilla post chain)
+     * from `shaderpacks/`, then from `resourcepacks/`. Returns null when there is none, in which
+     * case the built-in pipeline stays active.
+     */
+    fun loadJavaShaderPack(): JavaShaderPack.Loaded? {
+        val candidates = ArrayList<File>()
+        Ctx.shaderPacksDir.listFiles()?.filter {
+            it.isDirectory || (it.isFile && it.name.lowercase().endsWith(".zip"))
+        }?.sortedBy { it.name.lowercase() }?.let { candidates.addAll(it) }
+        Ctx.packsDir.listFiles()?.filter {
+            it.isDirectory || (it.isFile && it.name.lowercase().endsWith(".zip"))
+        }?.sortedBy { it.name.lowercase() }?.let { candidates.addAll(it) }
+        if (candidates.isEmpty()) return null
+        for (file in candidates) {
+            try {
+                PackSource(file).use { src ->
+                    val entries = src.entries()
+                    if (!JavaShaderPack.looksLikeJavaPack(entries)) return@use
+                    val loaded = JavaShaderPack.load(src.name, entries) { path ->
+                        src.read(path)?.toString(Charsets.UTF_8)
+                    }
+                    if (loaded != null) {
+                        Log.i("Shader pack de Java: ${loaded.packName} (${loaded.passes.size} pasadas)")
+                        return loaded
+                    }
+                }
+            } catch (t: Throwable) {
+                Log.e("Shader pack ${file.name} no se pudo leer", t)
+            }
+        }
+        return null
     }
 
     /** Collects shader sources from every pack. Later packs win. */

@@ -65,7 +65,11 @@ object Blocks {
     fun init() {
         if (loaded) return
         loaded = true
-        add("air", 0, 0, 0, solid = false, opaque = false, color = 0x000000)
+        // Air must have NO collision box. It used to fall back to BlockShape.FULL, which made
+        // every empty cell solid: the player AABB was embedded in "air" everywhere, so every
+        // axis of movement collided and the character could never move (the joystick worked and
+        // the walk animation played, but the position never changed).
+        add("air", 0, 0, 0, solid = false, opaque = false, color = 0x000000, shape = BlockShape.EMPTY)
 
         addTinted("grass", "grass_top", "grass_side", "dirt", tintTop = true, tintSide = true, color = 0x91BD59)
         add("dirt", "dirt", "dirt", "dirt", color = 0x8b5a2b)

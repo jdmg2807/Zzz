@@ -374,4 +374,71 @@ object Textures {
 
         return Bitmap.createBitmap(px, s, s, Bitmap.Config.ARGB_8888)
     }
+
+    /**
+     * Flat sprite icon: the texture itself, scaled into a transparent [out]x[out] box.
+     *
+     * Cross blocks (torch, flowers, saplings, sugar cane) and thin blocks (panes, carpets, wire)
+     * are not cubes, so drawing them as an isometric cube squashes a 2 px torch stem into a whole
+     * face — that was the "the torch icon looks broken" report. Java draws those as their item
+     * sprite, and so do we.
+     */
+    fun spriteIcon(tile: Int, out: Int = 48): Bitmap? {
+        val src = tiles.getOrNull(tile)?.bitmap ?: return null
+        val result = Bitmap.createBitmap(out, out, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(result)
+        // Keep the pixel-art crispness: nearest-neighbour scaling.
+        val paint = Paint().apply {
+            isAntiAlias = false
+            isFilterBitmap = false
+            isDither = false
+        }
+        val pad = (out * 0.06f).toInt()
+        canvas.drawBitmap(src, null, Rect(pad, pad, out - pad, out - pad), paint)
+        return result
+    }
+
+    /** Scales an arbitrary bitmap into a square icon, keeping transparent margins. */
+    fun iconFromBitmap(src: Bitmap, out: Int = 64): Bitmap? {
+        if (src.width <= 0 || src.height <= 0) return null
+        val result = Bitmap.createBitmap(out, out, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(result)
+        val paint = Paint().apply {
+            isAntiAlias = false
+            isFilterBitmap = false
+            isDither = false
+        }
+        val pad = (out * 0.05f).toInt()
+        canvas.drawBitmap(src, null, Rect(pad, pad, out - pad, out - pad), paint)
+        return result
+    }
+
+    /** True when the tile exists (used to fall back gracefully when a pack lacks an icon). */
+    fun hasTile(name: String): Boolean = byName.containsKey(name)
+
+    /**
+     * Stores a texture that no block uses yet (item sprites from a Java pack, mod textures).
+     * Returns the tile index, or -1 when the atlas is full.
+     */
+    fun putImage(name: String, bmp: Bitmap): Int {
+        byName[name]?.let { existing ->
+            val tile = tiles.getOrNull(existing)
+            if (tile != null) {
+                tile.bitmap = bmp
+                tile.avg = average(bmp)
+                invalidate()
+            }
+            return existing
+        }
+        if (tiles.size >= GRID * GRID) return -1
+        invalidate()
+        val idx = tiles.size
+        tiles.add(Tile(name, bmp, average(bmp)))
+        byName[name] = idx
+        variantCount[name] = 1
+        return idx
+    }
+
+    /** Raw texture lookup by name (item sprites and mod textures). */
+    fun bitmapNamed(name: String): Bitmap? = byName[name]?.let { tiles.getOrNull(it)?.bitmap }
 }
