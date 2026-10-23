@@ -3,6 +3,7 @@ package com.arena.voxel.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -344,6 +346,76 @@ fun BedrockSeparator(gui: Gui, width: Dp) {
             Color(0x33FFFFFF),
             topLeft = Offset(0f, 0f),
             size = Size(size.width, size.height * 0.5f)
+        )
+    }
+}
+
+/**
+ * Bedrock-style slider: a dark well with a green fill and a stone handle.
+ *
+ * Bedrock has no Material slider: the track is 2 px high, the filled part is the accent green and
+ * the handle is a small stone plate. [steps] > 0 snaps the value to that many intermediate steps
+ * (0 = continuous), which is how Bedrock's "Render distance" widget behaves.
+ */
+@Composable
+fun BedrockSlider(
+    gui: Gui,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    width: Dp = gui.px(220f),
+    steps: Int = 0,
+    onChange: (Float) -> Unit
+) {
+    val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.0001f)
+    val fraction = ((value - valueRange.start) / span).coerceIn(0f, 1f)
+
+    fun snap(raw: Float): Float {
+        if (steps <= 0) return raw.coerceIn(valueRange.start, valueRange.endInclusive)
+        val step = span / (steps + 1)
+        val snapped = valueRange.start + Math.round((raw - valueRange.start) / step) * step
+        return snapped.coerceIn(valueRange.start, valueRange.endInclusive)
+    }
+
+    Box(
+        Modifier
+            .width(width)
+            .height(gui.px(18f))
+            .pointerInput(valueRange, steps) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        val t = (offset.x / size.width).coerceIn(0f, 1f)
+                        onChange(snap(valueRange.start + span * t))
+                    }
+                ) { change, _ ->
+                    val t = (change.position.x / size.width).coerceIn(0f, 1f)
+                    onChange(snap(valueRange.start + span * t))
+                }
+            }
+            .pointerInput(valueRange, steps) {
+                detectTapGestures { offset ->
+                    val t = (offset.x / size.width).coerceIn(0f, 1f)
+                    onChange(snap(valueRange.start + span * t))
+                }
+            },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Canvas(Modifier.fillMaxWidth().height(gui.px(18f))) {
+            val cy = size.height / 2f
+            val h = gui.px(3f).toPx().coerceAtLeast(2f)
+            drawRect(Color(0xFF101010), topLeft = Offset(0f, cy - h / 2f), size = Size(size.width, h))
+            drawRect(
+                Color(0xFF8BD44C),
+                topLeft = Offset(0f, cy - h / 2f),
+                size = Size(size.width * fraction, h)
+            )
+        }
+        val handle = gui.px(10f)
+        Box(
+            Modifier
+                .offset(x = width * fraction - handle / 2)
+                .size(handle)
+                .background(Brush.verticalGradient(listOf(Bedrock.btnTop, Bedrock.btnBottom)))
+                .border(gui.px(1), Bedrock.btnBorder)
         )
     }
 }

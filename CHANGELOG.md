@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.1 — Ajustes con el diseño de Bedrock
+- **Pantalla de Ajustes reconstruida**: barra superior con flecha de volver, panel oscuro con
+  secciones (controles, interfaz, sonido, contenido, diagnóstico), deslizadores de piedra con
+  relleno verde como los de Bedrock (sensibilidad, campo de visión, distancia de render y escala
+  de interfaz) e interruptores SÍ/NO en lugar de los de Material.
+- Se añade `BedrockSlider`, el deslizador que faltaba en la biblioteca visual del juego.
+
 ## v2.2.0 — Mundo nuevo y propiedades reales de los bloques
 - **Generación de mundo reescrita**: continentalidad, erosión, crestas y ríos como el generador
   moderno del juego. Ahora hay continentes, océanos de verdad, costas, montañas que llegan a ~150

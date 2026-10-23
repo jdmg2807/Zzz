@@ -11,8 +11,8 @@ android {
         applicationId = "com.arena.voxel"
         minSdk = 24
         targetSdk = 34
-        versionCode = 18
-        versionName = "2.2.0"
+        versionCode = 19
+        versionName = "2.2.1"
     }
 
     /**

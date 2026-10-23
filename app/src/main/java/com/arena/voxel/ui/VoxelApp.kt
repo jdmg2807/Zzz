@@ -444,6 +444,13 @@ private fun PacksScreen(onBack: () -> Unit) {
     }
 }
 
+/**
+ * Pantalla de **Ajustes** con el lenguaje visual de Bedrock.
+ *
+ * Bedrock agrupa las opciones en secciones con barra de título y usa deslizadores de piedra en
+ * lugar de los de Material; los interruptores son placas "SÍ/NO". La lógica de guardado es la
+ * misma: al volver se escriben los valores en [Settings] y se aplican sonido y música.
+ */
 @Composable
 private fun SettingsScreen(onBack: () -> Unit, onMods: () -> Unit = {}, onPacks: () -> Unit = {}) {
     val context = LocalContext.current
@@ -457,130 +464,174 @@ private fun SettingsScreen(onBack: () -> Unit, onMods: () -> Unit = {}, onPacks:
     var useMods by remember { mutableStateOf(Settings.useMods) }
     var sound by remember { mutableStateOf(Settings.sound) }
     var music by remember { mutableStateOf(Settings.music) }
+    var logMessage by remember { mutableStateOf("") }
 
-    Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = {
-                Settings.sensitivity = sens
-                Settings.renderDistance = distance.roundToInt()
-                Settings.fov = fov
-                Settings.showHud = hud
-                Settings.usePacks = usePacks
-                Settings.useShaders = useShaders
-                Settings.useMods = useMods
-                Settings.guiScale = guiScale
-                Settings.sound = sound
-                Settings.music = music
-                com.arena.voxel.core.Sounds.enabled = sound
-                com.arena.voxel.core.Music.enabled = music
-                if (music) com.arena.voxel.core.Music.scene("menu") else com.arena.voxel.core.Music.stop()
-                Settings.save(context)
-                onBack()
-            }) { Text("‹ Volver", color = Accent) }
-            Spacer(Modifier.width(8.dp))
-            ScreenTitle("Ajustes")
-        }
-        Spacer(Modifier.height(18.dp))
+    fun saveAndBack() {
+        Settings.sensitivity = sens
+        Settings.renderDistance = distance.roundToInt()
+        Settings.fov = fov
+        Settings.showHud = hud
+        Settings.usePacks = usePacks
+        Settings.useShaders = useShaders
+        Settings.useMods = useMods
+        Settings.guiScale = guiScale
+        Settings.sound = sound
+        Settings.music = music
+        com.arena.voxel.core.Sounds.enabled = sound
+        com.arena.voxel.core.Music.enabled = music
+        if (music) com.arena.voxel.core.Music.scene("menu") else com.arena.voxel.core.Music.stop()
+        Settings.save(context)
+        onBack()
+    }
 
-        SettingRow("Sensibilidad del giro", "${(sens * 100).roundToInt()}%") {
-            Slider(value = sens, onValueChange = { sens = it }, valueRange = 0.2f..2.5f)
-        }
-        SettingRow("Distancia de render", "$distance chunks") {
-            Slider(value = distance, onValueChange = { distance = it }, valueRange = 2f..6f, steps = 3)
-        }
-        SettingRow("Campo de visión", "${fov.roundToInt()}°") {
-            Slider(value = fov, onValueChange = { fov = it }, valueRange = 50f..100f)
-        }
-        ToggleRow("Mostrar HUD", hud) { hud = it }
-        ToggleRow("Sonido", sound) { sound = it }
-        ToggleRow("Música", music) { music = it }
-        // Java's "GUI Scale" option: automatic, or forced 1..4.
-        SettingRow(
-            "Escala de interfaz",
-            if (guiScale == 0) "Automática" else "Nivel $guiScale"
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(0, 1, 2, 3, 4).forEach { level ->
-                    val selected = guiScale == level
-                    OutlinedButton(
-                        onClick = { guiScale = level },
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (selected) Accent else Color(0x33FFFFFF)
-                        ),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            horizontal = 10.dp,
-                            vertical = 2.dp
-                        )
+    GuiScreen(Settings.guiScale) { gui ->
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            PanoramaBackground()
+
+            // ---- Barra superior: flecha de volver + título (Bedrock) --------------------
+            Row(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(Color(0xCC000000), Color(0x00000000))))
+                    .padding(horizontal = gui.px(6f), vertical = gui.px(5f)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BedrockButton(gui, "◀", width = gui.px(20f), height = gui.px(18f), fontSize = 9f) { saveAndBack() }
+                Spacer(Modifier.width(gui.px(6f)))
+                BedrockText(gui, "Ajustes", size = 11f, bold = true)
+            }
+
+            // ---- Panel de opciones -----------------------------------------------------
+            BedrockPanel(
+                gui,
+                Modifier
+                    .align(Alignment.Center)
+                    .padding(top = gui.px(14f), bottom = gui.px(8f))
+                    .width(gui.px(320f))
+                    .height(gui.px(190f))
+            ) {
+                Column(Modifier.fillMaxSize()) {
+                    BedrockTitleBar(gui, "Ajustes del juego")
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(gui.px(8f)),
+                        verticalArrangement = Arrangement.spacedBy(gui.px(6f))
                     ) {
-                        Text(
-                            if (level == 0) "Auto" else "$level",
-                            color = if (selected) Accent else Color(0xFFDCE3EA),
-                            fontSize = 12.sp
+                        SectionLabel(gui, "CONTROLES Y CÁMARA")
+                        BedrockSliderRow(
+                            gui,
+                            "Sensibilidad",
+                            "${(sens * 100).roundToInt()} %",
+                            sens,
+                            0.2f..2.5f
+                        ) { sens = it }
+                        BedrockSliderRow(
+                            gui,
+                            "Campo de visión",
+                            "${fov.roundToInt()}°",
+                            fov,
+                            50f..100f
+                        ) { fov = it }
+                        BedrockSliderRow(
+                            gui,
+                            "Distancia de render",
+                            "${distance.roundToInt()} chunks",
+                            distance,
+                            2f..6f,
+                            steps = 3
+                        ) { distance = it }
+
+                        SectionLabel(gui, "INTERFAZ")
+                        BedrockSliderRow(
+                            gui,
+                            "Escala de interfaz",
+                            if (guiScale == 0) "Automática" else "Nivel $guiScale",
+                            guiScale.toFloat(),
+                            0f..4f,
+                            steps = 3
+                        ) { guiScale = it.roundToInt() }
+                        BedrockToggle(gui, "Mostrar HUD", hud, width = gui.px(304f)) { hud = it }
+
+                        SectionLabel(gui, "SONIDO")
+                        BedrockToggle(gui, "Efectos de sonido", sound, width = gui.px(304f)) { sound = it }
+                        BedrockToggle(gui, "Música", music, width = gui.px(304f)) { music = it }
+
+                        SectionLabel(gui, "CONTENIDO")
+                        BedrockToggle(gui, "Resource packs (texturas)", usePacks, width = gui.px(304f)) { usePacks = it }
+                        BedrockToggle(gui, "Shaders", useShaders, width = gui.px(304f)) { useShaders = it }
+                        BedrockToggle(gui, "Mods", useMods, width = gui.px(304f)) { useMods = it }
+                        Row(horizontalArrangement = Arrangement.spacedBy(gui.px(5f))) {
+                            BedrockButton(gui, "Texturas y shaders", width = gui.px(149f), height = gui.px(20f), fontSize = 7.5f) {
+                                onPacks()
+                            }
+                            BedrockButton(gui, "Mods instalados", width = gui.px(149f), height = gui.px(20f), fontSize = 7.5f) {
+                                onMods()
+                            }
+                        }
+
+                        SectionLabel(gui, "DIAGNÓSTICO")
+                        Row(horizontalArrangement = Arrangement.spacedBy(gui.px(5f))) {
+                            BedrockButton(gui, "Guardar log", width = gui.px(149f), height = gui.px(20f), fontSize = 7.5f) {
+                                logMessage = com.arena.voxel.core.Logs.exportToDownloads(context)
+                            }
+                            BedrockButton(gui, "Compartir log", width = gui.px(149f), height = gui.px(20f), fontSize = 7.5f) {
+                                logMessage = com.arena.voxel.core.Logs.share(context)
+                            }
+                        }
+                        if (logMessage.isNotEmpty()) {
+                            BedrockText(gui, logMessage, size = 6.5f, color = Bedrock.accent)
+                        }
+                        BedrockText(
+                            gui,
+                            "Carpeta del juego: ${Ctx.base.absolutePath}",
+                            size = 6f,
+                            color = Bedrock.textDim
+                        )
+                        BedrockText(
+                            gui,
+                            "Joystick para moverte, arrastra a la derecha para mirar, toca para colocar y mantén para romper.",
+                            size = 6f,
+                            color = Bedrock.textDim
                         )
                     }
                 }
             }
         }
+    }
+}
 
-        Spacer(Modifier.height(14.dp))
-        Text(
-            "CONTENIDO",
-            color = Color(0xFF7E8A9A),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold
-        )
-        ToggleRow("Resource packs (texturas)", usePacks) { usePacks = it }
-        ToggleRow("Shaders", useShaders) { useShaders = it }
-        ToggleRow("Mods", useMods) { useMods = it }
-        Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onPacks, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33FFFFFF))) {
-                Text("Texturas y shaders instalados", fontSize = 12.sp, color = Color(0xFFDCE3EA))
-            }
-            OutlinedButton(onClick = onMods, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33FFFFFF))) {
-                Text("Mods instalados", fontSize = 12.sp, color = Color(0xFFDCE3EA))
-            }
-        }
-        Text(
-            "Los cambios de contenido se aplican al volver a entrar a un mundo (el mundo nuevo o\ncontinuar los usará).",
-            color = Color(0xFF6B7A80),
-            fontSize = 11.sp
-        )
+/** Etiqueta de sección de los ajustes: verde y en mayúsculas, como en Bedrock. */
+@Composable
+private fun SectionLabel(gui: Gui, text: String) {
+    BedrockText(gui, text, size = 7f, color = Bedrock.accent, bold = true)
+}
 
-        Spacer(Modifier.height(16.dp))
-        Text("DIAGNÓSTICO", color = Color(0xFF7E8A9A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        Text(
-            "El log registra todo lo que pasa (texturas, shaders, mods, importación de mundos y errores). " +
-                "Se guarda en Descargas/VoxelCraft/ al pausar el juego.",
-            color = Color(0xFF8A94A6),
-            fontSize = 11.sp
-        )
-        Spacer(Modifier.height(8.dp))
-        var logMessage by remember { mutableStateOf("") }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                logMessage = com.arena.voxel.core.Logs.exportToDownloads(context)
-            }) { Text("Guardar log en Descargas") }
-            OutlinedButton(onClick = {
-                logMessage = com.arena.voxel.core.Logs.share(context)
-            }) { Text("Compartir log") }
+/** Fila de ajuste con deslizador de Bedrock: título + valor a la derecha y la barra debajo. */
+@Composable
+private fun BedrockSliderRow(
+    gui: Gui,
+    title: String,
+    value: String,
+    current: Float,
+    range: ClosedFloatingPointRange<Float>,
+    steps: Int = 0,
+    onChange: (Float) -> Unit
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            BedrockText(gui, title, size = 7.5f)
+            BedrockText(gui, value, size = 7.5f, color = Bedrock.accent)
         }
-        if (logMessage.isNotEmpty()) {
-            Text(logMessage, color = Accent, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
-        }
-
-        Spacer(Modifier.height(20.dp))
-        Text(
-            "Carpeta del juego: ${Ctx.base.absolutePath}\n" +
-                "mods/  ·  resourcepacks/  ·  shaderpacks/  ·  saves/",
-            color = Color(0xFF6B7A80), fontSize = 11.sp
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(
-            "Controles: joystick izquierdo para moverte, arrastra a la derecha para mirar, " +
-                "toca para colocar un bloque y mantén pulsado para romperlo.",
-            color = Color(0xFF6B7A80), fontSize = 11.sp
+        BedrockSlider(
+            gui = gui,
+            value = current,
+            valueRange = range,
+            width = gui.px(304f),
+            steps = steps,
+            onChange = onChange
         )
     }
 }
