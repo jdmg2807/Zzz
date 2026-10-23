@@ -194,6 +194,8 @@ class WorldGen(val seed: Long) {
         }
 
         maybeRuins(chunk)
+        maybeDungeon(chunk)
+        maybeVillageHouse(chunk)
         decorate(chunk)
         Mobs.spawnInChunk(chunk, this)
         chunk.maxY = chunk.blocks.indexOfLast { it != 0.toShort() }.let { idx ->
@@ -281,6 +283,121 @@ class WorldGen(val seed: Long) {
                 chunk.set(tx, ground + height + 1, tz, Blocks.index("torch"))
             }
         }
+    }
+
+    /**
+     * Underground dungeon: a 7x5x7 mossy-cobblestone room with a spawner in the middle and two
+     * chests, generated inside a single chunk at y 12..40 like the vanilla monster room.
+     */
+    private fun maybeDungeon(chunk: Chunk) {
+        val region = 9
+        val rx = Math.floorDiv(chunk.cx, region)
+        val rz = Math.floorDiv(chunk.cz, region)
+        if (hash(rx * 131 + 7, rz * 71 + 3) > 0.30f) return
+
+        val lx = 6
+        val lz = 6
+        val wx = chunk.cx * 16 + lx
+        val wz = chunk.cz * 16 + lz
+        val ground = heightAt(wx, wz)
+        val cy = 14 + (hash(rx * 17 + 1, rz * 19 + 5) * 18).toInt()
+        if (cy + 4 >= ground - 4) return
+
+        val cobble = Blocks.index("mossy_cobblestone")
+        val cobblePlain = Blocks.index("cobblestone")
+        for (dx in -3..3) {
+            for (dz in -3..3) {
+                for (dy in 0..3) {
+                    val tx = lx + dx
+                    val tz = lz + dz
+                    if (tx !in 0..15 || tz !in 0..15) continue
+                    val y = cy + dy
+                    if (y < 2 || y >= World.HEIGHT - 1) continue
+                    val edge = dx == -3 || dx == 3 || dz == -3 || dz == 3 || dy == 0 || dy == 3
+                    if (edge) {
+                        chunk.set(tx, y, tz, if (hash(wx + dx * 3, wz + dz * 5) > 0.5f) cobble else cobblePlain)
+                    } else {
+                        chunk.set(tx, y, tz, Blocks.AIR)
+                    }
+                }
+            }
+        }
+        // Spawner in the centre and two chests against the wall.
+        chunk.set(lx, cy + 1, lz, Blocks.index("trial_spawner"))
+        chunk.set(lx - 2, cy + 1, lz + 2, Blocks.index("chest"))
+        chunk.set(lx + 2, cy + 1, lz - 2, Blocks.index("chest"))
+        // A torch on each corner keeps the room visible.
+        chunk.set(lx - 2, cy + 2, lz - 2, Blocks.index("torch"))
+        chunk.set(lx + 2, cy + 2, lz + 2, Blocks.index("torch"))
+    }
+
+    /**
+     * A small village house: plank walls, a cobblestone base, a door opening and a torch. Villages
+     * in Java are multi-chunk structures; a single-chunk house is the portable version that never
+     * needs neighbour bookkeeping and still reads as a village.
+     */
+    private fun maybeVillageHouse(chunk: Chunk) {
+        val region = 11
+        val rx = Math.floorDiv(chunk.cx, region)
+        val rz = Math.floorDiv(chunk.cz, region)
+        if (hash(rx * 211 + 13, rz * 97 + 29) > 0.40f) return
+
+        val lx = 5
+        val lz = 5
+        val wx = chunk.cx * 16 + lx
+        val wz = chunk.cz * 16 + lz
+        val ground = heightAt(wx, wz)
+        if (ground <= SEA_LEVEL + 1 || ground + 6 >= World.HEIGHT) return
+        val biome = biomeAt(wx, wz)
+        if (biome == Biomes.DESERT) return
+
+        val planks = Blocks.index("oak_planks")
+        val log = Blocks.index("oak_log")
+        val cobble = Blocks.index("cobblestone")
+        val air = Blocks.AIR
+        val w = 5
+        val d = 5
+
+        // Foundation: flatten and pave.
+        for (dx in -1..w) {
+            for (dz in -1..d) {
+                val tx = lx + dx
+                val tz = lz + dz
+                if (tx !in 0..15 || tz !in 0..15) continue
+                chunk.set(tx, ground, tz, cobble)
+                for (dy in 1..4) chunk.set(tx, ground + dy, tz, air)
+            }
+        }
+        // Walls and corner posts.
+        for (dy in 1..3) {
+            for (dx in 0 until w) {
+                for (dz in 0 until d) {
+                    val tx = lx + dx
+                    val tz = lz + dz
+                    if (tx !in 0..15 || tz !in 0..15) continue
+                    val border = dx == 0 || dx == w - 1 || dz == 0 || dz == d - 1
+                    val corner = (dx == 0 || dx == w - 1) && (dz == 0 || dz == d - 1)
+                    if (!border) continue
+                    // Door opening in the middle of the south wall.
+                    if (dz == d - 1 && dx == w / 2 && dy <= 2) continue
+                    chunk.set(tx, ground + dy, tz, if (corner) log else planks)
+                }
+            }
+        }
+        // Roof: a flat plank ceiling with an overhang.
+        for (dx in -1..w) {
+            for (dz in -1..d) {
+                val tx = lx + dx
+                val tz = lz + dz
+                if (tx !in 0..15 || tz !in 0..15) continue
+                chunk.set(tx, ground + 4, tz, planks)
+            }
+        }
+        // Interior: crafting table, furnace, chest and a torch.
+        chunk.set(lx + 1, ground + 1, lz + 1, Blocks.index("crafting_table"))
+        chunk.set(lx + 2, ground + 1, lz + 1, Blocks.index("furnace"))
+        chunk.set(lx + 3, ground + 1, lz + 1, Blocks.index("chest"))
+        chunk.set(lx + 2, ground + 2, lz + 2, Blocks.index("torch"))
     }
 
     private fun decorate(chunk: Chunk) {
