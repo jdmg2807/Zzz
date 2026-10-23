@@ -3,9 +3,11 @@ package com.arena.voxel.mods
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.arena.voxel.core.Log
+import com.arena.voxel.core.VanillaAssets
 import com.arena.voxel.items.ItemStack
 import com.arena.voxel.items.Recipes
 import com.arena.voxel.textures.Textures
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.zip.ZipFile
@@ -263,11 +265,17 @@ object JavaModSupport {
                 }
             }
         }
+        // Vanilla recipes last: a mod that ships the same shape is matched first and wins.
+        var vanilla = 0
+        for (obj in vanillaRecipeObjects()) {
+            if (register(obj)) vanilla++
+        }
         if (totalTex > 0 || totalRecipes > 0) {
             Log.i("Contenido de mods de Java: $totalTex texturas, $totalRecipes recetas")
         }
         return buildString {
             append("${mods.size} mods · $totalTex texturas · $totalRecipes recetas")
+            append(" · $vanilla recetas de vanilla")
         }
     }
 
@@ -307,9 +315,15 @@ object JavaModSupport {
      * `minecraft:` namespace prefixes stripped. Unknown types (smithing, stonecutting) are skipped
      * with no error, exactly like a data pack for a feature the game does not have.
      */
-    fun registerRecipe(json: String): Boolean {
+    fun registerRecipe(json: String): Boolean = try {
+        register(JSONObject(json))
+    } catch (t: Throwable) {
+        false
+    }
+
+    /** Parses one recipe object (vanilla, datapack or mod) and adds it to the dynamic tables. */
+    private fun register(obj: JSONObject): Boolean {
         return try {
-            val obj = JSONObject(json)
             val type = obj.optString("type", "").removePrefix("minecraft:")
             fun idOf(node: Any?): String? = when (node) {
                 is String -> node
@@ -318,12 +332,17 @@ object JavaModSupport {
             }
             fun clean(raw: String?): String? {
                 if (raw == null) return null
-                val id = raw.removePrefix("minecraft:")
-                // Tags (#minecraft:planks) cannot be resolved statically: fall back to oak planks.
+                // Tags (#minecraft:planks) cannot be resolved statically; the material family in
+                // [sameIngredient] makes any planks/logs/wool work, so a member is enough.
                 if (raw.startsWith("#")) {
-                    return if (raw.contains("planks")) "oak_planks" else null
+                    return when {
+                        raw.contains("planks") -> "oak_planks"
+                        raw.contains("logs") || raw.contains("wood") -> "oak_log"
+                        raw.contains("wool") -> "white_wool"
+                        else -> null
+                    }
                 }
-                return id
+                return raw.removePrefix("minecraft:")
             }
 
             when (type) {
@@ -373,6 +392,51 @@ object JavaModSupport {
         }
     }
 
+    /**
+     * Material families.
+     *
+     * `minecraft-data` resolves the game's tags to one member (`#planks` arrives as
+     * `acacia_planks` in one recipe and `cherry_planks` in another), so a strict id comparison
+     * would make the crafting table craftable with only one kind of wood. The families keep the
+     * vanilla behaviour: any planks, any log/stem and any wool are interchangeable.
+     */
+    private fun family(id: String): String? = when {
+        id.endsWith("_planks") -> "planks"
+        id.endsWith("_log") || id.endsWith("_wood") || id.endsWith("_stem") || id.endsWith("_hyphae") ->
+            "logs"
+        id.endsWith("_wool") -> "wool"
+        else -> null
+    }
+
+    fun sameIngredient(actual: String, wanted: String): Boolean {
+        if (actual == wanted) return true
+        val a = family(actual) ?: return false
+        return a == family(wanted)
+    }
+
+    /** Recipes shipped in the APK (`assets/vanilla/recipes.json`, generated from minecraft-data). */
+    private var vanillaRecipes: List<JSONObject>? = null
+
+    private fun vanillaRecipeObjects(): List<JSONObject> {
+        vanillaRecipes?.let { return it }
+        val list = ArrayList<JSONObject>(1700)
+        try {
+            val text = VanillaAssets.readText("recipes.json")
+            if (text != null) {
+                val arr = JSONArray(text)
+                for (i in 0 until arr.length()) {
+                    arr.optJSONObject(i)?.let { list.add(it) }
+                }
+            }
+        } catch (t: Throwable) {
+            Log.w("No se pudieron leer las recetas de vanilla: ${t.message}")
+            list.clear()
+        }
+        vanillaRecipes = list
+        Log.i("Recetas de vanilla disponibles: ${list.size}")
+        return list
+    }
+
     /** Result of a mod recipe for a grid, or null. */
     fun craftFromMods(grid: List<String?>): ItemStack? {
         val size = if (grid.size == 4) 2 else 3
@@ -384,7 +448,7 @@ object JavaModSupport {
             val pool = filled.toMutableList()
             var ok = true
             for (ing in r.ingredients) {
-                val idx = pool.indexOfFirst { it == ing }
+                val idx = pool.indexOfFirst { sameIngredient(it, ing) }
                 if (idx < 0) {
                     ok = false
                     break
@@ -416,7 +480,7 @@ object JavaModSupport {
                                 }
                             } else {
                                 val wanted = recipe.key[expected]
-                                if (wanted == null || actual != wanted) {
+                                if (wanted == null || !sameIngredient(actual, wanted)) {
                                     match = false
                                     break@outer
                                 }
