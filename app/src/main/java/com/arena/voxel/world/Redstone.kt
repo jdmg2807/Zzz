@@ -92,7 +92,7 @@ object Redstone {
         id == "lever_on" -> 15
         id == "stone_button_on" -> 15
         id == "redstone_torch_on" -> 15
-        id == "repeater_on" -> 15
+        id.startsWith("repeater_on") -> 15
         id == "comparator_on" -> 15
         else -> 0
     }
