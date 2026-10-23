@@ -23,7 +23,7 @@ android {
      * (INSTALL_FAILED_UPDATE_INCOMPATIBLE) and every build looked like a "package conflict".
      * One fixed key = every future APK installs as an update.
      */
-    val stableKeystore = rootProject.file("keystore/voxelcraft.jks")
+    val stableKeystore = rootProject.file("keystore/voxelcraft.p12")
     signingConfigs {
         if (stableKeystore.exists()) {
             create("stable") {
@@ -31,6 +31,8 @@ android {
                 storePassword = "voxelcraft"
                 keyAlias = "voxelcraft"
                 keyPassword = "voxelcraft"
+                // PKCS12 is a standard Java keystore format, so no keytool step is needed.
+                storeType = "pkcs12"
             }
         }
     }
