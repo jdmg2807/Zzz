@@ -260,10 +260,10 @@ object Game {
                 val w = world
                 if (w == null) { chat("No hay mundo cargado"); return }
                 when (args.getOrNull(0)?.lowercase()) {
-                    "day" -> w.setDayTime(0.0f)
-                    "night" -> w.setDayTime(0.5f)
-                    "noon" -> w.setDayTime(0.25f)
-                    "midnight" -> w.setDayTime(0.75f)
+                    "day" -> w.timeOfDay(0.0f)
+                    "night" -> w.timeOfDay(0.5f)
+                    "noon" -> w.timeOfDay(0.25f)
+                    "midnight" -> w.timeOfDay(0.75f)
                     null -> chat("Hora del mundo: ${"%.2f".format(w.dayTime)}")
                     else -> { chat("Uso: /time day|noon|night|midnight"); return }
                 }

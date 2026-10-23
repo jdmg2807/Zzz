@@ -20,7 +20,7 @@ class World(val seed: Long) {
     var dayTime = 0.28f
 
     /** Sets the time of day directly (0 = amanecer, 0.25 = mediodía, 0.5 = anochecer). */
-    fun setDayTime(value: Float) {
+    fun timeOfDay(value: Float) {
         dayTime = value - kotlin.math.floor(value)
     }
 
