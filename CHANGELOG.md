@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.0.1 — Ajustes de los controles táctiles
+- **Los botones de acción tienen prioridad sobre la hotbar**: en vertical el botón de agacharse
+  se solapaba con el extremo derecho de la hotbar y la pulsación seleccionaba una ranura en vez
+  de agacharse.
+- **Girar la cámara ya no coloca bloques**: al soltar después de arrastrar, la pulsación se
+  descarta; solo un toque corto y quieto coloca el bloque y solo mantener pulsado mina.
+- Informe de CI con el tamaño del APK y la huella del certificado de firma en cada compilación.
+
 ## v2.0.0 — Interfaz de Bedrock, controles táctiles nuevos, arreglo del movimiento y APK completo
 
 > **Cambio de rumbo**: la interfaz deja de imitar Java y pasa a ser la de **Bedrock Edition**.

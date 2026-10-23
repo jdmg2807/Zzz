@@ -37,25 +37,6 @@ object BedrockInput {
 
     /** Called on every pointer down. Returns true when the press landed on the game world. */
     fun down(metrics: BedrockMetrics, id: Long, x: Float, y: Float, timeMs: Long): Boolean {
-        if (metrics.inHotbar(x, y)) {
-            val slot = metrics.hotbarIndex(x)
-            Game.inventory.selected = slot
-            Game.selectedSlot = slot
-            Game.syncHotbar()
-            return true
-        }
-        if (metrics.inInvButton(x, y)) {
-            Game.uiRequest = "inventory"
-            return true
-        }
-        if (metrics.inPause(x, y)) {
-            Game.uiRequest = "pause"
-            return true
-        }
-        if (metrics.inChat(x, y)) {
-            Game.uiRequest = "chat"
-            return true
-        }
         if (metrics.inJump(x, y)) {
             jumpPointer = id
             Game.jump = true
@@ -91,6 +72,26 @@ object BedrockInput {
                 it.flying = !it.flying
                 it.vy = 0.0
             }
+            return true
+        }
+        // HUD plates last: in portrait the action buttons overlap the right end of the hotbar.
+        if (metrics.inHotbar(x, y)) {
+            val slot = metrics.hotbarIndex(x)
+            Game.inventory.selected = slot
+            Game.selectedSlot = slot
+            Game.syncHotbar()
+            return true
+        }
+        if (metrics.inInvButton(x, y)) {
+            Game.uiRequest = "inventory"
+            return true
+        }
+        if (metrics.inPause(x, y)) {
+            Game.uiRequest = "pause"
+            return true
+        }
+        if (metrics.inChat(x, y)) {
+            Game.uiRequest = "chat"
             return true
         }
         if (joyPointer == -1L && metrics.inJoyZone(x, y)) {
@@ -165,7 +166,9 @@ object BedrockInput {
         }
         if (id == lookPointer) {
             lookPointer = -1L
-            // The renderer reads this as "tap = place, long hold = mine".
+            // The renderer reads this as "tap = place, long hold = mine". Dragging the camera is
+            // neither: restarting the press counter throws that gesture away.
+            if (lookMoved) Game.pressSeq++
             Game.pressActive = false
             lookMoved = false
         }
