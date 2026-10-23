@@ -31,4 +31,16 @@ public interface ModContext {
      * does not expose jar resources through {@code getResourceAsStream}.
      */
     byte[] readResource(String path);
+
+    /**
+     * Registers a mod item. Items are added to the creative tabs and can be given with
+     * {@code /give <id> [count]}.
+     */
+    void registerItem(ItemDef def);
+
+    /**
+     * Registers a chat command. The command is typed as {@code /name arg1 arg2} and the handler
+     * returns the message to show (null for silence).
+     */
+    void registerCommand(String name, CommandHandler handler);
 }

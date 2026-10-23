@@ -3,6 +3,7 @@ package com.arena.voxel.ui
 import android.opengl.GLSurfaceView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -73,6 +75,8 @@ fun GameScreen(onExit: () -> Unit) {
     var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
     var tick by remember { mutableIntStateOf(0) }
     var paused by remember { mutableStateOf(false) }
+    var chatting by remember { mutableStateOf(false) }
+    var chatText by remember { mutableStateOf("") }
     var picker by remember { mutableStateOf(false) }
     var container by remember { mutableStateOf<ContainerMode?>(null) }
     var entity by remember { mutableStateOf<BlockEntityUi?>(null) }
@@ -86,6 +90,7 @@ fun GameScreen(onExit: () -> Unit) {
 
     BackHandler {
         when {
+            chatting -> chatting = false
             entity != null -> entity = null
             container != null -> container = null
             picker -> picker = false
@@ -114,7 +119,7 @@ fun GameScreen(onExit: () -> Unit) {
         }
     }
 
-    LaunchedEffect(paused, picker, container, entity) {
+    LaunchedEffect(paused, picker, container, entity, chatting) {
         Game.paused = paused || picker || container != null || entity != null
     }
 
@@ -189,7 +194,11 @@ fun GameScreen(onExit: () -> Unit) {
             Controls(tick, onOpenPicker = { picker = true })
 
             Box(Modifier.align(Alignment.TopEnd).padding(12.dp)) {
-                TapButton("II") { paused = true }
+                Row {
+                    TapButton("T") { chatting = true }
+                    Spacer(Modifier.width(8.dp))
+                    TapButton("II") { paused = true }
+                }
             }
         }
 
@@ -215,6 +224,49 @@ fun GameScreen(onExit: () -> Unit) {
         }
 
         // Chest / furnace / anvil GUIs opened by tapping the block with an empty hand.
+        // Chat / command line (Java opens it with "T"; "/" starts a command).
+        if (chatting) {
+            GuiScreen(Settings.guiScale) { gui ->
+            Box(Modifier.fillMaxSize().background(Color(0x66000000))) {
+                BasicTextField(
+                    value = chatText,
+                    onValueChange = { chatText = it },
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontFamily = FontFamily.Monospace
+                    ),
+                    cursorBrush = SolidColor(Color.White),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(16.dp)
+                        .fillMaxWidth(0.85f)
+                        .background(Color(0xCC000000))
+                        .padding(10.dp)
+                )
+                Row(Modifier.align(Alignment.TopStart).offset(y = 74.dp).padding(16.dp)) {
+                    GuiButton(gui = gui, text = "Enviar", onClick = {
+                        val line = chatText.trim()
+                        chatText = ""
+                        chatting = false
+                        if (line.isEmpty()) return@GuiButton
+                        if (line.startsWith("/")) {
+                            Game.runCommand(line)
+                        } else {
+                            Game.chat("<Jugador> $line")
+                        }
+                    })
+                    Spacer(Modifier.width(8.dp))
+                    GuiButton(gui = gui, text = "Cancelar", onClick = {
+                        chatText = ""
+                        chatting = false
+                    })
+                }
+            }
+            }
+        }
+
         entity?.let { open ->
             GuiScreen(Settings.guiScale) { gui ->
                 if (open.kind == "anvil") {

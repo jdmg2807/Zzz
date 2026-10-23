@@ -226,6 +226,99 @@ object Game {
     fun chatSnapshot(last: Int = 3): List<String> =
         synchronized(chatLines) { chatLines.toList().takeLast(last) }
 
+    /** Mod commands, keyed by the lowercase command name. */
+    private val commands = HashMap<String, com.arena.voxel.api.CommandHandler>()
+
+    fun registerCommand(name: String, handler: com.arena.voxel.api.CommandHandler) {
+        commands[name.lowercase().removePrefix("/")] = handler
+    }
+
+    /**
+     * Runs a chat line. Built-in commands mirror a handful of vanilla ones, and mod commands are
+     * dispatched to their handler; unknown commands report the usual "unknown command" error.
+     */
+    fun runCommand(line: String) {
+        val text = line.trim().removePrefix("/")
+        if (text.isEmpty()) return
+        val parts = text.split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val name = parts.first().lowercase()
+        val args = parts.drop(1).toTypedArray()
+        val p = player
+        when (name) {
+            "give" -> {
+                val id = args.getOrNull(0)
+                val count = args.getOrNull(1)?.toIntOrNull() ?: 1
+                if (id == null || !com.arena.voxel.items.Items.exists(id)) {
+                    chat("Uso: /give <objeto> [cantidad]")
+                    return
+                }
+                give(id, count)
+                chat("Se han dado $count × ${com.arena.voxel.items.Items.nameOf(id)}")
+                return
+            }
+            "time" -> {
+                val w = world
+                if (w == null) { chat("No hay mundo cargado"); return }
+                when (args.getOrNull(0)?.lowercase()) {
+                    "day" -> w.dayTime = 0f
+                    "night" -> w.dayTime = 0.5f
+                    "noon" -> w.dayTime = 0.25f
+                    "midnight" -> w.dayTime = 0.75f
+                    null -> chat("Hora del mundo: ${"%.2f".format(w.dayTime)}")
+                    else -> { chat("Uso: /time day|noon|night|midnight"); return }
+                }
+                chat("Hora del mundo: ${"%.2f".format(w.dayTime)}")
+                return
+            }
+            "tp" -> {
+                if (p == null || args.size < 3) { chat("Uso: /tp <x> <y> <z>"); return }
+                p.x = args[0].toDoubleOrNull() ?: return
+                p.y = args[1].toDoubleOrNull() ?: return
+                p.z = args[2].toDoubleOrNull() ?: return
+                p.vy = 0.0
+                chat("Teletransportado a ${p.x.toInt()} ${p.y.toInt()} ${p.z.toInt()}")
+                return
+            }
+            "heal" -> {
+                if (p == null) { chat("No hay jugador"); return }
+                p.health = p.maxHealth
+                p.food = 20
+                chat("Vida y hambre restauradas")
+                return
+            }
+            "gamemode" -> {
+                val mode = args.getOrNull(0)?.lowercase()
+                when (mode) {
+                    "creative", "creativo", "1" -> creative = true
+                    "survival", "supervivencia", "0" -> creative = false
+                    else -> { chat("Uso: /gamemode creative|survival"); return }
+                }
+                chat(if (creative) "Modo creativo" else "Modo supervivencia")
+                return
+            }
+            "help" -> {
+                val mods = commands.keys.sorted()
+                chat("Comandos: /give /time /tp /heal /gamemode" + if (mods.isEmpty()) "" else " · mods: " + mods.joinToString(" "))
+                return
+            }
+        }
+        val handler = commands[name]
+        if (handler == null) {
+            chat("Comando desconocido: /$name")
+            return
+        }
+        try {
+            handler.run(modHostForCommands, args)?.let { chat(it) }
+        } catch (t: Throwable) {
+            Log.e("Error en el comando /$name", t)
+            chat("El comando /$name falló: ${t.message}")
+        }
+    }
+
+    /** Minimal context handed to mod commands. */
+    private val modHostForCommands: com.arena.voxel.api.ModContext
+        get() = com.arena.voxel.mods.ModLoader.commandContext()
+
     fun chat(message: String) {
         val line = message
         chatLines.add(line)

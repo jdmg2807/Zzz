@@ -3,6 +3,8 @@ package com.arena.voxel.mods
 import com.arena.voxel.Game
 import com.arena.voxel.api.BlockDef
 import com.arena.voxel.api.ChatAPI
+import com.arena.voxel.api.CommandHandler
+import com.arena.voxel.api.ItemDef
 import com.arena.voxel.api.ModContext
 import com.arena.voxel.api.PlayerAPI
 import com.arena.voxel.api.WorldAPI
@@ -92,6 +94,16 @@ class ModHost(private val descriptor: ModDescriptor) : ModContext {
         Blocks.registerMod(def)
         Game.addHotbarBlock(def.id)
         Log.i("Mod ${descriptor.id} registró el bloque ${def.id}")
+    }
+
+    override fun registerItem(def: ItemDef) {
+        com.arena.voxel.items.Items.registerMod(def)
+        Log.i("Mod ${descriptor.id} registró el objeto ${def.id}")
+    }
+
+    override fun registerCommand(name: String, handler: CommandHandler) {
+        com.arena.voxel.Game.registerCommand(name, handler)
+        Log.i("Mod ${descriptor.id} registró el comando /$name")
     }
 
     override fun readResource(path: String): ByteArray? {

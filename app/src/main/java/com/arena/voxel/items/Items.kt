@@ -192,6 +192,17 @@ object Items {
         item("redstone_lamp", "Lámpara de redstone")
     }
 
+    /** Registers an item declared by a mod jar. */
+    fun registerMod(def: com.arena.voxel.api.ItemDef) {
+        if (defs.containsKey(def.id)) return
+        defs[def.id] = Def(
+            id = def.id,
+            name = def.name,
+            maxStack = def.maxStack.coerceIn(1, 64),
+            food = def.food
+        )
+    }
+
     fun def(id: String): Def? = defs[id]
     fun exists(id: String): Boolean = defs.containsKey(id)
     fun nameOf(id: String): String = defs[id]?.name ?: id.replace('_', ' ')

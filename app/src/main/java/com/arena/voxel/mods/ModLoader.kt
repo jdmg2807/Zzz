@@ -163,6 +163,12 @@ object ModLoader {
         }
     }
 
+    /** Context handed to mod commands: the first loaded mod's host, or a standalone one. */
+    fun commandContext(): com.arena.voxel.api.ModContext =
+        hosts.values.firstOrNull() ?: ModHost(
+            ModDescriptor(File(Ctx.modsDir, "builtin"), "builtin", "Comandos", "1", "-", "")
+        )
+
     fun count(): Int = mods.size
 
     fun installed(): List<ModDescriptor> = scan()
