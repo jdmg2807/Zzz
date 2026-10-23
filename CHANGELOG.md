@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.2 — 1660 recetas de vanilla
+- **Tabla de recetas completa**: se generan 1660 recetas (con forma y sin forma) desde los datos
+  públicos de `minecraft-data` (MIT) con `tools/gen_recipes.py`. Antes había un puñado escritas a
+  mano; ahora la mesa de trabajo, el horno y el inventario 2×2 aceptan las recetas del juego.
+- **Familias de materiales**: como los datos traen las etiquetas resueltas a un solo miembro
+  (`#planks` llega como `acacia_planks`), el motor considera intercambiables cualquier tablón,
+  cualquier tronco/tallo y cualquier lana, como en el juego.
+- **Las recetas de un mod siguen ganando**: se registran antes que las de vanilla.
+- Documento `docs/FUENTES_Y_LICENCIAS.md` con el origen y la licencia de cada cosa.
+
 ## v2.1.1 — Física real de Java Edition
 - **Movimiento reescrito con el modelo del juego**: la velocidad ya no persigue un objetivo, se
   suma aceleración (0,1 andando / 0,13 esprintando en suelo, 0,02 en el aire) y después se aplica
