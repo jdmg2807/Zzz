@@ -127,6 +127,30 @@ jobs:
           cp examplemod/build/libs/examplemod.jar dist/examplemod.jar
           ls -lh dist
 
+      - name: Verificar firma y tamaño
+        if: success() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          APKSIGNER=$(ls "$SDK"/build-tools/*/apksigner 2>/dev/null | tail -1)
+          {
+            echo "Run ${{ github.run_id }} · commit ${{ github.sha }}"
+            echo ""
+            echo "### APK"
+            ls -l dist/*.apk | awk '{printf "- %s: %d bytes (%.1f MB)\n", $9, $5, $5/1048576}'
+            echo ""
+            echo "### Certificado de firma"
+            echo '```'
+            if [ -n "$APKSIGNER" ]; then
+              "$APKSIGNER" verify --print-certs dist/*-release.apk | head -6
+            else
+              echo "apksigner no encontrado"
+            fi
+            echo '```'
+          } > /tmp/sign.md
+          gh issue comment 1 --body-file /tmp/sign.md || true
+
       - name: Subir APK
         if: success()
         uses: actions/upload-artifact@v4
