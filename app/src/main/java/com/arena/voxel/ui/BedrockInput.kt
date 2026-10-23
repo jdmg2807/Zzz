@@ -25,6 +25,8 @@ object BedrockInput {
     private var lookLastX = 0f
     private var lookLastY = 0f
     private var lookMoved = false
+    /** Distance of the current camera drag, as a fraction of the smaller screen side. */
+    private var lookDistance = 0f
 
     private var jumpPointer = -1L
     private var sneakPointer = -1L
@@ -110,6 +112,7 @@ object BedrockInput {
             lookLastX = x
             lookLastY = y
             lookMoved = false
+            lookDistance = 0f
             Game.pressSeq++
             Game.pressActive = true
             return true
@@ -147,7 +150,9 @@ object BedrockInput {
             lookLastX = x
             lookLastY = y
             if (abs(dx) > 0.01f || abs(dy) > 0.01f) {
-                lookMoved = true
+                // A finger always jitters a little; only a real drag counts as "looking around".
+                lookDistance += hypot(dx, dy) / kotlin.math.min(metrics.w, metrics.h)
+                lookMoved = lookDistance > 0.045f
                 Game.addLook(dx, dy)
             }
         }
@@ -209,5 +214,6 @@ object BedrockInput {
         Game.pressActive = false
         forwardWasHigh = false
         lookMoved = false
+        lookDistance = 0f
     }
 }

@@ -2,6 +2,7 @@ package com.arena.voxel.core
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Log
 import com.arena.voxel.world.Blocks
 import org.json.JSONObject
 import java.io.File
@@ -185,22 +186,32 @@ object VanillaAssets {
         return if (exists(path)) "$ROOT/$path" else null
     }
 
-    /** Every OGG file under `sounds/` whose path contains [folder], as asset paths. */
-    fun soundFiles(folder: String): List<String> {
-        val out = ArrayList<String>()
+    /** Cached index of every OGG under `sounds/` (walking the assets tree is not free). */
+    private var soundIndex: List<String>? = null
+
+    private fun ensureSoundIndex(): List<String> {
+        soundIndex?.let { return it }
+        val out = ArrayList<String>(512)
         fun walk(path: String) {
             for (entry in list(path)) {
                 val full = "$path/$entry"
                 if (entry.endsWith(".ogg")) {
-                    if (path.contains(folder)) out.add("$ROOT/$full")
+                    out.add(full)
                 } else if (!entry.contains('.')) {
                     walk(full)
                 }
             }
         }
         walk("sounds")
-        return out
+        val result = out.map { "$ROOT/$it" }
+        soundIndex = result
+        Log.i("Sonidos de vanilla indexados: ${result.size}")
+        return result
     }
+
+    /** Every OGG file under `sounds/` whose path contains [folder], as asset paths. */
+    fun soundFiles(folder: String): List<String> =
+        ensureSoundIndex().filter { it.contains(folder) }
 
     // ------------------------------------------------------------------ io helpers
 

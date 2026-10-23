@@ -70,6 +70,12 @@ class Renderer : GLSurfaceView.Renderer {
     private var handFor: String = ""
     private val crackMeshes = arrayOfNulls<ChunkMesh>(6)
     private var pressSeqSeen = -1
+
+    /**
+     * A touch shorter than this counts as a tap (place), longer as a hold (mine). Bedrock uses
+     * roughly a third of a second; a tighter window made normal taps start mining instead.
+     */
+    private val TAP_WINDOW = 0.30f
     private var pressTime = 0f
     private var mineProgress = 0f
     private var swing = 0f
@@ -1635,7 +1641,7 @@ class Renderer : GLSurfaceView.Renderer {
         }
         if (Game.pressActive) {
             pressTime += dt
-            if (pressTime > 0.20f) {
+            if (pressTime > TAP_WINDOW) {
                 Game.mining = true
                 if (hit != null) {
                     val targetId = Blocks.get(w.get(hit.x, hit.y, hit.z)).id
@@ -1651,7 +1657,7 @@ class Renderer : GLSurfaceView.Renderer {
             }
         } else {
             if (pressTime > 0f) {
-                if (pressTime <= 0.20f) {
+                if (pressTime <= TAP_WINDOW) {
                     // Java's attack: the crosshair checks entities before blocks.
                     val mob = mobUnderCrosshair(w)
                     if (mob != null) {

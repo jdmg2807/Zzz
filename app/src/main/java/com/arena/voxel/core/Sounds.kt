@@ -92,15 +92,17 @@ object Sounds {
     private fun loadVanilla(pool: SoundPool): Int {
         if (!VanillaAssets.available()) return 0
         val groups = mapOf(
-            "dig_stone" to listOf("random/break", "dig/stone", "block/stone/break"),
-            "dig_wood" to listOf("dig/wood", "block/wood/break", "block/bamboo/break"),
-            "dig_soft" to listOf("dig/gravel", "dig/grass", "block/gravel/break", "block/grass/break"),
-            "place" to listOf("block/stone/place", "random/click", "block/wood/place"),
-            "step" to listOf("step/stone", "step/grass", "step/wood"),
-            "hurt" to listOf("damage/hit", "entity/player/hurt"),
-            "eat" to listOf("random/eat", "entity/generic/eat"),
+            // Newer packs keep one folder per block (`block/stone/break1.ogg`), older ones a flat
+            // `dig/stone1.ogg`. Both are listed, the first folder that yields files wins.
+            "dig_stone" to listOf("block/stone/break", "dig/stone", "random/break"),
+            "dig_wood" to listOf("block/wood/break", "dig/wood", "block/bamboo/break"),
+            "dig_soft" to listOf("block/gravel/break", "dig/gravel", "dig/sand", "dig/grass"),
+            "place" to listOf("block/stone/place", "dig/stone", "random/click"),
+            "step" to listOf("step/stone", "step/grass", "block/stone/step", "dig/cloth"),
+            "hurt" to listOf("entity/player/hurt", "damage/hit"),
+            "eat" to listOf("random/eat", "entity/generic/eat", "dig/cloth"),
             "levelup" to listOf("random/levelup", "entity/player/levelup"),
-            "click" to listOf("random/click", "ui/button/click"),
+            "click" to listOf("ui/button/click", "random/click"),
             "splash" to listOf("random/splash", "entity/generic/splash", "liquid/water")
         )
         var count = 0

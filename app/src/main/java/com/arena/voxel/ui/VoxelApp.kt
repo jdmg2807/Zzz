@@ -341,6 +341,22 @@ private fun PacksScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                // What ships inside the APK: the vanilla Java assets.
+                Text(
+                    "ASSETS DE VANILLA INCLUIDOS",
+                    color = Color(0xFF7E8A9A),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    com.arena.voxel.core.VanillaAssets.summary() +
+                        " · sonidos, modelos y nombres en español de Minecraft Java 1.21",
+                    color = Color(0xFFB8C2CE),
+                    fontSize = 11.sp
+                )
+                Spacer(Modifier.height(8.dp))
+            }
             item { Text("RESOURCE PACKS", color = Color(0xFF7E8A9A), fontSize = 11.sp, fontWeight = FontWeight.Bold) }
             if (packs.isEmpty()) {
                 item {
