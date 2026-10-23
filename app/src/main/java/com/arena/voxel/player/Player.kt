@@ -5,6 +5,7 @@ import com.arena.voxel.world.World
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.floor
+import kotlin.math.hypot
 import kotlin.math.sin
 
 /**
@@ -14,11 +15,13 @@ import kotlin.math.sin
  * interpolates. Constants are the public ones the community has measured from the game:
  *
  *  - gravity          `vy -= 0.08` then `vy *= 0.98`
- *  - jump             `vy = 0.42` (+ 0.2 * forward speed when sprinting)
- *  - walk / sprint    4.317 / 5.612 blocks per second  (0.1 / 0.13 blocks per tick)
- *  - sneak            1.295 blocks per second
- *  - friction         `*0.546` on ground (~0.6 on ice), `*0.91` in the air
- *  - water            buoyancy 0.02, drag `*0.8`, swim up 0.04
+ *  - jump             `vy = 0.42` (+ a 0.2 blocks/tick horizontal impulse when sprinting)
+ *  - acceleration     `vel += heading * accel`, accel 0.1 (0.13 sprinting) on the ground,
+ *                     0.02 in the air, the input normalised by `speed / max(speed, 1)`
+ *  - inertia          `*0.546` on ground (0.6 slipperiness × 0.91, ice is 0.98), air `*0.91`
+ *  - sneak            input ×0.3 and an edge guard that backs off in 0.05 steps
+ *  - water / lava     inertia 0.8 / 0.5, buoyancy −0.02, swim up +0.04, out-of-water 0.3
+ *  - ladder           horizontal clamp 0.15, climb 0.2
  *  - step height      0.6 (so a slab or a stair is walked up without jumping)
  *  - AABB             0.6 x 1.8 (eyes at 1.62, 1.27 when sneaking)
  */
@@ -37,19 +40,17 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
         const val DRAG_GROUND = 0.546
         const val DRAG_ICE = 0.98
         const val STEP_HEIGHT = 0.6
+        /** Longest distance the AABB moves before testing collisions again (no tunnelling). */
+        const val MAX_SUBSTEP = 0.4
         /**
-         * Target horizontal speeds in blocks **per tick** (20 ticks/s), taken from the movement
-         * speeds of Java Edition:
+         * The steady horizontal speeds that fall out of the model, in blocks per tick (20 ticks
+         * per second). They describe the result of the physics, not a value the code assigns:
          *
-         *   walk   4.317 b/s = 0.21585 b/tick
-         *   sprint 5.612 b/s = 0.28060 b/tick
-         *   sneak  1.295 b/s = 0.06475 b/tick
+         *   walk   4.317 b/s = 0.21585 b/tick   (accel 0.1, inertia 0.546)
+         *   sprint 5.612 b/s = 0.28060 b/tick   (accel 0.13)
+         *   sneak  1.295 b/s = 0.06475 b/tick   (input scaled by 0.3)
          *   swim   2.2   b/s = 0.11    b/tick
          *   fly    10.9  b/s = 0.545   b/tick (creative, double-tap jump)
-         *
-         * The old numbers (0.1 / 0.13) were half of the real speed and, worse, were multiplied by
-         * the ground friction afterwards, which left 0.034 b/tick — the "joystick feels stuck"
-         * of the previous build.
          */
         const val WALK = 0.21585
         const val SPRINT = 0.28060
@@ -57,6 +58,9 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
         const val SWIM = 0.11
         const val FLY = 0.28
         const val FLY_FAST = 0.545
+        /** Ladders/vines: horizontal speed clamp and the climb impulse (Java values). */
+        const val LADDER_SIDE = 0.15
+        const val LADDER_UP = 0.2
     }
 
     var yaw = 0f
@@ -83,8 +87,9 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
     var level = 0
 
     private var accumulator = 0f
+    /** True when the last tick was stopped by a wall (used by the ladder climb). */
+    private var collidedHorizontally = false
     private var unstickTimer = 0
-    private var jumpCooldown = 0
     private var tickCounter = 0
 
     /** Blocks fallen since leaving the ground; damage starts at 3 (Java's rule). */
@@ -297,80 +302,106 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
         sneak: Boolean
     ) {
         // ---------------------------------------------------------- input direction
-        val rad = Math.toRadians(yaw.toDouble())
-        val fx = -sin(rad)
-        val fz = -cos(rad)
-        val rx = cos(rad)
-        val rz = -sin(rad)
-        var dx = fx * moveZ + rx * moveX
-        var dz = fz * moveZ + rz * moveX
-        val len = kotlin.math.hypot(dx, dz)
-        val hasInput = len > 0.001
-        if (len > 1.0) {
-            dx /= len
-            dz /= len
+        // Java reads the keyboard as ±0.98 and normalises the vector only when it is longer than
+        // one; an analog stick keeps its magnitude, which makes slow walking possible.
+        var strafe = moveX.toDouble()
+        var forward = moveZ.toDouble()
+        val inputLen = hypot(strafe, forward)
+        if (inputLen > 1.0) {
+            strafe /= inputLen
+            forward /= inputLen
         }
-
-        val sprinting = sprint && hasInput && !sneak
-        val speed = when {
-            flying -> if (sprinting) FLY_FAST else FLY
-            inWater -> SWIM
-            sneak -> SNEAK
-            sprinting -> SPRINT
-            else -> WALK
+        val hasInput = inputLen > 0.01
+        val norm = kotlin.math.max(inputLen, 1.0)
+        val dirX = if (hasInput) strafe / norm else 0.0
+        val dirZ = if (hasInput) forward / norm else 0.0
+        if (sneak) {
+            strafe *= 0.3
+            forward *= 0.3
         }
+        val sprinting = sprint && forward > 0.0 && !sneak
 
-        // Target horizontal velocity for this tick.
-        val tx = if (hasInput) dx * speed else 0.0
-        val tz = if (hasInput) dz * speed else 0.0
-
-        val slippery = onGround && groundBlockFriction(world) > 0.6
+        collidedHorizontally = false
+        // Velocities below 0.003 blocks/tick are noise; the game zeroes them.
+        if (abs(vx) < 0.003) vx = 0.0
+        if (abs(vy) < 0.003) vy = 0.0
+        if (abs(vz) < 0.003) vz = 0.0
 
         if (flying) {
-            vx = tx
-            vz = tz
+            // Creative flight: 10.9 blocks/s with the sprint button, like the Java ability.
+            val flySpeed = if (sprinting) FLY_FAST else FLY
+            vx += (dirX * flySpeed - vx) * 0.55
+            vz += (dirZ * flySpeed - vz) * 0.55
             vy = when {
                 jump -> FLY
                 ascend < -0.1f -> -FLY
                 ascend > 0.1f -> FLY
                 else -> 0.0
             }
-        } else if (inWater) {
-            vx += (tx - vx) * 0.16
-            vz += (tz - vz) * 0.16
-            vy -= GRAVITY * 0.32
-            if (jump || ascend > 0.1f) vy = SWIM * 1.9
-            if (ascend < -0.1f) vy = -SWIM * 1.4
-            vy *= 0.8
+            moveXAxis(world, vx, 0)
+            moveYAxis(world, vy)
+            moveZAxis(world, vz)
         } else {
-            // Exponential approach towards the target: full speed in ~5 ticks on ground, quick
-            // but floaty in the air — the Java feel without the old double friction.
-            val accel = if (onGround) 0.42 else 0.08
-            vx += (tx - vx) * accel
-            vz += (tz - vz) * accel
-            if (!hasInput) {
-                // Releasing the stick slides to a stop (0.546 ground / 0.91 air, the game values).
-                if (slippery) {
-                    vx *= DRAG_ICE
-                    vz *= DRAG_ICE
-                } else if (onGround) {
-                    vx *= DRAG_GROUND
-                    vz *= DRAG_GROUND
-                } else {
-                    vx *= DRAG_AIR
-                    vz *= DRAG_AIR
+            // Jump first, as LivingEntity.jumpFromGround does: 0.42 up and, while sprinting,
+            // an extra 0.2 blocks/tick of horizontal impulse in the facing direction.
+            if (jump && onGround && !inWater && !inLava) {
+                vy = JUMP
+                if (sprinting) {
+                    vx += dirX * 0.2
+                    vz += dirZ * 0.2
                 }
-            }
-            // Gravity, exactly the Java constants.
-            vy -= GRAVITY
-            vy *= DRAG_VERTICAL
-            if (jump && onGround && jumpCooldown <= 0) {
-                vy = JUMP + if (sprinting) 0.2 * speed else 0.0
                 onGround = false
-                jumpCooldown = 10
             }
+            if (inWater && jump) vy += 0.04
+
+            // Ladders, vines and scaffolding clamp the horizontal speed and allow climbing.
+            val ladder = onLadder(world)
+            if (ladder) {
+                vx = vx.coerceIn(-LADDER_SIDE, LADDER_SIDE)
+                vz = vz.coerceIn(-LADDER_SIDE, LADDER_SIDE)
+                if (vy < -LADDER_SIDE) vy = -LADDER_SIDE
+            }
+
+            // Acceleration and inertia, exactly the values of the game's travel():
+            //   ground  0.546 (= 0.6 * 0.91), accel = speedAttribute * 0.16277136 / inertia^3
+            //   air     0.91, accel 0.02 (0.026 while sprinting)
+            //   water   0.8, accel 0.02; lava 0.5
+            var accel: Double
+            var inertia: Double
+            if (inWater) {
+                accel = 0.02
+                inertia = 0.8
+            } else if (inLava) {
+                accel = 0.02
+                inertia = 0.5
+            } else if (onGround) {
+                inertia = friction(world) * 0.91
+                val attribute = if (sprinting) 0.13 else 0.1
+                accel = attribute * (0.1627714 / (inertia * inertia * inertia))
+            } else {
+                accel = if (sprinting) 0.026 else 0.02
+                inertia = 0.91
+            }
+
+            applyHeading(strafe, forward, accel)
+            moveXAxis(world, vx, 0)
+            moveYAxis(world, vy)
+            moveZAxis(world, vz)
+
+            if (inWater || inLava) {
+                vy *= inertia
+                vy -= 0.02
+                vx *= inertia
+                vz *= inertia
+            } else {
+                vy -= GRAVITY
+                vy *= DRAG_VERTICAL
+                vx *= inertia
+                vz *= inertia
+            }
+
+            if (ladder && (collidedHorizontally || jump)) vy = LADDER_UP
         }
-        if (jumpCooldown > 0) jumpCooldown--
         tickCounter++
         if (!onGround && vy < 0 && !inWater) fallDistance += -vy else if (onGround) fallDistance = 0.0
 
@@ -384,10 +415,11 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
         // Regeneration when food is high enough (Java heals every 4 s at food >= 18).
         if (food >= 18 && health < maxHealth && tickCounter % 80 == 0) heal(1f)
 
-        // Sneaking keeps the player on the edge instead of walking off (Java's edge guard).
+        // Sneaking backs off from edges in 0.05 steps (the game's maybeBackOffFromEdge): the old
+        // version zeroed the speed whenever there was no wall ahead, so sneaking could not move.
         if (sneak && onGround && !flying) {
-            if (!collides(world, x + vx, y, z)) vx = 0.0
-            if (!collides(world, x, y, z + vz)) vz = 0.0
+            vx = backOffFromEdge(world, vx, 0.0)
+            vz = backOffFromEdge(world, 0.0, vz)
         }
 
         moveXAxis(world, vx, 0)
@@ -400,48 +432,115 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
         }
     }
 
-    private fun groundBlockFriction(world: World): Double {
+    /** Slipperiness of the block under the feet, from the community-measured Java values. */
+    private fun friction(world: World): Double {
         val below = world.get(floor(x).toInt(), floor(y - 0.05).toInt(), floor(z).toInt())
-        val id = Blocks.get(below).id
-        return when (id) {
-            "ice", "packed_ice" -> 0.98
+        return when (Blocks.get(below).id) {
+            "ice", "packed_ice", "frosted_ice" -> 0.98
+            "blue_ice" -> 0.989
+            "slime_block", "slime" -> 0.8
             else -> 0.6
         }
     }
 
+    /**
+     * Java's `applyHeading`: `vel += direction * accel`, where the acceleration is divided by the
+     * input length so a diagonal push is not faster than a straight one (`speed / max(speed, 1)`).
+     */
+    private fun applyHeading(strafe: Double, forward: Double, accel: Double) {
+        var speed = hypot(strafe, forward)
+        if (speed < 0.01) return
+        speed = accel / kotlin.math.max(speed, 1.0)
+        val right = strafe * speed
+        val ahead = forward * speed
+        val rad = Math.toRadians(yaw.toDouble())
+        vx += cos(rad) * right - sin(rad) * ahead
+        vz += -sin(rad) * right - cos(rad) * ahead
+    }
+
+    /** True when the feet overlap a ladder, a vine or scaffolding. */
+    private fun onLadder(world: World): Boolean {
+        for (dy in 0..1) {
+            val id = Blocks.get(world.get(floor(x).toInt(), floor(y + 0.5 + dy).toInt(), floor(z).toInt())).id
+            if (id == "ladder" || id == "vine" || id == "scaffolding") return true
+        }
+        return false
+    }
+
+    /**
+     * Snaking along an edge while sneaking must not drop the player off it. Java shrinks the
+     * movement in 0.05 steps while the new position has no block under the feet.
+     */
+    private fun backOffFromEdge(world: World, dx: Double, dz: Double): Double {
+        var d = if (dx != 0.0) dx else dz
+        val alongX = dx != 0.0
+        var guard = 0
+        while (d != 0.0 && guard++ < 40) {
+            val px = if (alongX) x + d else x
+            val pz = if (alongX) z else z + d
+            if (collides(world, px, y - 0.02, pz)) return d
+            d = if (abs(d) <= 0.05) 0.0 else d - Math.signum(d) * 0.05
+        }
+        return d
+    }
+
+    /**
+     * Sub-stepped axis moves.
+     *
+     * A single position test is only safe while the step is shorter than a block. Falling reaches
+     * 3.92 blocks/tick (the terminal velocity) and flying 0.545, so every axis is walked in
+     * chunks of at most [MAX_SUBSTEP]; otherwise the AABB jumps over a one-block-thick floor and
+     * the player falls through the world.
+     */
     private fun moveXAxis(world: World, amount: Double, stepUp: Int) {
         if (amount == 0.0) return
-        if (!collides(world, x + amount, y, z)) {
-            x += amount
+        var remaining = amount
+        var guard = 0
+        while (abs(remaining) > 1e-9 && guard++ < 32) {
+            val step = remaining.coerceIn(-MAX_SUBSTEP, MAX_SUBSTEP)
+            if (!collides(world, x + step, y, z)) {
+                x += step
+                remaining -= step
+                continue
+            }
+            // Try stepping up a slab/stair before blocking.
+            if (onGround && stepUp == 0) {
+                val top = groundHeight(world, x + step, y, z)
+                if (top - y in 0.001..STEP_HEIGHT && !collides(world, x + step, top, z)) {
+                    y = top
+                    x += step
+                    return
+                }
+            }
+            vx = 0.0
+            collidedHorizontally = true
             return
         }
-        // Try stepping up a slab/stair before blocking.
-        if (onGround && stepUp == 0) {
-            val top = groundHeight(world, x + amount, y, z)
-            if (top - y in 0.001..STEP_HEIGHT && !collides(world, x + amount, top, z)) {
-                y = top
-                x += amount
-                return
-            }
-        }
-        vx = 0.0
     }
 
     private fun moveZAxis(world: World, amount: Double, stepUp: Int = 0) {
         if (amount == 0.0) return
-        if (!collides(world, x, y, z + amount)) {
-            z += amount
+        var remaining = amount
+        var guard = 0
+        while (abs(remaining) > 1e-9 && guard++ < 32) {
+            val step = remaining.coerceIn(-MAX_SUBSTEP, MAX_SUBSTEP)
+            if (!collides(world, x, y, z + step)) {
+                z += step
+                remaining -= step
+                continue
+            }
+            if (onGround && stepUp == 0) {
+                val top = groundHeight(world, x, y, z + step)
+                if (top - y in 0.001..STEP_HEIGHT && !collides(world, x, top, z + step)) {
+                    y = top
+                    z += step
+                    return
+                }
+            }
+            vz = 0.0
+            collidedHorizontally = true
             return
         }
-        if (onGround && stepUp == 0) {
-            val top = groundHeight(world, x, y, z + amount)
-            if (top - y in 0.001..STEP_HEIGHT && !collides(world, x, top, z + amount)) {
-                y = top
-                z += amount
-                return
-            }
-        }
-        vz = 0.0
     }
 
     /**
@@ -475,11 +574,23 @@ class Player(var x: Double = 0.5, var y: Double = 70.0, var z: Double = 0.5) {
 
     private fun moveYAxis(world: World, amount: Double) {
         if (amount == 0.0) return
-        if (!collides(world, x, y + amount, z)) {
-            y += amount
-            onGround = false
+        var remaining = amount
+        var guard = 0
+        while (abs(remaining) > 1e-9 && guard++ < 32) {
+            val step = remaining.coerceIn(-MAX_SUBSTEP, MAX_SUBSTEP)
+            if (!collides(world, x, y + step, z)) {
+                y += step
+                remaining -= step
+                onGround = false
+                continue
+            }
+            land(world, step)
             return
         }
+    }
+
+    /** Resolves a blocked vertical step: landing on a surface, or stopping against a ceiling. */
+    private fun land(world: World, amount: Double) {
         if (amount < 0) {
             // Land exactly on top of the highest box below us.
             val top = topSurface(world, x, y, z)

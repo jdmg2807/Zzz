@@ -208,3 +208,37 @@ Lo implementado y verificado en esta tanda, con la fuente de cada número:
 Pendiente declarado (no forma parte de esta entrega): traducción completa de shaders Iris
 (`#version 330` → GLSL ES 3.00 con gbuffers/composite), estructuras multi-chunk de aldea,
 encantamientos y pociones, y el client-server real (aquí el mundo vive en un solo proceso).
+
+---
+
+## 12. Movimiento del jugador (v2.1.x)
+
+El movimiento se reescribió siguiendo el modelo real del juego en lugar de perseguir una
+velocidad objetivo. La referencia de comportamiento usada es `prismarine-physics`
+(licencia MIT, `PrismarineJS`), que reproduce el movimiento de Java Edition a partir de
+mediciones de la comunidad; el código Kotlin de este repositorio es propio.
+
+| Paso | Fórmula | Valor |
+|---|---|---|
+| Aceleración | `vel += dirección · accel` con `accel / max(velocidad_de_entrada, 1)` | 0,1 andando / 0,13 esprintando |
+| Inercia en suelo | `vel × (deslizamiento · 0,91)` | 0,546 (hielo 0,98 → 0,8918) |
+| Aceleración en suelo | `atributo · 0,16277136 / inercia³` | 0,1 y 0,13 con la inercia por defecto |
+| Aire | `accel` 0,02 (0,026 esprintando), inercia 0,91 | — |
+| Salto | `vy = 0,42`; esprintando `+0,2` horizontal en la dirección de la vista | ápice 1,252 bloques |
+| Gravedad | `vy -= 0,08`, `vy *= 0,98` | velocidad límite 3,92 b/tick |
+| Agua / lava | inercia 0,8 / 0,5, flotación −0,02, subir +0,04 | impulso al salir 0,3 |
+| Escalera | clamp horizontal 0,15, trepar 0,2 | — |
+| Agachado | entrada × 0,3 y retroceso de 0,05 en el borde | ya no congela el movimiento |
+| Umbral | velocidades < 0,003 b/tick se anulan | — |
+| Colisión | subpasos de 0,4 bloques por eje | impide atravesar suelos al caer |
+
+Las velocidades sostenidas que salen de esas fórmulas son 4,317 b/s andando, 5,612 b/s
+esprintando y 1,295 b/s agachado, las de Java Edition.
+
+### Sobre el código fuente de Minecraft
+
+`mcsrc.dev` descomprime y descompila el jar de Minecraft **en el navegador del visitante**
+(descargado de los servidores de Mojang, con Vineflower): no hay ninguna URL que sirva el
+código, y copiarlo a este repositorio sería redistribuir código de Mojang. Este proyecto
+sigue siendo limpio: los números vienen de la wiki, de mediciones de la comunidad y de
+implementaciones libres como `prismarine-physics`.
