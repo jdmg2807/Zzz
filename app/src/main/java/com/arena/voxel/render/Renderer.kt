@@ -1509,6 +1509,9 @@ class Renderer : GLSurfaceView.Renderer {
     /** Attack cooldown in ticks, from the held item's attack speed. */
     private var attackCooldown = 0f
 
+    /** Tool speed multipliers of the game, indexed by tool tier (0 = bare hand). */
+    private val TOOL_SPEED = floatArrayOf(1f, 2f, 4f, 6f, 8f, 9f)
+
     /** Damage multiplier from the 1.9 attack charge: 0.2 at zero charge, 1.0 when full. */
     private fun chargeMultiplier(): Float {
         val speed = com.arena.voxel.items.Items.attackSpeed(Game.selectedItem())
@@ -1517,16 +1520,29 @@ class Renderer : GLSurfaceView.Renderer {
         return 0.2f + charge * charge * 0.8f
     }
 
-    /** Minecraft's breaking formula: hardness / tool speed, 30x slower without the right tool. */
+    /**
+     * Minecraft's breaking formula.
+     *
+     * Damage per tick is `speed / hardness / 30` when the player can harvest the block and
+     * `/ 100` when the tool is wrong, so the time in seconds is:
+     *
+     *   * right tool or bare hands on a soft block: `hardness × 1.5 / speed`
+     *   * wrong tool:                              `hardness × 5 / speed`
+     *
+     * Tool speeds are the game's own multipliers (wood 2, stone 4, iron 6, diamond 8,
+     * netherite 9); `speed` is 1 bare-handed. Bedrock is unbreakable (hardness −1).
+     */
     private fun mineSeconds(blockId: String): Float {
         val hardness = Blocks.hardnessOf(blockId)
         if (hardness < 0f) return Float.MAX_VALUE
+        if (hardness == 0f) return 0.05f
         val held = Game.selectedItem()
         val toolType = com.arena.voxel.items.Items.toolType(held)
         val tier = com.arena.voxel.items.Items.tier(held)
         val matches = toolType.isNotEmpty() && toolType == Blocks.toolOf(blockId)
-        val speed = if (matches) 1f + tier * 1.6f else 1f
-        return (hardness * 1.5f / speed).coerceAtLeast(0.05f)
+        val speed = if (matches) TOOL_SPEED[tier.coerceIn(0, TOOL_SPEED.size - 1)] else 1f
+        val factor = if (com.arena.voxel.items.Items.canHarvest(blockId, held)) 1.5f else 5f
+        return (hardness * factor / speed).coerceAtLeast(0.05f)
     }
 
     /** Entity ray test (AABB of the box models) within the 3 block attack reach. */

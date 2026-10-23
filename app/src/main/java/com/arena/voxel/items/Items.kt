@@ -216,7 +216,8 @@ object Items {
             ?: com.arena.voxel.mods.JavaModSupport.translatedName(id)
             ?: id.replace('_', ' ')
     fun isBlock(id: String): Boolean = Blocks.index(id) != 0 && id != "air"
-    fun maxStack(id: String): Int = defs[id]?.maxStack ?: 64
+    fun maxStack(id: String): Int =
+        defs[id]?.maxStack ?: Blocks.stackSizeOf(id).takeIf { it in 1..64 } ?: 64
     fun food(id: String): Int = defs[id]?.food ?: 0
 
     /** Java's saturation modifier per food (steak 0.8, bread 0.6, apple 0.3, rotten flesh 0.1). */
@@ -249,7 +250,13 @@ object Items {
      * Minimum tool tier needed for a block to drop anything (Java's `needs_iron_tool` etc.):
      * 1 = wood, 2 = stone, 3 = iron, 4 = diamond. 0 = bare hands are enough.
      */
-    fun requiredTier(blockId: String): Int = when (blockId) {
+    fun requiredTier(blockId: String): Int {
+        val fromTable = Blocks.tierOf(blockId)
+        return if (fromTable > 0) fromTable else legacyTier(blockId)
+    }
+
+    /** Hand-written fallback for ids the vanilla table does not know (mods, aliases). */
+    private fun legacyTier(blockId: String): Int = when (blockId) {
         "iron_ore", "deepslate_iron_ore", "copper_ore", "deepslate_copper_ore",
         "lapis_ore", "deepslate_lapis_ore" -> 2
         "gold_ore", "deepslate_gold_ore", "redstone_ore", "deepslate_redstone_ore",

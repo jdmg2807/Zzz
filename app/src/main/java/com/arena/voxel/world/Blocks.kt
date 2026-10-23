@@ -9,15 +9,15 @@ class Block(
     val tileSide: Int,
     val tileBottom: Int,
     val solid: Boolean,
-    val opaque: Boolean,
+    var opaque: Boolean,
     val liquid: Boolean = false,
     val cross: Boolean = false,
     val tintTop: Boolean = false,
     val tintSide: Boolean = false,
     val tintBottom: Boolean = false,
     val color: Int = 0x808080,
-    /** Emitted light level 0..15. */
-    val light: Int = 0,
+    /** Emitted light level 0..15 (overridden from the vanilla table by [BlockData]). */
+    var light: Int = 0,
     /** Horizontal inset in blocks, e.g. 1/16 for cactus. 0 = full cube. */
     val inset: Float = 0f,
     /** Vertical cut in blocks, e.g. 1/16 for the 15/16 cactus. 0 = full height. */
@@ -25,9 +25,15 @@ class Block(
     /** Collision + mesh boxes. Empty for plants, torches and liquids. */
     val shape: BlockShape = BlockShape.FULL,
     /** How long it takes to break bare-handed, in the same units as the wiki. */
-    val hardness: Float = 1f,
+    var hardness: Float = 1f,
     /** Preferred tool: "pickaxe", "axe", "shovel", "hoe", "" (none). */
-    val tool: String = ""
+    var tool: String = "",
+    /** Blast resistance (obsidian 1200, stone 6, dirt 0.5). */
+    var resistance: Float = 0f,
+    /** Minimum tool tier for the block to drop anything (0 = bare hands). */
+    var harvestTier: Int = 0,
+    /** Maximum stack size (pearls 16, buckets 1, blocks 64). */
+    var maxStack: Int = 64
 ) {
     /**
      * True when the block hides the face of its neighbour. Only full cubes do: an inset block
@@ -266,6 +272,10 @@ object Blocks {
         // ---- generated palette: dye families, wood species, stone families, ores, copper,
         //      1.21 blocks and plants. Anything already declared above keeps its tuned entry.
         for (spec in BlockGen.specs) registerGenerated(spec)
+
+        // Vanilla numbers last: hardness, blast resistance, light, tool and harvest tier of every
+        // block the table knows (1165 ids), so mining times and lights match the game.
+        applyVanillaTable()
     }
 
     /** Adds a block from the generated palette, ignoring ids that already exist. */
@@ -323,6 +333,20 @@ object Blocks {
             light = light, inset = inset, heightCut = heightCut, shape = shape,
             hardness = hardness, tool = tool
         )
+    }
+
+    /**
+     * Applies the vanilla block table (`assets/vanilla/blocks.json`) to the palette.
+     *
+     * Done at the end of [init] so every block already exists: the table only overrides numbers
+     * (hardness, resistance, light, tool, harvest tier, stack size), never geometry.
+     */
+    private fun applyVanillaTable() {
+        try {
+            BlockData.applyTo(list)
+        } catch (t: Throwable) {
+            com.arena.voxel.core.Log.w("Tabla de bloques no aplicada: ${t.message}")
+        }
     }
 
     private fun addTinted(
@@ -604,6 +628,15 @@ object Blocks {
 
     /** Tool family that speeds this block up ("pickaxe", "axe", "shovel", "hoe" or ""). */
     fun toolOf(id: String): String = byId[id]?.let { list[it].tool } ?: ""
+
+    /** Minimum tool tier for a drop: from the vanilla table, with the old hand-written fallback. */
+    fun tierOf(id: String): Int = BlockData.info(id)?.tier ?: 0
+
+    fun resistanceOf(id: String): Float =
+        BlockData.info(id)?.resistance ?: byId[id]?.let { list[it].resistance } ?: 0f
+
+    fun stackSizeOf(id: String): Int =
+        BlockData.info(id)?.stackSize ?: byId[id]?.let { list[it].maxStack } ?: 64
 
     fun ids(): List<String> = list.map { it.id }
 
