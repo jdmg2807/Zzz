@@ -18,7 +18,11 @@ class World(val seed: Long) {
         private set
 
     var dayTime = 0.28f
-        private set
+
+    /** Sets the time of day directly (0 = amanecer, 0.25 = mediodía, 0.5 = anochecer). */
+    fun setDayTime(value: Float) {
+        dayTime = value - kotlin.math.floor(value)
+    }
 
     fun keyOf(cx: Int, cz: Int): Long = keyOfStatic(cx, cz)
 

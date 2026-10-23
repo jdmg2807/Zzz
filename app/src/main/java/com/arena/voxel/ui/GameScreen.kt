@@ -245,7 +245,11 @@ fun GameScreen(onExit: () -> Unit) {
                         .background(Color(0xCC000000))
                         .padding(10.dp)
                 )
-                Row(Modifier.align(Alignment.TopStart).offset(y = 74.dp).padding(16.dp)) {
+                Row(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 16.dp, top = 74.dp)
+                ) {
                     GuiButton(gui = gui, text = "Enviar", onClick = {
                         val line = chatText.trim()
                         chatText = ""
