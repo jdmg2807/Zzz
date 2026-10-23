@@ -223,6 +223,18 @@ object Blocks {
         addCross("redstone_torch_off", "redstone_torch_off", color = 0x6A2A1A)
         add("repeater_off", "repeater", "repeater", "repeater", solid = false, opaque = false,
             color = 0x9a9a9a, shape = BlockShape.LAYER, hardness = 0f)
+        // Repeaters keep their delay (1..4 redstone ticks) in the block id, exactly like the
+        // 4 texture variants the vanilla block model uses.
+        for (delay in 1..4) {
+            add(
+                "repeater_off_d$delay", "repeater", "repeater", "repeater", solid = false,
+                opaque = false, color = 0x9a9a9a, shape = BlockShape.LAYER, hardness = 0f
+            )
+            add(
+                "repeater_on_d$delay", "repeater_on", "repeater_on", "repeater_on", solid = false,
+                opaque = false, color = 0xb04a3a, shape = BlockShape.LAYER, hardness = 0f
+            )
+        }
         add("repeater_on", "repeater_on", "repeater_on", "repeater_on", solid = false, opaque = false,
             color = 0xb04a3a, shape = BlockShape.LAYER, hardness = 0f, light = 0)
         add("comparator_off", "comparator", "comparator", "comparator", solid = false, opaque = false,

@@ -20,6 +20,61 @@ object Redstone {
 
     private const val MAX_NETWORK = 2048
 
+    /** Scheduled state changes: key, target block index, due time (nanoseconds). */
+    private val pending = ArrayList<LongArray>()
+
+    private fun keyOf(x: Int, y: Int, z: Int): Long = key(x, y, z)
+
+    /** Delay of a repeater in redstone ticks (1..4); 1 for comparators and anything unknown. */
+    fun repeaterDelay(id: String): Int {
+        if (!id.startsWith("repeater")) return 1
+        val d = id.substringAfterLast("_d", "").toIntOrNull() ?: 1
+        return d.coerceIn(1, 4)
+    }
+
+    fun repeaterId(on: Boolean, delay: Int): String {
+        val d = delay.coerceIn(1, 4)
+        return if (on) "repeater_on_d$d" else "repeater_off_d$d"
+    }
+
+    private fun schedule(world: World, x: Int, y: Int, z: Int, blockId: String, seconds: Float) {
+        val k = keyOf(x, y, z)
+        pending.removeAll { it[0] == k }
+        pending.add(
+            longArrayOf(
+                k, Blocks.index(blockId).toLong(),
+                System.nanoTime() + (seconds * 1_000_000_000L).toLong()
+            )
+        )
+    }
+
+    /** Runs the delayed flips (repeater/comparator delays). Called every frame by [World.tick]. */
+    fun tick(world: World) {
+        if (pending.isEmpty()) return
+        val now = System.nanoTime()
+        var i = 0
+        while (i < pending.size) {
+            val entry = pending[i]
+            if (entry[2] > now) {
+                i++
+                continue
+            }
+            pending.removeAt(i)
+            val x = unkeyX(entry[0])
+            val y = unkeyY(entry[0])
+            val z = unkeyZ(entry[0])
+            val current = Blocks.get(world.get(x, y, z)).id
+            if (!current.startsWith("repeater") && !current.startsWith("comparator")) continue
+            val target = Blocks.get(entry[1].toInt()).id
+            if (current == target) continue
+            world.setSilently(x, y, z, entry[1].toInt())
+            recomputeBounded(world, x, y, z)
+        }
+    }
+
+    /** Clears the delay queue (new world / world unloaded). */
+    fun reset() = pending.clear()
+
     fun isWire(id: String): Boolean = id.startsWith("redstone_wire_")
 
     fun isComponent(id: String): Boolean =
@@ -165,11 +220,32 @@ object Redstone {
                 if (isWire(nid)) input = maxOf(input, Blocks.wireLevel(nid))
                 else input = maxOf(input, sourcePower(nid))
             }
+            // Repeaters and comparators do not flip instantly: they schedule their new state
+            // after 1..4 redstone ticks (0.1..0.4 s), which is what makes clocks possible.
+            if (id.startsWith("repeater")) {
+                val delay = repeaterDelay(id)
+                val on = id.contains("_on")
+                val wanted = input > 0
+                if (wanted != on) {
+                    schedule(world, cx, cy, cz, repeaterId(wanted, delay), delay * 0.1f)
+                } else {
+                    pending.removeAll { it[0] == keyOf(cx, cy, cz) }
+                }
+                return
+            }
+            if (id.startsWith("comparator")) {
+                val on = id.contains("_on")
+                val wanted = input > 0
+                if (wanted != on) {
+                    schedule(world, cx, cy, cz, if (wanted) "comparator_on" else "comparator_off", 0.1f)
+                } else {
+                    pending.removeAll { it[0] == keyOf(cx, cy, cz) }
+                }
+                return
+            }
             val newId = when {
                 id.startsWith("redstone_lamp") -> if (input > 0) "redstone_lamp_on" else "redstone_lamp_off"
                 id.startsWith("piston") -> if (input > 0) "piston_extended" else "piston"
-                id.startsWith("repeater") -> if (input > 0) "repeater_on" else "repeater_off"
-                id.startsWith("comparator") -> if (input > 0) "comparator_on" else "comparator_off"
                 id.startsWith("observer") -> if (input > 0) "observer_on" else "observer"
                 // A redstone torch burns out when its supporting block is powered (inversion).
                 id == "redstone_torch_on" && input > 0 -> "redstone_torch_off"
@@ -233,6 +309,15 @@ object Redstone {
     /** Toggles a component the player tapped (lever, button). */
     fun interact(world: World, x: Int, y: Int, z: Int): Boolean {
         val id = Blocks.get(world.get(x, y, z)).id
+        // Tapping a repeater cycles its delay 1 -> 2 -> 3 -> 4 -> 1, like right-clicking it.
+        if (id.startsWith("repeater")) {
+            val delay = repeaterDelay(id)
+            val next = delay % 4 + 1
+            val on = id.contains("_on")
+            world.set(x, y, z, Blocks.index(repeaterId(on, next)))
+            com.arena.voxel.Game.chat("Retardo del repetidor: $next ticks (${next * 2} de juego)")
+            return true
+        }
         val (from, to) = when (id) {
             "lever_off" -> "lever_off" to "lever_on"
             "lever_on" -> "lever_on" to "lever_off"

@@ -27,6 +27,7 @@ class World(val seed: Long) {
         dayTime += dt / 600f
         if (dayTime > 1f) dayTime -= 1f
         Fluids.tick(this, dt)
+        Redstone.tick(this)
     }
 
     /** Marks a block and its neighbours for re-meshing (used by the fluid simulator). */
