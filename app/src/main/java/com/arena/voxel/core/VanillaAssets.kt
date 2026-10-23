@@ -2,7 +2,6 @@ package com.arena.voxel.core
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.util.Log
 import com.arena.voxel.world.Blocks
 import org.json.JSONObject
 import java.io.File
