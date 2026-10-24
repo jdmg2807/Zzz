@@ -168,7 +168,7 @@ fun EditPanel(state: AppState) {
         ),
         modifier = Modifier.fillMaxWidth()
     )
-    key(rev, node.id) {
+    run {
         val euler = com.arena.modeler.io.Fbx.eulerFromQuat(node.rotation)
         SectionTitle("Posición", "metros")
         SliderRow("X", node.position.x, -5f..5f) { state.setPosition(it, node.position.y, node.position.z) }
@@ -210,7 +210,7 @@ fun MaterialPanel(state: AppState) {
         return
     }
     val mat = node.material
-    key(rev, node.id) {
+    run {
         SectionTitle("Color", node.name)
         for (row in chunk(swatches, 6)) {
             RowWrap(4) {

@@ -620,6 +620,9 @@ class AppState(private val context: Context) {
 
     fun onPause() {
         persistSettings()
+        // Save the rest pose, not a frame in the middle of a playing clip.
+        if (playing) viewport?.state?.restoreRest()
+        playing = false
         doc?.let { ObjectStore.autosave(it) }
     }
 
