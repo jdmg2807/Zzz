@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arena.modeler.ai.AiCatalog
 import com.arena.modeler.ai.AiProvider
+import com.arena.modeler.ai.ModelRegistry
 import com.arena.modeler.io.ExportFormat
 import com.arena.modeler.scene.AnimPath
 import com.arena.modeler.scene.AnimationClip
@@ -336,6 +337,10 @@ fun AnimatePanel(state: AppState) {
 @Composable
 fun AiPanel(state: AppState, onOpenKeyPage: (String) -> Unit) {
     val provider = state.provider
+    // First time the tab is opened, ask the provider for its live catalogue.
+    androidx.compose.runtime.LaunchedEffect(provider) {
+        if (state.modelStatus == null && !state.modelLoading) state.refreshModels(provider, silent = true)
+    }
     SectionTitle("Proveedor de IA")
     RowWrap {
         for (p in AiProvider.all()) {
@@ -358,19 +363,7 @@ fun AiPanel(state: AppState, onOpenKeyPage: (String) -> Unit) {
         ActionButton("Obtener clave", Modifier.weight(1f)) { onOpenKeyPage(provider.keyUrl) }
     }
     Divider()
-    SectionTitle("Modelo")
-    for (row in chunk(AiCatalog.models(provider), 2)) {
-        RowWrap {
-            for (model in row) {
-                ChipButton(
-                    model.label,
-                    selected = state.currentModel() == model.id,
-                    modifier = Modifier.weight(1f)
-                ) { state.setModel(model.id) }
-            }
-        }
-    }
-    Hint("Modelo actual: ${state.currentModel()}")
+    ModelPicker(state)
     Divider()
     SectionTitle("Describe el modelo")
     var prompt by remember { mutableStateOf(state.aiPrompt) }
@@ -415,6 +408,124 @@ fun AiPanel(state: AppState, onOpenKeyPage: (String) -> Unit) {
         "La clave se guarda solo en este teléfono. El modelo se envía directamente al proveedor " +
             "elegido: OpenRouter o Google AI Studio."
     )
+}
+
+/**
+ * Model chooser: every model the provider offers, with a free/paid filter, a search box and a
+ * field for typing an id that is not in the list yet.
+ */
+@Composable
+fun ModelPicker(state: AppState) {
+    var custom by remember { mutableStateOf("") }
+    val all = state.modelList
+    SectionTitle(
+        "Modelo",
+        "${all.size} disponibles · ${state.freeModelCount()} gratis · ${state.paidModelCount()} de pago"
+    )
+    RowWrap {
+        for (filter in ModelRegistry.PriceFilter.values()) {
+            ChipButton(
+                filter.label,
+                selected = state.modelFilter == filter,
+                modifier = Modifier.weight(1f)
+            ) { state.setModelFilter(filter) }
+        }
+    }
+    RowWrap {
+        ActionButton(
+            if (state.modelLoading) "Descargando lista…" else "Actualizar lista",
+            Modifier.weight(1f),
+            enabled = !state.modelLoading,
+            primary = true
+        ) { state.refreshModels() }
+    }
+    if (state.modelStatus != null) {
+        Text(state.modelStatus ?: "", color = Palette.muted, fontSize = 11.sp)
+    }
+    LabeledField("Buscar modelo", state.modelQuery, placeholder = "gemini, claude, llama…") {
+        state.modelQuery = it
+    }
+
+    val visible = state.visibleModels()
+    val shown = visible.take(state.modelsShown)
+    if (shown.isEmpty()) {
+        Hint(
+            if (all.isEmpty()) "Sin lista todavía. Pulsa «Actualizar lista»."
+            else "Ningún modelo coincide con el filtro o la búsqueda."
+        )
+    } else {
+        for (model in shown) {
+            ModelRow(model, selected = state.currentModel() == model.id) { state.setModel(model.id) }
+        }
+        if (visible.size > state.modelsShown) {
+            ActionButton(
+                "Mostrar más (${visible.size - state.modelsShown})",
+                Modifier.fillMaxWidth()
+            ) { state.modelsShown += 24 }
+        }
+    }
+    RowWrap {
+        Box(Modifier.weight(1f)) {
+            LabeledField("Otro modelo (id exacto)", custom, placeholder = "proveedor/modelo") { custom = it }
+        }
+    }
+    ActionButton("Usar ese id", Modifier.fillMaxWidth(), enabled = custom.isNotBlank()) {
+        state.setModel(custom.trim())
+        state.message = "Modelo seleccionado: ${custom.trim()}"
+    }
+    Hint("Modelo actual: ${state.modelLabel(state.provider, state.currentModel())}")
+    Hint(
+        "El filtro «Gratis» usa los precios que publica el proveedor (OpenRouter) o el nivel " +
+            "gratuito de AI Studio (Gemini Flash/Lite y Gemma). Los modelos de pago necesitan " +
+            "saldo en la cuenta; la app nunca cobra nada."
+    )
+}
+
+@Composable
+private fun ModelRow(model: ModelRegistry.ModelEntry, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(if (selected) Palette.accentSoft else Palette.panelHigh.copy(alpha = 0.55f))
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                model.label,
+                color = Palette.text,
+                fontSize = 13.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+            )
+            Text(
+                model.id + (if (model.context > 0) " · ${contextLabel(model.context)}" else ""),
+                color = Palette.muted,
+                fontSize = 10.sp
+            )
+        }
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(if (model.free) Palette.good.copy(alpha = 0.18f) else Palette.stroke)
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Text(
+                if (model.free) "GRATIS" else "PAGO",
+                color = if (model.free) Palette.good else Palette.muted,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+private fun contextLabel(tokens: Int): String = when {
+    tokens >= 1_000_000 -> "${tokens / 1_000_000}M contexto"
+    tokens >= 1_000 -> "${tokens / 1_000}K contexto"
+    else -> "$tokens contexto"
 }
 
 // ---------------------------------------------------------------------------- files

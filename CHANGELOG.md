@@ -1,5 +1,21 @@
 # Changelog
 
+## v3.1.0 — Cualquier modelo, con filtro gratis/de pago, y APK suelto
+- **Catálogo de modelos en vivo**: la app descarga la lista real de OpenRouter (`/api/v1/models`)
+  y de Google AI Studio (`/v1beta/models`) con tu clave, así que sirve **cualquier modelo
+  disponible**, incluso uno publicado después de este APK. Se guarda en caché para elegir sin
+  conexión.
+- **Filtro Gratis / De pago** en el selector: OpenRouter usa sus precios reales por millón de
+  tokens (los `:free` y los de coste 0 quedan en «Gratis»); Google marca Flash/Flash-Lite/Gemma
+  como nivel gratuito y Pro como de pago. Incluye buscador, tamaño de contexto y campo para
+  escribir un id exacto.
+- **Arreglo del error «ese modelo ya no está disponible»**: el mensaje ahora explica el problema
+  y la app **actualiza la lista automáticamente** para elegir otro modelo de un toque.
+- **APK sin zip y sin el juego**: el workflow `Build VoxelForge APK` compila solo `:modeler` y el
+  Release publica un único archivo `VoxelForge-<n>.apk`. El juego (VoxelCraft) queda terminado y
+  fuera de la compilación automática.
+- Versión de la app: 1.1.0 (versionCode 2).
+
 ## v3.0.0 — VoxelForge 3D: modelado, animación e IA
 - **App nueva en el mismo repositorio** (módulo `modeler/`, `com.arena.modeler`): se instala y
   actualiza aparte del juego, con su propio icono y su propia firma (`keystore/modeler.p12`).

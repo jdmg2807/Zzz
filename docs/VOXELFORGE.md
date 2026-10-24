@@ -20,6 +20,7 @@ obligaría a abrir Blender: montar un modelo con primitivas, darle materiales, a
 | Materiales | Color, metalicidad, rugosidad y emisión por objeto (PBR, lo mismo que guarda glTF). |
 | Animación | Clips con claves de posición / rotación / escala, interpolación lineal o por pasos, reproducción en el visor y giro automático de 4 s para empezar. |
 | IA | Escribe una idea («un zorro voxel sentado») y la app pide el modelo a **OpenRouter** o a **Google AI Studio**, con tu clave. También puede *modificar* el modelo que ya tienes. |
+| Catálogo de modelos | La app **descarga la lista real del proveedor** (cualquier modelo disponible, incluso lanzado después de este APK), con filtro **Gratis / De pago**, buscador y campo para escribir un id a mano. |
 | Importar | glTF, GLB, FBX ASCII, OBJ, STL (texto y binario), PLY (texto y binario). |
 | Exportar | GLB, .gltf, FBX ASCII, OBJ + MTL, STL binario/texto, PLY texto/binario. |
 | Proyectos | Guardado local en GLB (conserva malla, materiales y animaciones), lista de proyectos y autoguardado al salir. |
@@ -31,10 +32,13 @@ selecciona y las flechas roja/verde/azul del gizmo mueven el objeto en un eje.
 
 ## 2. Instalar
 
-1. Pestaña **Actions** → workflow **Build Android APK** → ejecución más reciente.
-2. Descarga el artefacto **APKs**.
-3. Instala `VoxelForge-<n>-release.apk`. Las siguientes versiones se instalan **encima**
-   (misma clave de firma), sin desinstalar nada.
+1. Pestaña **Releases** del repositorio → última versión.
+2. Descarga **`VoxelForge-<n>.apk`** — un `.apk` suelto, sin zip y sin el APK del juego.
+3. Instálalo. Las siguientes versiones se instalan **encima** (misma clave de firma), sin
+   desinstalar nada.
+
+El workflow `Build VoxelForge APK` compila solo este módulo; el juego ya no forma parte de la
+compilación ni de los releases (proyecto terminado).
 
 Requisitos: Android 7.0 (API 24) o superior y GPU con OpenGL ES 3.0.
 
@@ -59,6 +63,28 @@ La app no tiene servidor propio: la petición sale del teléfono hacia el provee
 La clave se guarda en el almacenamiento privado de la app (`filesDir/ajustes.json`) y solo se
 usa en la cabecera de la petición. No se envía a ningún otro sitio. Si cambias de proveedor,
 cada uno conserva su clave y su modelo.
+
+### Elegir modelo (cualquiera del proveedor)
+
+La lista **no está fijada en el APK**: se descarga de cada proveedor y se guarda en caché para
+poder elegir sin conexión.
+
+- **Actualizar lista** descarga el catálogo actual:
+  - *OpenRouter*: `GET /api/v1/models`, con `pricing` por token → el filtro **Gratis** muestra
+    los que cuestan 0 (`:free` incluidos) y **De pago** el resto, con el precio por millón de
+    tokens y el tamaño de contexto.
+  - *Google AI Studio*: `GET /v1beta/models` con tu clave; se listan solo los que generan texto
+    (`generateContent`), y **Gratis** marca Flash / Flash-Lite / Gemma (nivel gratuito de AI
+    Studio), **De pago** los Pro.
+- **Filtros**: `Todos`, `Gratis`, `De pago`. Se combinan con el buscador («gemini», «claude»…).
+- **Otro modelo (id exacto)**: si conoces un id que no aparece (uno recién publicado), escríbelo
+  y pulsa *Usar ese id*; la app lo usará tal cual.
+- Si el proveedor retira un modelo, el error lo dice y la app **actualiza la lista sola** para
+  que elijas otro de un toque.
+
+El filtro de Google es orientativo (su API no publica precios): Flash y Gemma tienen cuota
+gratuita, los Pro necesitan facturación al agotarla. La app nunca cobra nada; el consumo va a tu
+cuenta del proveedor.
 
 ### Cómo pedir modelos que salgan bien
 
@@ -124,7 +150,8 @@ modeler/src/main/java/com/arena/modeler/
 ├─ core/      V3, Quat, M4 (column-major), Geom (ray-triangle)
 ├─ scene/     MeshData, Material, SceneNode, SceneDocument, AnimationClip, Primitives
 ├─ io/        Gltf, Fbx, Obj, Stl, Ply, ModelFormats (detección + despacho)
-├─ ai/        AiCatalog, AiSchema (esquema JSON ↔ escena), AiHttp, AiClient, ObjectStore
+├─ ai/        AiCatalog (respaldo), ModelRegistry (catálogo vivo + filtros), AiSchema
+│             (esquema JSON ↔ escena), AiHttp, AiClient, ObjectStore
 ├─ render/    GLCommon (shaders + líneas), MeshBatch, OrbitCamera, SceneRenderer, ViewportState, ViewportView
 └─ ui/        AppState (estado y operaciones), Components, Panels, ModelerApp, MainActivity
 ```
@@ -133,6 +160,8 @@ Decisiones que conviene respetar:
 
 - **La escena es el formato de intercambio.** Todo importador produce `SceneDocument` y todo
   exportador lo consume; la UI nunca habla con un formato concreto.
+- **El catálogo de modelos es dinámico**: `ModelRegistry` descarga y cachea la lista del
+  proveedor; `AiCatalog` es solo el respaldo para el primer arranque sin red.
 - **`ModelFormats` es el único punto de entrada** de archivos: detecta por extensión y por
   bytes mágicos, y convierte cualquier fallo en un mensaje en español.
 - **El visor no muta nada**: lee `ViewportState` (banderas y documento) y dibuja; los cambios

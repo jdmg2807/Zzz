@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import com.arena.modeler.ai.AiCatalog
 import com.arena.modeler.ai.AiClient
 import com.arena.modeler.ai.AiProvider
+import com.arena.modeler.ai.ModelRegistry
 import com.arena.modeler.ai.ObjectStore
 import com.arena.modeler.core.Quat
 import com.arena.modeler.core.V3
@@ -82,11 +83,23 @@ class AppState(private val context: Context) {
     var aiPrompt by mutableStateOf("")
     var aiRefine by mutableStateOf(false)
 
+    // ---- model catalogue ----------------------------------------------------
+    var modelList by mutableStateOf<List<ModelRegistry.ModelEntry>>(emptyList())
+        private set
+    var modelFilter by mutableStateOf(ModelRegistry.PriceFilter.ALL)
+        private set
+    var modelQuery by mutableStateOf("")
+    var modelLoading by mutableStateOf(false)
+        private set
+    var modelStatus by mutableStateOf<String?>(null)
+    var modelsShown by mutableIntStateOf(24)
+
     private var viewport: ViewportView? = null
     private val undoStack = ArrayDeque<ByteArray>()
 
     init {
         active = this
+        modelList = ModelRegistry.cached(provider)
         val autosaved = ObjectStore.autosaved()
         val initial = autosaved ?: SceneDocument("Sin título").also { it.materialFor() }
         doc = initial
@@ -181,6 +194,8 @@ class AppState(private val context: Context) {
     fun setKey(key: String) {
         if (provider == AiProvider.OPENROUTER) openRouterKey = key.trim() else googleKey = key.trim()
         persistSettings()
+        // With a fresh key the catalogue can be downloaded, so show the real models right away.
+        if (key.isNotBlank()) refreshModels(provider, silent = true)
     }
 
     fun setModel(model: String) {
@@ -189,9 +204,79 @@ class AppState(private val context: Context) {
     }
 
     fun chooseProvider(p: AiProvider) {
+        if (provider == p) return
         provider = p
+        modelQuery = ""
+        modelsShown = 24
+        modelList = ModelRegistry.cached(p)
+        modelStatus = null
         persistSettings()
     }
+
+    // ------------------------------------------------------------------ model catalogue
+
+    /** Downloads the provider's live list (all models the account can use). */
+    fun refreshModels(target: AiProvider = provider, silent: Boolean = false) {
+        if (modelLoading) return
+        val key = if (target == AiProvider.OPENROUTER) openRouterKey else googleKey
+        if (target == AiProvider.GOOGLE_AI_STUDIO && key.isBlank()) {
+            if (!silent) message = "Pega primero la API key de Google AI Studio para ver sus modelos."
+            return
+        }
+        modelLoading = true
+        if (!silent) modelStatus = null
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { ModelRegistry.fetch(target, key) }
+            }
+            modelLoading = false
+            result.fold(
+                onSuccess = { listing ->
+                    ModelRegistry.save(target, listing.models)
+                    if (target == provider) {
+                        modelList = listing.models
+                        modelsShown = 24
+                        val free = listing.models.count { it.free }
+                        modelStatus = "${listing.models.size} modelos · $free gratis"
+                        if (!silent) message = "Lista actualizada: ${listing.models.size} modelos disponibles"
+                    }
+                },
+                onFailure = { e ->
+                    if (target == provider && modelList.isEmpty()) {
+                        modelList = ModelRegistry.cached(target)
+                    }
+                    modelStatus = "No se pudo actualizar"
+                    if (!silent) {
+                        message = "No se pudo descargar la lista: ${e.message}"
+                    }
+                }
+            )
+        }
+    }
+
+    fun setModelFilter(filter: ModelRegistry.PriceFilter) {
+        modelFilter = filter
+        modelsShown = 24
+    }
+
+    /** Models that pass the free/paid filter and the search box. */
+    fun visibleModels(): List<ModelRegistry.ModelEntry> {
+        val query = modelQuery.trim().lowercase()
+        return modelList.filter { m ->
+            val priceOk = when (modelFilter) {
+                ModelRegistry.PriceFilter.ALL -> true
+                ModelRegistry.PriceFilter.FREE -> m.free
+                ModelRegistry.PriceFilter.PAID -> !m.free
+            }
+            val queryOk = query.isEmpty() ||
+                m.id.lowercase().contains(query) || m.label.lowercase().contains(query)
+            priceOk && queryOk
+        }
+    }
+
+    fun freeModelCount(): Int = modelList.count { it.free }
+
+    fun paidModelCount(): Int = modelList.count { !it.free }
 
     // ------------------------------------------------------------------ document
 
@@ -582,7 +667,16 @@ class AppState(private val context: Context) {
                     aiPrompt = ""
                 },
                 onFailure = { e ->
-                    message = e.message ?: "La IA falló sin dar detalles"
+                    val text = e.message ?: "La IA falló sin dar detalles"
+                    message = text
+                    // The model was retired by the provider: fetch the new list right away so the
+                    // fix is one tap away instead of a guessing game.
+                    if (text.contains("no está disponible", ignoreCase = true) ||
+                        text.contains("modelo ya no", ignoreCase = true) ||
+                        text.contains("404", ignoreCase = true)
+                    ) {
+                        refreshModels(providerSnapshot, silent = true)
+                    }
                 }
             )
         }
@@ -592,8 +686,14 @@ class AppState(private val context: Context) {
 
     fun modelsFor(provider: AiProvider): List<String> = AiCatalog.models(provider).map { it.id }
 
-    fun modelLabel(provider: AiProvider, id: String): String =
-        AiCatalog.find(provider, id)?.let { "${it.label} — ${it.id}" } ?: id
+    fun modelLabel(provider: AiProvider, id: String): String {
+        val cachedEntry = (if (provider == this.provider) modelList else ModelRegistry.cached(provider))
+            .firstOrNull { it.id == id }
+        if (cachedEntry != null) return "${cachedEntry.label} (${cachedEntry.id})"
+        return AiCatalog.find(provider, id)?.let { "${it.label} (${it.id})" } ?: id
+    }
+
+    fun currentModelEntry(): ModelRegistry.ModelEntry? = modelList.firstOrNull { it.id == currentModel() }
 
     // ------------------------------------------------------------------ undo
 

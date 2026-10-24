@@ -135,17 +135,33 @@ object AiHttp {
 
     // ------------------------------------------------------------------ transport
 
-    private fun post(url: String, headers: Map<String, String>, body: String): String {
+    /** Simple GET, used to download the model catalogue of a provider. */
+    fun get(url: String, headers: Map<String, String>): String =
+        request(url, "GET", headers, null, 30_000, 45_000)
+
+    private fun post(url: String, headers: Map<String, String>, body: String): String =
+        request(url, "POST", headers, body, 30_000, 180_000)
+
+    private fun request(
+        url: String,
+        method: String,
+        headers: Map<String, String>,
+        body: String?,
+        connectTimeoutMs: Int,
+        readTimeoutMs: Int
+    ): String {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 30_000
-            readTimeout = 180_000
-            doOutput = true
+            requestMethod = method
+            connectTimeout = connectTimeoutMs
+            readTimeout = readTimeoutMs
+            doOutput = body != null
             setRequestProperty("Accept", "application/json")
             for ((k, v) in headers) setRequestProperty(k, v)
         }
         return try {
-            connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            if (body != null) {
+                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            }
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val text = stream?.let { s ->
@@ -173,7 +189,8 @@ object AiHttp {
             401 -> "La API key no es válida o fue revocada. Revísala en Ajustes. ($detail)"
             402 -> "La cuenta no tiene crédito suficiente para ese modelo. ($detail)"
             403 -> "La clave no tiene permiso para este modelo. ($detail)"
-            404 -> "Ese modelo ya no existe en el proveedor. Elige otro en la lista. ($detail)"
+            404 -> "Ese modelo ya no está disponible en el proveedor. " +
+                "Pulsa «Actualizar» en la lista de modelos y elige otro. ($detail)"
             429 -> "Demasiadas peticiones o cuota agotada. Espera un momento o cambia de modelo. ($detail)"
             in 500..599 -> "El proveedor está fallando (error $code). Inténtalo de nuevo en un minuto."
             else -> "Error $code del proveedor. $detail"

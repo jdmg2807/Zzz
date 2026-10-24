@@ -21,6 +21,8 @@ teléfono (módulo `modeler/`, paquete `com.arena.modeler`, se instala aparte de
 - **IA integrada**: genera o modifica modelos desde una descripción usando **OpenRouter** o
   **Google AI Studio** con *tu* clave (la clave se queda en el teléfono).
 - **Animación**: claves de posición/rotación/escala, reproducción y giro automático.
+- **Cualquier modelo de cada proveedor**: la app descarga la lista real de OpenRouter y de Google
+  AI Studio, con filtro **gratis / de pago**, buscador y opción de escribir un id a mano.
 - **Importar/exportar**: glTF, GLB, FBX ASCII, OBJ+MTL, STL y PLY; la animación se conserva en
   GLB/glTF/FBX.
 
@@ -30,21 +32,22 @@ Guía completa, límites por formato y cómo sacar la clave: **[docs/VOXELFORGE.
 
 ## Descargar el APK
 
-Cada push a este repositorio compila el juego:
+Este repositorio ahora publica **una sola app**: **VoxelForge 3D**. El juego (VoxelCraft) quedó
+terminado y **ya no se compila** en la cadena automática; su código sigue en `app/` por si algún día
+se retoma.
 
-1. Abre la pestaña **Actions** → workflow **Build Android APK**.
-2. Entra a la ejecución más reciente y descarga el artefacto **APKs**.
-3. Dentro están los APK del juego y los del modelador (`VoxelForge-<n>-release.apk`). Los del juego:
-   - `VoxelCraft-<n>-release.apk` → el juego (~57 MB, incluye la banda sonora).
-   - `VoxelCraft-<n>-debug.apk` → misma app (`com.arena.voxel`) con la misma clave de firma, así
-     que **se instala como actualización** de la versión anterior, sin duplicar el icono.
-   - `examplemod.jar` → mod de ejemplo listo para importar desde el juego.
+La forma más directa, **sin zip**:
 
-También puedes crear un tag (`v1.0.0`) y el APK se publica como **GitHub Release**.
+1. Abre la pestaña **[Releases](../../releases)** del repositorio.
+2. En la última versión descarga **`VoxelForge-<n>.apk`** (un `.apk` suelto, ~6 MB).
+3. Instálalo. Las versiones siguientes se instalan **encima** (misma firma), sin desinstalar.
+
+También hay un artefacto en **Actions → Build VoxelForge APK**, pero GitHub siempre empaqueta los
+artefactos en un `.zip`; por eso la descarga limpia es la del Release.
 
 ```bash
 # instalar por ADB
-adb install -r VoxelCraft-release.apk
+adb install -r VoxelForge-<n>.apk
 ```
 
 Requisitos: Android 7.0+ (API 24) con OpenGL ES 3.0.

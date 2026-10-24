@@ -110,6 +110,10 @@ object ObjectStore {
         return s
     }
 
+    /** Where the downloaded model catalogue of a provider is cached. */
+    fun modelCacheFile(provider: AiProvider): File =
+        File(appContext.filesDir, "modelos_${provider.id}.json")
+
     fun saveSettings() {
         val s = cached ?: return
         runCatching { File(appContext.filesDir, SETTINGS).writeText(s.toJson().toString(2)) }
