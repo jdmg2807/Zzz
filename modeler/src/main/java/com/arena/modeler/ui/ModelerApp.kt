@@ -247,7 +247,7 @@ private fun ViewportOverlay(state: AppState) {
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for (mode in ViewMode.values()) {
-                ChipButton(mode.label, selected = state.viewMode == mode) { state.setViewMode(mode) }
+                ChipButton(mode.label, selected = state.viewMode == mode) { state.applyViewMode(mode) }
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -683,7 +683,7 @@ private fun ModelPicker(state: AppState, onClose: () -> Unit) {
                     ModelCatalog.PriceFilter.UNKNOWN -> state.unknownCount()
                 }
                 ChipButton("${filter.label} ($count)", selected = state.priceFilter == filter) {
-                    state.setPriceFilter(filter)
+                    state.applyPriceFilter(filter)
                 }
             }
         }

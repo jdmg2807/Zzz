@@ -240,7 +240,7 @@ class AppState(private val context: Context) {
         viewport?.refresh()
     }
 
-    fun setViewMode(mode: ViewMode) {
+    fun applyViewMode(mode: ViewMode) {
         viewMode = mode
         viewport?.state?.viewMode = mode
         viewport?.refresh()
@@ -393,7 +393,7 @@ class AppState(private val context: Context) {
 
     fun catalogAgeLabel(): String = ModelCatalog.updatedLabel(catalogUpdatedAt)
 
-    fun setPriceFilter(filter: ModelCatalog.PriceFilter) {
+    fun applyPriceFilter(filter: ModelCatalog.PriceFilter) {
         priceFilter = filter
         modelsShown = 30
     }
