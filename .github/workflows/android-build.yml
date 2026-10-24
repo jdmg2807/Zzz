@@ -173,6 +173,53 @@ jobs:
           [ -f /tmp/errors.txt ] || exit 0
           sed -n '41,50p' /tmp/errors.txt | while IFS= read -r line; do echo "::error::$line"; done
 
+      - name: Anotar fallos de pruebas
+        if: failure()
+        run: |
+          python3 - <<'PY' > /tmp/fails.txt
+          import glob
+          import xml.etree.ElementTree as ET
+          msgs = []
+          for f in glob.glob("modeler/build/test-results/testDebugUnitTest/*.xml"):
+              for tc in ET.parse(f).getroot().iter("testcase"):
+                  for fail in tc.findall("failure") + tc.findall("error"):
+                      msg = (fail.get("message") or "").split("\n")[0][:240]
+                      msgs.append(f"{tc.get('classname').split('.')[-1]}.{tc.get('name')}: {msg}")
+          for m in msgs:
+              print(m)
+          PY
+          echo "fallos: $(wc -l < /tmp/fails.txt)"
+
+      - name: Anotar fallos (1)
+        if: failure()
+        run: |
+          [ -f /tmp/fails.txt ] || exit 0
+          sed -n '1,10p' /tmp/fails.txt | while IFS= read -r line; do echo "::error::$line"; done
+
+      - name: Anotar fallos (2)
+        if: failure()
+        run: |
+          [ -f /tmp/fails.txt ] || exit 0
+          sed -n '11,20p' /tmp/fails.txt | while IFS= read -r line; do echo "::error::$line"; done
+
+      - name: Anotar fallos (3)
+        if: failure()
+        run: |
+          [ -f /tmp/fails.txt ] || exit 0
+          sed -n '21,30p' /tmp/fails.txt | while IFS= read -r line; do echo "::error::$line"; done
+
+      - name: Anotar fallos (4)
+        if: failure()
+        run: |
+          [ -f /tmp/fails.txt ] || exit 0
+          sed -n '31,40p' /tmp/fails.txt | while IFS= read -r line; do echo "::error::$line"; done
+
+      - name: Anotar fallos (5)
+        if: failure()
+        run: |
+          [ -f /tmp/fails.txt ] || exit 0
+          sed -n '41,50p' /tmp/fails.txt | while IFS= read -r line; do echo "::error::$line"; done
+
       - name: Reunir el APK
         if: success()
         run: |
