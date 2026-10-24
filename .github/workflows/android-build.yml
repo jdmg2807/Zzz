@@ -112,7 +112,9 @@ jobs:
             echo ""
             echo "### Errores / avisos"
             echo '```'
-            grep -E "^(e: |w: |FAILURE|What went wrong|> Task .*FAILED|Caused by|Execution failed)" build.log 2>/dev/null | head -120 || true
+            cat test.log build.log 2>/dev/null \
+              | grep -E "^(e: |FAILURE|What went wrong|> Task .*FAILED|Execution failed|Caused by|.*AssertionError|.*expected:)" \
+              | head -120 || true
             echo '```'
             echo ""
             echo "### Inicio del log"
@@ -131,11 +133,15 @@ jobs:
         if: failure()
         run: |
           echo "Errores detectados:"
-          grep -E "^e: |^w: .*error|FAILURE: Build|What went wrong|^> Task .*FAILED|Execution failed|Caused by" build.log \
-            | head -10 | while IFS= read -r line; do
+          # Se anotan los errores del compilador y de las pruebas: las anotaciones del check-run
+          # son lo único legible sin descargar el log completo.
+          for LOG in test.log build.log; do
+            [ -f "$LOG" ] || continue
+            echo "--- $LOG"
+            grep -E "^e: |AssertionError|expected:|FAILED" "$LOG" | head -25 | while IFS= read -r line; do
               echo "::error::$line"
             done
-          grep -E "^e: " build.log | head -10
+          done
 
       - name: Reunir el APK
         if: success()
