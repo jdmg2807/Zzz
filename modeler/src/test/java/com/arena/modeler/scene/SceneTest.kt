@@ -14,7 +14,7 @@ class SceneTest {
     private fun docWithCube(): Pair<SceneDocument, SceneNode> {
         val doc = SceneDocument("Prueba")
         val node = doc.newNode("Cubo.1")
-        node.setEditableMesh(EditableMesh.box())
+        node.setEditableMesh(EditableMesh.box(), smooth = true)
         node.material = doc.materialFor()
         return doc to node
     }

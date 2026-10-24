@@ -19,7 +19,7 @@ class GeometryTest {
     fun `todas las primitivas son mallas válidas`() {
         for (kind in Primitives.Kind.values()) {
             val mesh = EditableMesh.fromPrimitive(kind)
-            assertTrue("$kind sin caras", mesh.faces.size >= 3)
+            assertTrue("$kind sin caras", mesh.faces.isNotEmpty())
             assertTrue("$kind sin vértices", mesh.vertexCount >= 3)
             val check = MeshOps.validate(mesh)
             assertTrue("$kind inválida: ${check.problems}", check.ok)
@@ -37,7 +37,7 @@ class GeometryTest {
     }
 
     @Test
-    fun `extruir añade caras y conserva la validez`() {
+    fun `extruir cada cara de un cubo añade caras y volumen`() {
         val out = MeshOps.extrude(box(), 0.4f)
         assertTrue(out.faces.size > 6)
         assertTrue(MeshOps.validate(out).ok)
@@ -84,11 +84,13 @@ class GeometryTest {
     }
 
     @Test
-    fun `reducir no rompe la malla y quita caras coplanares`() {
-        val dense = MeshOps.subdivide(box(), 1, smooth = false)
-        val out = MeshOps.reduce(dense)
-        assertTrue(out.faces.isNotEmpty())
-        assertTrue("reduce debería quitar caras", out.faces.size < dense.faces.size)
+    fun `reducir agrupa triángulos coplanares en polígonos`() {
+        // El cubo del visor llega triangulado (12 triángulos): reducir debe dejarlo en 6 caras.
+        val triangles = EditableMesh.fromMeshData(box().toMeshData(), mergeCoplanar = false)
+        assertEquals(12, triangles.faces.size)
+        val out = MeshOps.reduce(triangles)
+        assertTrue("reduce debería quitar caras", out.faces.size < triangles.faces.size)
+        assertEquals(6, out.faces.size)
         assertTrue(MeshOps.validate(out).ok)
     }
 

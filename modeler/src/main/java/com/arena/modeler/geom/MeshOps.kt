@@ -57,7 +57,10 @@ object MeshOps {
             nz += n[2]
         }
         val len = sqrt(nx * nx + ny * ny + nz * nz)
-        if (len < 1e-8f) throw MeshOpException("No se pudo calcular la normal de la zona a extruir")
+        // Una región cerrada tiene normal media cero (las caras opuestas se cancelan): extruirla
+        // "en bloque" no tiene sentido, así que cada cara se extruye por su cuenta, que es la
+        // operación clásica de «extruir caras individuales».
+        if (len < 1e-8f) return extrudeEachFace(mesh, selected, distance)
         nx = nx / len * distance
         ny = ny / len * distance
         nz = nz / len * distance
@@ -95,6 +98,49 @@ object MeshOps {
                 val b = f[(k + 1) % f.size]
                 val key = EditableMesh.Edge(a, b).key()
                 if ((edgeUse[key] ?: 0) > 1) continue
+                out.addFace(intArrayOf(a, b, dup(b), dup(a)), mat)
+            }
+        }
+        return out.compact()
+    }
+
+    /**
+     * Extrusión individual: cada cara se desplaza por su propia normal y se cosen paredes en sus
+     * aristas. Se usa cuando la región no tiene una normal común (objeto cerrado completo).
+     */
+    private fun extrudeEachFace(
+        mesh: EditableMesh,
+        faces: Set<Int>,
+        distance: Float
+    ): EditableMesh {
+        val out = EditableMesh()
+        out.positions.addAll(mesh.positions)
+        out.name = mesh.name
+        val n = FloatArray(3)
+        for (fi in mesh.faces.indices) {
+            val mat = mesh.faceMaterial.getOrElse(fi) { 0 }
+            val f = mesh.faces[fi]
+            if (fi !in faces) {
+                out.addFace(f.copyOf(), mat)
+                continue
+            }
+            mesh.faceNormal(fi, n)
+            val l = sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2])
+            if (l < 1e-9f) {
+                out.addFace(f.copyOf(), mat)
+                continue
+            }
+            val dx = n[0] / l * distance
+            val dy = n[1] / l * distance
+            val dz = n[2] / l * distance
+            val map = HashMap<Int, Int>()
+            fun dup(v: Int): Int = map.getOrPut(v) {
+                out.addVertex(mesh.x(v) + dx, mesh.y(v) + dy, mesh.z(v) + dz)
+            }
+            out.addFace(IntArray(f.size) { dup(f[it]) }, mat)
+            for (k in f.indices) {
+                val a = f[k]
+                val b = f[(k + 1) % f.size]
                 out.addFace(intArrayOf(a, b, dup(b), dup(a)), mat)
             }
         }
@@ -471,10 +517,10 @@ object MeshOps {
             out.addFace(f, merged.faceMaterial.getOrElse(fi) { 0 })
         }
         val cleaned = dropDegenerate(out)
-        // Si agrupar planos no ayudó (malla curva), se devuelve la original intacta.
-        if (cleaned.triangleCount() >= mesh.triangleCount()) return mesh
+        // Se compara el número de **caras**: agrupar dos triángulos en un cuadrilátero deja los
+        // mismos triángulos pero la mitad de caras, que es lo que el usuario ve al editar.
+        if (cleaned.faces.size >= mesh.faces.size) return mesh
         // El ángulo se documenta para el usuario; el agrupado ya es por plano exacto.
-        if (mergeAngleDegrees <= 1f) return cleaned
         return cleaned
     }
 

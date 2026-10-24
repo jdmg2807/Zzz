@@ -176,17 +176,31 @@ object Ply {
             }
         } else {
             val bb = ByteBuffer.wrap(bytes, bodyStart, bytes.size - bodyStart).order(ByteOrder.LITTLE_ENDIAN)
+            // Las propiedades declaradas en la cabecera deciden qué hay que consumir de cada
+            // vértice; si no se respeta el orden, el bucle de caras lee basura (BufferUnderflow).
+            val hasNormals = props.any { it.trim().endsWith(" nx") }
+            val hasColors = props.any { it.trim().endsWith(" red") }
+            val vertexStride = 12 + (if (hasNormals) 12 else 0) + (if (hasColors) 3 else 0)
             for (v in 0 until vertexCount) {
+                if (bb.remaining() < vertexStride) break
                 positions[v * 3] = bb.float
                 positions[v * 3 + 1] = bb.float
                 positions[v * 3 + 2] = bb.float
-                if (v == 0 && props.none { it.contains(" nx") }) continue
-                normals[v * 3] = bb.float
-                normals[v * 3 + 1] = bb.float
-                normals[v * 3 + 2] = bb.float
+                if (hasNormals) {
+                    normals[v * 3] = bb.float
+                    normals[v * 3 + 1] = bb.float
+                    normals[v * 3 + 2] = bb.float
+                }
+                if (hasColors) {
+                    colors[v * 3] = (bb.get().toInt() and 0xFF) / 255f
+                    colors[v * 3 + 1] = (bb.get().toInt() and 0xFF) / 255f
+                    colors[v * 3 + 2] = (bb.get().toInt() and 0xFF) / 255f
+                }
             }
             for (f in 0 until faceCount) {
+                if (bb.remaining() < 1) break
                 val n = bb.get().toInt() and 0xFF
+                if (n < 3 || bb.remaining() < n * 4) break
                 val v = IntArray(n) { bb.int }
                 for (k in 1 until n - 1) {
                     indices.add(v[0]); indices.add(v[k]); indices.add(v[k + 1])

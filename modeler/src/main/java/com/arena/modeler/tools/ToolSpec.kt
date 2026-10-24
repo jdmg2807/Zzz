@@ -85,7 +85,7 @@ object ToolSpec {
         ),
         Tool(
             "extrude",
-            "Extruye las caras de un objeto a lo largo de su normal.",
+            "Extruye las caras de un objeto. En un objeto cerrado extrusiona cada cara por su normal.",
             listOf(obj, num("distance", true, -3.0, 3.0, null, "Distancia (negativa hacia dentro)"))
         ),
         Tool(

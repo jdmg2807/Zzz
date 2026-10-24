@@ -459,8 +459,9 @@ object Fbx {
             // Only accept blocks that are followed by a body in braces.
             val braceIdx = text.indexOf('{', m.range.last)
             if (braceIdx < 0) break
+            // Entre el nombre y la llave solo puede venir la clase del objeto (`, "Mesh" `).
             val between = text.substring(m.range.last + 1, braceIdx)
-            if (between.isNotBlank()) break
+            if (!Regex("^\\s*(,\\s*\"[^\"]*\"\\s*)?$").matches(between)) break
             val type = m.groupValues[1]
             if (type == "Connections" || type == "Takes") break
             var depth = 0

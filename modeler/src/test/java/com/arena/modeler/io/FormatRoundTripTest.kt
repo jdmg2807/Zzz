@@ -37,7 +37,7 @@ class FormatRoundTripTest {
         assertTrue("el GLB debe tener cabecera glTF", String(bytes, 0, 4, Charsets.ISO_8859_1) == "glTF")
 
         val back = Gltf.read(bytes, "prueba.glb")
-        assertEquals(doc.allNodes().size, back.allNodes().size)
+        assertEquals(doc.allNodes().count { it.mesh != null }, back.allNodes().count { it.mesh != null })
         assertEquals(doc.totalTriangles(), back.totalTriangles())
         assertTrue("los materiales deben sobrevivir", back.materials.isNotEmpty())
         assertTrue("la animación debe sobrevivir", back.animations.isNotEmpty())

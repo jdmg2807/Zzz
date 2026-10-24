@@ -167,8 +167,10 @@ object Csg {
         }
 
         fun clipTo(other: Node) {
+            // Hay que recortar **antes** de vaciar la lista: `clipPolygons` la lee.
+            val clipped = other.clipPolygons(polygons)
             polygons.clear()
-            polygons.addAll(other.clipPolygons(polygons))
+            polygons.addAll(clipped)
             front?.clipTo(other)
             back?.clipTo(other)
         }
