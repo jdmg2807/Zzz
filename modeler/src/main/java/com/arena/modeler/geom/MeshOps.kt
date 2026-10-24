@@ -445,57 +445,72 @@ object MeshOps {
     enum class Axis { X, Y, Z }
 
     /**
-     * Simetría: copia la mitad positiva del eje y la refleja. Con [keepBoth] conserva la mitad
-     * original (modelado de un solo lado), si no, reconstruye la malla completa desde ella.
+     * Simetría respecto a un eje.
+     *
+     * - [keepBoth] = `true` (modificador espejo): conserva toda la geometría y añade la copia
+     *   reflejada de la mitad positiva. Si el modelo ya era simétrico, la copia coincide con la
+     *   geometría existente y se descarta (sin caras duplicadas).
+     * - [keepBoth] = `false` (simetrizar): se queda con la mitad positiva (más las caras que
+     *   están sobre el plano del eje) y la refleja, de modo que el modelo queda simétrico.
+     *
+     * En ambos casos las caras que viven **sobre** el plano no se duplican.
      */
     fun mirror(mesh: EditableMesh, axis: Axis = Axis.X, keepBoth: Boolean = true): EditableMesh {
         check(mesh, mesh.faces.size)
         val out = EditableMesh()
         out.name = mesh.name
         out.positions.addAll(mesh.positions)
-        for (fi in mesh.faces.indices) {
-            out.addFace(mesh.faces[fi].copyOf(), mesh.faceMaterial.getOrElse(fi) { 0 })
+
+        fun along(v: Int): Float = when (axis) {
+            Axis.X -> mesh.x(v)
+            Axis.Y -> mesh.y(v)
+            Axis.Z -> mesh.z(v)
         }
-        val map = HashMap<Int, Int>()
-        fun reflect(v: Int): Int = map.getOrPut(v) {
+
+        fun centroid(f: IntArray): Float = f.sumOf { along(it).toDouble() }.toFloat() / f.size
+        fun onPlane(f: IntArray): Boolean = f.all { abs(along(it)) < 1e-6f }
+
+        val reflected = HashMap<Int, Int>()
+        fun reflect(v: Int): Int = reflected.getOrPut(v) {
             when (axis) {
                 Axis.X -> out.addVertex(-mesh.x(v), mesh.y(v), mesh.z(v))
                 Axis.Y -> out.addVertex(mesh.x(v), -mesh.y(v), mesh.z(v))
                 Axis.Z -> out.addVertex(mesh.x(v), mesh.y(v), -mesh.z(v))
             }
         }
+
         for (fi in mesh.faces.indices) {
             val f = mesh.faces[fi]
-            // Solo los polígonos de la mitad positiva, para no duplicar el eje.
-            val centroidAlong = when (axis) {
-                Axis.X -> f.sumOf { mesh.x(it).toDouble() }.toFloat() / f.size
-                Axis.Y -> f.sumOf { mesh.y(it).toDouble() }.toFloat() / f.size
-                Axis.Z -> f.sumOf { mesh.z(it).toDouble() }.toFloat() / f.size
+            val mat = mesh.faceMaterial.getOrElse(fi) { 0 }
+            val c = centroid(f)
+            val plane = onPlane(f)
+            val keep = keepBoth || plane || c > 1e-6f
+            if (keep) out.addFace(f.copyOf(), mat)
+            // Solo se refleja lo que está estrictamente en la mitad positiva: reflejar una cara
+            // sobre el plano la duplicaría, y reflejar una negativa la sacaría de su sitio.
+            if (!plane && c > 1e-6f) {
+                val nf = IntArray(f.size)
+                for (k in f.indices) nf[k] = reflect(f[f.size - 1 - k])
+                out.addFace(nf, mat)
             }
-            if (centroidAlong < 0f) continue
-            val nf = IntArray(f.size)
-            for (k in f.indices) nf[k] = reflect(f[f.size - 1 - k])
-            out.addFace(nf, mesh.faceMaterial.getOrElse(fi) { 0 })
         }
-        // Con keepBoth se conserva también la mitad original; sin él la malla se reconstruye
-        // desde la mitad positiva (lo habitual al modelar la mitad y espejar).
-        if (!keepBoth) {
-            val rebuilt = EditableMesh()
-            rebuilt.positions.addAll(out.positions)
-            for (fi in out.faces.indices) {
-                val f = out.faces[fi]
-                val centroidAlong = when (axis) {
-                    Axis.X -> f.sumOf { out.x(it).toDouble() }.toFloat() / f.size
-                    Axis.Y -> f.sumOf { out.y(it).toDouble() }.toFloat() / f.size
-                    Axis.Z -> f.sumOf { out.z(it).toDouble() }.toFloat() / f.size
-                }
-                if (centroidAlong >= -1e-5f) {
-                    rebuilt.addFace(f.copyOf(), out.faceMaterial.getOrElse(fi) { 0 })
-                }
-            }
-            return rebuilt.weld(1e-5f)
+        return removeDuplicateFaces(out.weld(1e-5f))
+    }
+
+    /** Quita caras repetidas (mismos vértices y material), conservando el orden. */
+    private fun removeDuplicateFaces(mesh: EditableMesh): EditableMesh {
+        val out = EditableMesh()
+        out.positions.addAll(mesh.positions)
+        out.name = mesh.name
+        val seen = HashSet<String>()
+        for (fi in mesh.faces.indices) {
+            val f = mesh.faces[fi]
+            val mat = mesh.faceMaterial.getOrElse(fi) { 0 }
+            val key = f.sorted().joinToString(",") + "#" + mat
+            if (!seen.add(key)) continue
+            out.addFace(f.copyOf(), mat)
         }
-        return out.weld(1e-5f)
+        return out
     }
 
     // ------------------------------------------------------------------ decimación

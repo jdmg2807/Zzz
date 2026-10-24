@@ -313,25 +313,18 @@ object Csg {
     }
 
     fun fromPolygons(polygons: List<Polygon>): EditableMesh {
+        // Se añaden todos los vértices tal cual y se sueldan al final con el algoritmo de
+        // [EditableMesh.weld], que comprueba distancias reales. Un índice por *hash* de la
+        // posición (como se hacía antes) fusionaba vértices distintos y deformaba el resultado.
         val out = EditableMesh()
         out.name = "Booleana"
-        val index = HashMap<Long, Int>()
-        fun vertexIndex(v: Vertex): Int {
-            val key = (Math.round(v.x * 10000f).toLong() * 73856093L) xor
-                (Math.round(v.y * 10000f).toLong() * 19349663L) xor
-                (Math.round(v.z * 10000f).toLong() * 83492791L)
-            return index.getOrPut(key) { out.addVertex(v.x, v.y, v.z) }
-        }
         for (p in polygons) {
             if (p.vertices.size < 3) continue
             if (p.vertices.any { !it.x.isFinite() || !it.y.isFinite() || !it.z.isFinite() }) continue
-            val unique = LinkedHashSet<Int>()
-            for (v in p.vertices) unique.add(vertexIndex(v))
-            if (unique.size < 3) continue
-            out.addFace(unique.toIntArray(), p.material.coerceAtLeast(0))
+            val idx = IntArray(p.vertices.size) { out.addVertex(p.vertices[it].x, p.vertices[it].y, p.vertices[it].z) }
+            out.addFace(idx, p.material.coerceAtLeast(0))
         }
-        val cleaned = MeshOps.dropDegenerate(out)
-        return cleaned
+        return MeshOps.dropDegenerate(out.weld(1e-4f))
     }
 
     /**
