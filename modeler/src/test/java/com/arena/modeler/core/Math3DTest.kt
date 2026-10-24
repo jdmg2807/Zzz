@@ -52,7 +52,8 @@ class Math3DTest {
     @Test
     fun `euler 90 grados en Y gira el eje X hacia -Z`() {
         val q = Quat.euler(0f, 90f, 0f)
-        val m = q.toMatrix(FloatArray(16))
+        val m = FloatArray(16)
+        q.toMatrix(m)
         val v = M4.transformPoint(m, 1f, 0f, 0f)
         assertEquals(0f, v[0], 1e-4f)
         assertEquals(0f, v[1], 1e-4f)
