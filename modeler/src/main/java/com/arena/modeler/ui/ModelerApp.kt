@@ -309,7 +309,7 @@ private fun SettingsSheet(state: AppState, onClose: () -> Unit) {
                     state.syncViewport()
                     state.persistSettings()
                 }
-                ToggleRow("Girar solo", state.autoRotate) { state.setAutoRotate(it) }
+                ToggleRow("Girar solo", state.autoRotate) { state.enableAutoRotate(it) }
                 SectionTitle("Cámara")
                 RowWrap {
                     ActionButton("Frente", Modifier.weight(1f)) { state.cameraFront() }

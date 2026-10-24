@@ -280,7 +280,7 @@ fun AnimatePanel(state: AppState) {
                         modifier = Modifier.weight(1f)
                     ) {
                         state.clipIndex = index
-                        state.setAnimTime(0f)
+                        state.seekAnimation(0f)
                         state.syncViewport()
                     }
                 }
@@ -298,7 +298,7 @@ fun AnimatePanel(state: AppState) {
         Box(Modifier.width(10.dp))
         Slider(
             value = state.animTime.coerceIn(0f, duration),
-            onValueChange = { state.setAnimTime(it) },
+            onValueChange = { state.seekAnimation(it) },
             valueRange = 0f..duration,
             modifier = Modifier.weight(1f).height(32.dp),
             colors = SliderDefaults.colors(
@@ -340,7 +340,7 @@ fun AiPanel(state: AppState, onOpenKeyPage: (String) -> Unit) {
     RowWrap {
         for (p in AiProvider.all()) {
             ChipButton(p.label, selected = provider == p, modifier = Modifier.weight(1f)) {
-                state.setProvider(p)
+                state.chooseProvider(p)
             }
         }
     }

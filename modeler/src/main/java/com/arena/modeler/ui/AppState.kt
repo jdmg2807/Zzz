@@ -187,7 +187,7 @@ class AppState(private val context: Context) {
         persistSettings()
     }
 
-    fun setProvider(p: AiProvider) {
+    fun chooseProvider(p: AiProvider) {
         provider = p
         persistSettings()
     }
@@ -403,7 +403,7 @@ class AppState(private val context: Context) {
         message = "Clave añadida en ${"%.2f".format(animTime)} s"
     }
 
-    fun setAnimTime(t: Float) {
+    fun seekAnimation(t: Float) {
         val clip = currentClip() ?: return
         animTime = t.coerceIn(0f, clip.duration().coerceAtLeast(0.01f))
         clip.apply(doc ?: return, animTime)
@@ -429,7 +429,7 @@ class AppState(private val context: Context) {
         viewport?.refresh()
     }
 
-    fun setAutoRotate(on: Boolean) {
+    fun enableAutoRotate(on: Boolean) {
         autoRotate = on
         persistSettings()
         viewport?.setAnimated(playing || autoRotate)
