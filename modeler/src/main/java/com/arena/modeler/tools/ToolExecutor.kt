@@ -230,6 +230,8 @@ class ToolExecutor(
         "transform_object" -> transformObject(a)
         "duplicate_object" -> duplicateObject(a)
         "delete_object" -> deleteObject(a)
+        "join_objects" -> joinObjects(a)
+        "split_components" -> splitComponents(a)
         "inspect_scene" -> ToolResult(true, inspectScene())
         "export_model" -> exportModel(a)
         else -> ToolResult(false, "Herramienta no implementada: ${spec.name}")
@@ -534,6 +536,74 @@ class ToolExecutor(
             clip.channels.removeAll { it.nodeId == node.id }
         }
         return ToolResult(true, "Eliminado «${node.name}»")
+    }
+
+    /**
+     * Une dos objetos: la malla del segundo se transforma al espacio local del primero y se
+     * añade. El segundo objeto se elimina para no dejar copias superpuestas.
+     */
+    private fun joinObjects(a: Args): ToolResult {
+        val target = node(a)
+        val otherName = a.stringOrNull("other")
+        val other = findNode(otherName)
+            ?: return ToolResult(false, "No existe el objeto «${otherName ?: "?"}»")
+        if (other.id == target.id) return ToolResult(false, "No se puede unir un objeto consigo mismo")
+        val targetMesh = target.editableMesh()
+            ?: return ToolResult(false, "«${target.name}» no tiene malla")
+        val otherMesh = other.editableMesh()
+            ?: return ToolResult(false, "«${other.name}» no tiene malla")
+        val inverse = FloatArray(16)
+        if (!com.arena.modeler.core.M4.invert(inverse, target.worldMatrix())) {
+            return ToolResult(false, "La transformación de «${target.name}» no se puede invertir")
+        }
+        val relative = FloatArray(16)
+        com.arena.modeler.core.M4.multiply(relative, inverse, other.worldMatrix())
+        val moved = otherMesh.copy().transform(relative)
+        val merged = targetMesh.copy().append(moved)
+        if (merged.faces.size > MeshOps.MAX_FACES) {
+            return ToolResult(
+                false,
+                "La unión tendría ${merged.faces.size} caras; el límite es ${MeshOps.MAX_FACES}"
+            )
+        }
+        val check = MeshOps.validate(merged)
+        if (!check.ok) return ToolResult(false, check.problems.first())
+        target.setEditableMesh(merged, smooth = false)
+        doc.root.children.remove(other)
+        other.removeFromParent()
+        for (clip in doc.animations) clip.channels.removeAll { it.nodeId == other.id }
+        return ToolResult(
+            true,
+            "Unido «${other.name}» en «${target.name}» (${merged.faces.size} caras)",
+            target.id
+        )
+    }
+
+    /** Separa un objeto en varios según sus piezas conectadas, manteniendo la transformación. */
+    private fun splitComponents(a: Args): ToolResult {
+        val node = node(a)
+        val mesh = node.editableMesh() ?: return ToolResult(false, "«${node.name}» no tiene malla")
+        val parts = MeshOps.splitComponents(mesh)
+        if (parts.size <= 1) {
+            return ToolResult(true, "«${node.name}» ya es una sola pieza", node.id)
+        }
+        node.setEditableMesh(parts[0], smooth = false)
+        val created = ArrayList<String>()
+        for (i in 1 until parts.size) {
+            val sub = doc.newNode(doc.nextNodeName("${node.name}_pieza"))
+            sub.position.set(node.position)
+            sub.rotation = node.rotation.copy()
+            sub.scale.set(node.scale)
+            sub.material = node.material
+            sub.setEditableMesh(parts[i], smooth = false)
+            created.add(sub.name)
+        }
+        return ToolResult(
+            true,
+            "Separado «${node.name}» en ${parts.size} piezas" +
+                (if (created.isEmpty()) "" else " (${created.joinToString(", ")})"),
+            node.id
+        )
     }
 
     /** Resumen compacto de la escena: lo que el modelo necesita para razonar sin ver la malla. */

@@ -16,7 +16,7 @@ repositorio y compilando con GitHub Actions.
 | Geometría | Mallas indexadas simples (`MeshData`: posiciones + índices + normales + UV). Primitivas generadas por fórmulas (`scene/Primitives.kt`) |
 | Escena | `SceneDocument` con nodos jerárquicos, materiales PBR, huesos y clips de animación. Forma equivalente a glTF 2.0 |
 | IO | Lectores/escritores propios: glTF/GLB, FBX ASCII, OBJ+MTL, STL, PLY (`io/`) |
-| IA | `ai/AiSchema` pide JSON de *partes con primitivas* y lo convierte en `SceneDocument`; `ai/AiHttp` habla con OpenRouter y Google AI Studio; `ModelRegistry` descarga catálogos |
+| IA | `ai/AiSchema` pide JSON de *partes con primitivas* y lo convierte en `SceneDocument`; `ai/AiHttp` habla con OpenRouter y Google AI Studio; `ModelCatalog` descarga y cachea catálogos |
 | Estado/UI | `ui/AppState` centraliza mutaciones; `ui/Panels` + `ui/ModelerApp` componen la interfaz |
 | Almacenamiento | `ai/ObjectStore`: ajustes y proyectos en `filesDir`, exportación a `Descargas/VoxelForge` |
 | Pruebas | **Ninguna** (no había `src/test`) |
@@ -115,3 +115,46 @@ modeler/src/main/java/com/arena/modeler/
   textura para importar/exportar glTF, pero el visor no muestrea imágenes (limitación anotada en
   la UI).
 - **Rigging con pesos pintados a mano**: se conserva la animación por nodos/claves existente.
+
+---
+
+## 7. Resultado de esta fase (v3.2.0 / app 1.2.0)
+
+Lo que está implementado y **pasa las pruebas automáticas**:
+
+| Área | Comprobado por |
+| --- | --- |
+| Primitivas y mallas editables | `geom/GeometryTest` (8 vértices y 6 caras el cubo, normales hacia fuera, volumen, UV de la esfera dentro de 0..1 con polos sin costura) |
+| Extrusión, inset, bisel, subdivisión, suavizado, simetría, decimación, esculpido, barrido | `GeometryTest` (simetría de medio cubo = 6 caras, una subdivisión = 24 caras, cubo de 12 triángulos reducido = 6 caras, esculpido solo mueve vértices dentro del radio) |
+| Booleanas | `GeometryTest` (volumen de unión = 1,5, diferencia = 0,5, intersección = 0,5 y malla válida) |
+| Separar / unir piezas | `GeometryTest` (`splitComponents` de dos cajas = 2 piezas) y `ToolExecutorTest` |
+| Escena y animación | `scene/SceneTest` |
+| Formatos y verificación de exportación | `io/FormatRoundTripTest` (GLB, glTF, FBX, OBJ, STL, PLY) |
+| Ejecutor de herramientas | `tools/ToolExecutorTest` (argumentos fuera de rango, tipos erróneos, herramienta desconocida, rollback, booleanas, esculpido, unir/separa) |
+| Matemáticas | `core/Math3DTest` |
+
+Errores **reales** que las pruebas sacaron a la luz y que se corrigieron (no eran cosméticos):
+
+1. `Csg.Node.clipTo` vaciaba la lista de polígonos antes de recortarla → diferencias vacías.
+2. `Csg.fromPolygons` soldaba vértices por un *hash* de posición y colapsaba mallas distintas
+   (unión de dos medias cajas daba volumen 0,5 en vez de 1,5). Ahora añade un vértice por esquina
+   y suelda con `EditableMesh.weld`.
+3. La extrusión de un objeto cerrado no tenía a dónde moverse (todas las caras ya comparten
+   vértices): se añadió el camino «extruir cara a cara».
+4. La simetría descartaba las caras que cruzan el plano → resultado vacío.
+5. El lector de FBX ASCII cortaba el bloque `Objects` por la primera aparición exacta; el de PLY
+   binario usaba un paso fijo de bytes que fallaba cuando no había normales o colores.
+
+Lo que **no está probado** y por tanto no se afirma:
+
+- La interfaz en un teléfono real (no hay emulador en el CI): se compila, y las pantallas siguen
+  el mismo patrón que la 1.1.0, pero la disposición del panel plegable y del chat no se ha visto
+  en pantalla física.
+- Llamadas reales a los proveedores con una clave del usuario (el CI no tiene claves). La
+  validación y el manejo de errores HTTP están cubiertos por código, no por una prueba de red.
+- Calidad de las decisiones del modelo al elegir herramientas: depende del modelo. Los
+  argumentos se validan y una operación inválida no toca la escena.
+- Esculpido con muchos dedos simultáneos y mallas de más de ~50 000 caras en un teléfono de gama
+  baja: los límites (`MAX_FACES`, `MAX_VERTICES`) evitan bloqueos, pero el rendimiento real no se
+  ha medido.
+

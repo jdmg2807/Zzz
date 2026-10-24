@@ -241,4 +241,21 @@ class GeometryTest {
         assertEquals(a.vertexCount, welded.vertexCount)
         assertEquals("las caras duplicadas no se fusionan solas", a.faces.size * 2, welded.faces.size)
     }
+
+    @Test
+    fun `separar componentes devuelve una pieza por cuerpo conectado`() {
+        val two = box().append(EditableMesh.box(1f, 1f, 1f).translate(3f, 0f, 0f))
+        assertEquals(12, two.faces.size)
+        val parts = MeshOps.splitComponents(two)
+        assertEquals(2, parts.size)
+        for (p in parts) {
+            assertEquals(6, p.faces.size)
+            assertTrue(MeshOps.validate(p).problems.toString(), MeshOps.validate(p).ok)
+        }
+    }
+
+    @Test
+    fun `un cubo suelto es una sola pieza`() {
+        assertEquals(1, MeshOps.splitComponents(box()).size)
+    }
 }

@@ -543,6 +543,41 @@ object MeshOps {
         return cleaned
     }
 
+    // ------------------------------------------------------------------ componentes
+
+    /**
+     * Separa la malla en piezas conectadas por vértices compartidos. Es lo que necesita
+     * «separar en objetos»: una taza con asa sale en una pieza, dos cubos pegados en dos.
+     */
+    fun splitComponents(mesh: EditableMesh): List<EditableMesh> {
+        check(mesh)
+        val parent = IntArray(mesh.vertexCount) { it }
+        fun find(x: Int): Int {
+            var r = x
+            while (parent[r] != r) r = parent[r]
+            var c = x
+            while (parent[c] != c) {
+                val next = parent[c]
+                parent[c] = r
+                c = next
+            }
+            return r
+        }
+        for (f in mesh.faces) {
+            for (k in 1 until f.size) {
+                val a = find(f[0])
+                val b = find(f[k])
+                if (a != b) parent[b] = a
+            }
+        }
+        val groups = LinkedHashMap<Int, MutableList<Int>>()
+        for (fi in mesh.faces.indices) {
+            val root = find(mesh.faces[fi][0])
+            groups.getOrPut(root) { ArrayList() }.add(fi)
+        }
+        return groups.values.map { subset(mesh, it).compact() }
+    }
+
     // ------------------------------------------------------------------ validación
 
     class ValidationResult(val problems: List<String>, val degenerateFaces: Int, val duplicateVertices: Int) {

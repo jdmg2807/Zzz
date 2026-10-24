@@ -1,5 +1,37 @@
 # Changelog
 
+## v3.2.0 — VoxelForge 3D 1.2.0: estudio de modelado con IA que trabaja sobre la escena
+- **Chat que modela de verdad**: el asistente ya no solo genera primitivas; pide **herramientas**
+  (`extrude`, `bevel`, `boolean`, `subdivide`, `sculpt`, `mirror`, `join_objects`,
+  `split_components`…) con argumentos validados (tipo, rango, límite de caras) que la app ejecuta
+  sobre la escena. El modelo nunca ejecuta código y las operaciones destructivas piden
+  confirmación. Fuera del alcance: la IA **no** genera mallas orgánicas de alta calidad ni
+  texturas; eso necesitaría un servicio externo aparte (ver `docs/ARQUITECTURA_VOXELFORGE.md`).
+- **Motor de geometría propio** (`geom/`): mallas editables con caras de n lados, extrusión
+  (por región y por cara), inset, bisel, Catmull-Clark, suavizado, simetría, decimación,
+  booleanas BSP (unión/diferencia/intersección), barrido de perfiles por curvas Bézier y
+  Catmull-Rom, pincel de esculpido (inflar/suavizar/pellizcar) y validación/reparación de mallas.
+- **Interfaz rediseñada**: barra superior con deshacer/rehacer/guardar/ajustes, visor a pantalla
+  completa con superposiciones (modos sólido/alámbrico/material, cámara, pincel), panel inferior
+  plegable con pestañas Escena/Crear/Editar/Material/Animar/Chat/Archivo/Historial, e historial de
+  cambios legible.
+- **Deshacer y rehacer** de 20 pasos sobre estados completos de la escena (también deshace lo que
+  hizo la IA).
+- **Catálogo de modelos con precios reales**: entrada y salida por millón de tokens, contexto,
+  capacidades, fecha de actualización, filtros Todos/Gratis/De pago/Precio desconocido y aviso de
+  datos desactualizados si el proveedor falla. Sin modelos escritos a mano en el APK.
+- **Claves cifradas** con el Android Keystore (AES-256-GCM, clave no exportable) en lugar de
+  `ajustes.json` en texto plano; aviso y degradación controlada si el dispositivo no tiene
+  Keystore.
+- **Exportación verificada**: cada archivo se vuelve a leer y se comprueba que la geometría está
+  antes de decir «exportado»; si la verificación falla, se informa del motivo.
+- **Pruebas automáticas** (62 en la JVM, `:modeler:testDebugUnitTest`) del motor de geometría,
+  escena, formatos de archivo y ejecutor de herramientas, integradas en el workflow. Gracias a
+  ellas se corrigieron errores reales en las booleanas (el BSP vaciaba la lista antes de
+  recortarla y el resultado soldaba vértices por un hash de posición), en la extrusión de objetos
+  cerrados, en el espejo, y en la lectura de FBX ASCII y PLY binario.
+- Versión de la app: 1.2.0 (versionCode 3).
+
 ## v3.1.0 — Cualquier modelo, con filtro gratis/de pago, y APK suelto
 - **Catálogo de modelos en vivo**: la app descarga la lista real de OpenRouter (`/api/v1/models`)
   y de Google AI Studio (`/v1beta/models`) con tu clave, así que sirve **cualquier modelo

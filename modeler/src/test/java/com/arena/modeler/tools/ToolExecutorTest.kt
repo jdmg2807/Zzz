@@ -154,6 +154,30 @@ class ToolExecutorTest {
         val catalog = ToolSpec.promptCatalog()
         assertTrue(catalog.contains("create_primitive"))
         assertTrue(catalog.contains("export_model"))
-        assertEquals(18, ToolSpec.tools.size)
+        assertEquals(20, ToolSpec.tools.size)
+    }
+
+    @Test
+    fun `join_objects funde la malla y quita el segundo objeto`() {
+        val doc = SceneDocument()
+        val ex = executor(doc)
+        ex.execute(call("create_primitive", "kind" to "cube", "name" to "A"))
+        ex.execute(call("create_primitive", "kind" to "cube", "name" to "B"))
+        val result = ex.execute(call("join_objects", "object" to "A", "other" to "B"))
+        assertTrue(result.message, result.ok)
+        assertEquals(1, doc.allNodes().size)
+        assertEquals("A", doc.allNodes().first().name)
+        // Dos cubos de 6 caras: 12 caras, 24 triángulos.
+        assertEquals(24, doc.totalTriangles())
+    }
+
+    @Test
+    fun `split_components no inventa piezas cuando el objeto ya es una`() {
+        val doc = SceneDocument()
+        val ex = executor(doc)
+        ex.execute(call("create_primitive", "kind" to "cube", "name" to "A"))
+        val result = ex.execute(call("split_components", "object" to "A"))
+        assertTrue(result.message, result.ok)
+        assertEquals(1, doc.allNodes().size)
     }
 }

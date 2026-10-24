@@ -183,11 +183,16 @@ class AppState(private val context: Context) {
 
     fun attach(view: ViewportView, frameAllOnAttach: Boolean = true) {
         viewport = view
-        view.state.onSelect = { id ->
+        // El visor avisa por sus propios callbacks (los de `ViewportState` no se disparan).
+        view.onNodeSelected = { id ->
             selectedId = id
             if (id >= 0 && tab == Tab.OBJECTS) tab = Tab.EDIT
+            revision++
         }
-        view.state.onTransform = { dirty = true; revision++ }
+        view.onNodeTransformed = {
+            dirty = true
+            revision++
+        }
         view.onSculpt = { world -> sculptAt(world) }
         view.state.doc = doc
         syncViewport()
@@ -195,8 +200,8 @@ class AppState(private val context: Context) {
     }
 
     fun detach() {
-        viewport?.state?.onSelect = null
-        viewport?.state?.onTransform = null
+        viewport?.onNodeSelected = null
+        viewport?.onNodeTransformed = null
         viewport?.onSculpt = null
         viewport = null
     }

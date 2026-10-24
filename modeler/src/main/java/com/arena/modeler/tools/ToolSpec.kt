@@ -170,6 +170,16 @@ object ToolSpec {
             listOf(obj)
         ),
         Tool(
+            "join_objects",
+            "Une la geometría de un objeto con otro: el segundo pasa a formar parte del primero.",
+            listOf(obj, str("other", true, null, "Nombre del segundo objeto"))
+        ),
+        Tool(
+            "split_components",
+            "Separa un objeto en varios según sus piezas conectadas.", 
+            listOf(obj)
+        ),
+        Tool(
             "inspect_scene",
             "Devuelve un resumen de la escena (objetos, mallas, materiales). No modifica nada.",
             emptyList(),

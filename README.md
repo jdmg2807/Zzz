@@ -17,14 +17,21 @@ GitHub Actions compila el APK automáticamente.
 En el mismo repositorio vive **VoxelForge 3D**, una app de modelado y animación 3D para el
 teléfono (módulo `modeler/`, paquete `com.arena.modeler`, se instala aparte del juego):
 
-- **Modelado**: primitivas, jerarquía, materiales PBR, gizmo de traslación y visor OpenGL ES 3.
-- **IA integrada**: genera o modifica modelos desde una descripción usando **OpenRouter** o
-  **Google AI Studio** con *tu* clave (la clave se queda en el teléfono).
+- **Estudio de modelado real**: primitivas que son **mallas editables** — extrusión, inset,
+  bisel, subdivisión Catmull-Clark, suavizado, simetría, decimación, booleanas y pincel de
+  esculpido.
+- **Chat de IA que trabaja sobre la escena**: pide herramientas (`extrude`, `bevel`, `boolean`,
+  `sculpt`, `join_objects`…) con argumentos validados; nunca ejecuta código, pide confirmación
+  antes de destruir geometría y todo se deshace con un toque.
+- **IA integrada**: **OpenRouter** o **Google AI Studio** con *tu* clave, cifrada con el Android
+  Keystore. La lista de modelos se descarga del proveedor, con **precio de entrada y salida por
+  millón de tokens**, contexto, capacidades y filtro gratis / de pago.
+- **Interfaz**: barra superior, visor a pantalla completa con modos de vista, panel plegable con
+  pestañas Escena / Crear / Editar / Material / Animar / Chat / Archivo / Historial.
 - **Animación**: claves de posición/rotación/escala, reproducción y giro automático.
-- **Cualquier modelo de cada proveedor**: la app descarga la lista real de OpenRouter y de Google
-  AI Studio, con filtro **gratis / de pago**, buscador y opción de escribir un id a mano.
 - **Importar/exportar**: glTF, GLB, FBX ASCII, OBJ+MTL, STL y PLY; la animación se conserva en
-  GLB/glTF/FBX.
+  GLB/glTF/FBX y cada exportación se **verifica releyendo el archivo**.
+- **Pruebas**: 62 pruebas de JVM ejecutadas por el CI antes de compilar el APK.
 
 Guía completa, límites por formato y cómo sacar la clave: **[docs/VOXELFORGE.md](docs/VOXELFORGE.md)**.
 
