@@ -138,10 +138,40 @@ jobs:
           for LOG in test.log build.log; do
             [ -f "$LOG" ] || continue
             echo "--- $LOG"
-            grep -E "^e: |AssertionError|expected:|FAILED" "$LOG" | head -25 | while IFS= read -r line; do
-              echo "::error::$line"
-            done
+            grep -E "^e: " "$LOG" | awk '!seen[$0]++' | head -50 > /tmp/errors.txt || true
+            wc -l /tmp/errors.txt
+            head -10 /tmp/errors.txt | while IFS= read -r line; do echo "::error::$line"; done
           done
+
+      - name: Anotar errores (1)
+        if: failure()
+        run: |
+          [ -f /tmp/errors.txt ] || exit 0
+          sed -n '1,10p' /tmp/errors.txt | while IFS= read -r line; do echo "::error::$line"; done
+
+      - name: Anotar errores (2)
+        if: failure()
+        run: |
+          [ -f /tmp/errors.txt ] || exit 0
+          sed -n '11,20p' /tmp/errors.txt | while IFS= read -r line; do echo "::error::$line"; done
+
+      - name: Anotar errores (3)
+        if: failure()
+        run: |
+          [ -f /tmp/errors.txt ] || exit 0
+          sed -n '21,30p' /tmp/errors.txt | while IFS= read -r line; do echo "::error::$line"; done
+
+      - name: Anotar errores (4)
+        if: failure()
+        run: |
+          [ -f /tmp/errors.txt ] || exit 0
+          sed -n '31,40p' /tmp/errors.txt | while IFS= read -r line; do echo "::error::$line"; done
+
+      - name: Anotar errores (5)
+        if: failure()
+        run: |
+          [ -f /tmp/errors.txt ] || exit 0
+          sed -n '41,50p' /tmp/errors.txt | while IFS= read -r line; do echo "::error::$line"; done
 
       - name: Reunir el APK
         if: success()

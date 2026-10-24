@@ -72,7 +72,7 @@ object ModelFormats {
     fun export(doc: SceneDocument, format: ExportFormat): ExportResult {
         val result = build(doc, format)
         val check = verify(result.bytes, result.fileName, doc)
-        if (!check.ok) throw ExportVerificationException(check.message)
+        if (!check.supported) throw ExportVerificationException(check.detail)
         return result
     }
 

@@ -103,7 +103,7 @@ class FormatRoundTripTest {
         val result = ModelFormats.export(doc, ExportFormat.GLB)
         assertTrue(result.bytes.size > 64)
         val check = ModelFormats.verify(result.bytes, result.fileName, doc)
-        assertTrue(check.message, check.ok)
+        assertTrue(check.detail, check.supported)
         assertEquals(doc.totalTriangles(), ModelFormats.read(result.bytes, result.fileName).totalTriangles())
     }
 
@@ -111,7 +111,7 @@ class FormatRoundTripTest {
     fun `verificar un archivo ilegible no miente`() {
         val garbage = "no soy un modelo 3D".toByteArray()
         val check = ModelFormats.verify(garbage, "roto.glb", null)
-        assertFalse(check.ok)
+        assertFalse(check.supported)
     }
 
     @Test
