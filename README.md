@@ -31,7 +31,7 @@ teléfono (módulo `modeler/`, paquete `com.arena.modeler`, se instala aparte de
 - **Animación**: claves de posición/rotación/escala, reproducción y giro automático.
 - **Importar/exportar**: glTF, GLB, FBX ASCII, OBJ+MTL, STL y PLY; la animación se conserva en
   GLB/glTF/FBX y cada exportación se **verifica releyendo el archivo**.
-- **Pruebas**: 62 pruebas de JVM ejecutadas por el CI antes de compilar el APK.
+- **Pruebas**: 66 pruebas de JVM ejecutadas por el CI antes de compilar el APK.
 
 Guía completa, límites por formato y cómo sacar la clave: **[docs/VOXELFORGE.md](docs/VOXELFORGE.md)**.
 

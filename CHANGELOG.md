@@ -25,7 +25,7 @@
   Keystore.
 - **Exportación verificada**: cada archivo se vuelve a leer y se comprueba que la geometría está
   antes de decir «exportado»; si la verificación falla, se informa del motivo.
-- **Pruebas automáticas** (62 en la JVM, `:modeler:testDebugUnitTest`) del motor de geometría,
+- **Pruebas automáticas** (66 en la JVM, `:modeler:testDebugUnitTest`) del motor de geometría,
   escena, formatos de archivo y ejecutor de herramientas, integradas en el workflow. Gracias a
   ellas se corrigieron errores reales en las booleanas (el BSP vaciaba la lista antes de
   recortarla y el resultado soldaba vértices por un hash de posición), en la extrusión de objetos

@@ -208,7 +208,7 @@ Decisiones que conviene respetar:
 
 ### Pruebas
 
-62 pruebas de JVM en `modeler/src/test/java/com/arena/modeler/`:
+66 pruebas de JVM en `modeler/src/test/java/com/arena/modeler/`:
 
 ```bash
 gradle :modeler:testDebugUnitTest
