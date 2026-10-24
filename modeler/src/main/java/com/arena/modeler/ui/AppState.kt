@@ -254,7 +254,7 @@ class AppState(private val context: Context) {
         }
     }
 
-    fun setModelFilter(filter: ModelRegistry.PriceFilter) {
+    fun applyPriceFilter(filter: ModelRegistry.PriceFilter) {
         modelFilter = filter
         modelsShown = 24
     }

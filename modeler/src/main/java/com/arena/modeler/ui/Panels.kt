@@ -428,7 +428,7 @@ fun ModelPicker(state: AppState) {
                 filter.label,
                 selected = state.modelFilter == filter,
                 modifier = Modifier.weight(1f)
-            ) { state.setModelFilter(filter) }
+            ) { state.applyPriceFilter(filter) }
         }
     }
     RowWrap {
