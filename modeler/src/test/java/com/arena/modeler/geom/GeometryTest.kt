@@ -77,10 +77,18 @@ class GeometryTest {
 
     @Test
     fun `espejar reconstruye una malla simétrica`() {
-        val out = MeshOps.mirror(box(), MeshOps.Axis.X, keepBoth = false)
-        assertTrue(out.faces.isNotEmpty())
-        assertTrue("debe añadir la mitad reflejada", out.vertexCount > box().vertexCount)
-        assertTrue(MeshOps.validate(out).ok)
+        val half = MeshOps.mirror(box(), MeshOps.Axis.X, keepBoth = false)
+        assertEquals("el cubo partido por la mitad son tres caras y su reflejo", 6, half.faces.size)
+        assertTrue(MeshOps.validate(half).ok)
+        // Cada vértice debe tener su gemelo al otro lado del eje X.
+        for (v in 0 until half.vertexCount) {
+            val twin = (0 until half.vertexCount).any { u ->
+                kotlin.math.abs(half.x(u) + half.x(v)) < 1e-4f &&
+                    kotlin.math.abs(half.y(u) - half.y(v)) < 1e-4f &&
+                    kotlin.math.abs(half.z(u) - half.z(v)) < 1e-4f
+            }
+            assertTrue("el vértice $v no tiene reflejo", twin)
+        }
     }
 
     @Test
@@ -153,8 +161,11 @@ class GeometryTest {
         val b = EditableMesh.box(0.5f, 0.5f, 0.5f)
         val result = Csg.subtract(a, b)
         assertTrue(result.faces.isNotEmpty())
-        assertTrue(MeshOps.validate(result).ok)
-        assertTrue("la resta debe tener menos volumen", result.volume() < a.volume())
+        assertTrue(MeshOps.validate(result).problems.toString(), MeshOps.validate(result).ok)
+        assertTrue(
+            "la resta debe tener menos volumen (A=${a.volume()}, resta=${result.volume()})",
+            result.volume() < a.volume()
+        )
     }
 
     @Test
@@ -162,8 +173,11 @@ class GeometryTest {
         val a = EditableMesh.box(1f, 1f, 1f)
         val b = EditableMesh.box(1f, 1f, 1f).translate(0.5f, 0f, 0f)
         val result = Csg.union(a, b)
-        assertTrue(MeshOps.validate(result).ok)
-        assertTrue(result.volume() > a.volume())
+        assertTrue(MeshOps.validate(result).problems.toString(), MeshOps.validate(result).ok)
+        assertTrue(
+            "la unión debe ocupar más volumen que A (A=${a.volume()}, unión=${result.volume()})",
+            result.volume() > a.volume()
+        )
     }
 
     @Test

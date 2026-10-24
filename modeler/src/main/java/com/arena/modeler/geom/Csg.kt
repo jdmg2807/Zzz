@@ -79,11 +79,17 @@ object Csg {
                         if (ti != b) fv.add(vi)
                         if (ti != f) bv.add(vi)
                         if ((ti or tj) == spanning) {
-                            val t = (w - (nx * vi.x + ny * vi.y + nz * vi.z)) /
-                                (nx * (vj.x - vi.x) + ny * (vj.y - vi.y) + nz * (vj.z - vi.z))
-                            val v = vi.lerp(vj, t)
-                            fv.add(v)
-                            bv.add(v)
+                            val denom = nx * (vj.x - vi.x) + ny * (vj.y - vi.y) + nz * (vj.z - vi.z)
+                            // Una arista casi paralela al plano no se puede cortar: cortar por
+                            // cero produciría NaN y una malla imposible de usar.
+                            if (abs(denom) > 1e-12f) {
+                                var t = (w - (nx * vi.x + ny * vi.y + nz * vi.z)) / denom
+                                if (t.isNaN() || t.isInfinite()) t = 0f
+                                t = t.coerceIn(0f, 1f)
+                                val v = vi.lerp(vj, t)
+                                fv.add(v)
+                                bv.add(v)
+                            }
                         }
                     }
                     if (fv.size >= 3) front.add(Polygon(fv, polygon.plane, polygon.material))
@@ -317,6 +323,8 @@ object Csg {
             return index.getOrPut(key) { out.addVertex(v.x, v.y, v.z) }
         }
         for (p in polygons) {
+            if (p.vertices.size < 3) continue
+            if (p.vertices.any { !it.x.isFinite() || !it.y.isFinite() || !it.z.isFinite() }) continue
             val unique = LinkedHashSet<Int>()
             for (v in p.vertices) unique.add(vertexIndex(v))
             if (unique.size < 3) continue
