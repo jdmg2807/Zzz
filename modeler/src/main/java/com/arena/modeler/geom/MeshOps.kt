@@ -450,8 +450,9 @@ object MeshOps {
      * - [keepBoth] = `true` (modificador espejo): conserva toda la geometría y añade la copia
      *   reflejada de la mitad positiva. Si el modelo ya era simétrico, la copia coincide con la
      *   geometría existente y se descarta (sin caras duplicadas).
-     * - [keepBoth] = `false` (simetrizar): se queda con la mitad positiva (más las caras que
-     *   están sobre el plano del eje) y la refleja, de modo que el modelo queda simétrico.
+     * - [keepBoth] = `false` (simetrizar): se queda con la mitad positiva, conserva enteras las
+     *   caras que cruzan el plano y refleja solo lo estrictamente positivo, de modo que el
+     *   modelo queda simétrico sin duplicar caras.
      *
      * En ambos casos las caras que viven **sobre** el plano no se duplican.
      */
@@ -484,7 +485,10 @@ object MeshOps {
             val mat = mesh.faceMaterial.getOrElse(fi) { 0 }
             val c = centroid(f)
             val plane = onPlane(f)
-            val keep = keepBoth || plane || c > 1e-6f
+            // Simetrizar: se descarta solo lo que está estrictamente en la mitad negativa. Las
+            // caras que cruzan el plano se conservan enteras (no se cortan): cortar exige un
+            // algoritmo de recorte que aquí no hace falta y perdería detalle del modelo.
+            val keep = keepBoth || c >= -1e-6f
             if (keep) out.addFace(f.copyOf(), mat)
             // Solo se refleja lo que está estrictamente en la mitad positiva: reflejar una cara
             // sobre el plano la duplicaría, y reflejar una negativa la sacaría de su sitio.
