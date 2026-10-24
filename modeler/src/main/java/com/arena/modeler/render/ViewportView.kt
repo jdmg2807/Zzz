@@ -6,6 +6,7 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.ViewConfiguration
+import com.arena.modeler.core.Geom
 import com.arena.modeler.core.M4
 import com.arena.modeler.core.V3
 import com.arena.modeler.scene.SceneDocument
@@ -31,6 +32,10 @@ class ViewportView @JvmOverloads constructor(
 
     var onNodeSelected: ((Int) -> Unit)? = null
     var onNodeTransformed: (() -> Unit)? = null
+    /** Punto del mundo donde el usuario apoya el pincel de esculpido. */
+    var onSculpt: ((FloatArray) -> Unit)? = null
+
+    private var lastSculptAt = 0L
 
     private val scaleDetector = ScaleGestureDetector(
         context,
@@ -119,6 +124,10 @@ class ViewportView @JvmOverloads constructor(
         scaleDetector.onTouchEvent(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                if (state.sculpting) {
+                    sculptAt(event.x, event.y)
+                    return true
+                }
                 lastX = event.x
                 lastY = event.y
                 downX = event.x
@@ -147,6 +156,15 @@ class ViewportView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_MOVE -> {
                 if (hypot(event.x - downX, event.y - downY) > touchSlop * 2) moved = true
+                if (state.sculpting) {
+                    val now = System.currentTimeMillis()
+                    // Se limita a ~12 pinceladas por segundo para no saturar la malla.
+                    if (now - lastSculptAt > 80) {
+                        lastSculptAt = now
+                        sculptAt(event.x, event.y)
+                    }
+                    return true
+                }
                 when {
                     mode == MODE_GIZMO -> dragGizmo(event.x, event.y)
                     mode == MODE_PAN && event.pointerCount >= 2 -> {
@@ -257,6 +275,53 @@ class ViewportView @JvmOverloads constructor(
             }
         }
         return tmin
+    }
+
+    // ------------------------------------------------------------------ esculpido
+
+    /**
+     * Lanza un rayo desde el dedo y aplica el pincel en el primer triángulo del objeto
+     * seleccionado. El test se hace en el espacio local de la malla (con la inversa de la matriz
+     * del nodo) y el punto se devuelve en coordenadas del mundo.
+     */
+    private fun sculptAt(x: Float, y: Float) {
+        val node = state.selectedNode() ?: return
+        val mesh = node.mesh ?: return
+        val aspect = width.toFloat() / height.coerceAtLeast(1).toFloat()
+        val origin = V3()
+        val dir = V3()
+        state.camera.ray(x / width * 2f - 1f, 1f - y / height * 2f, aspect, origin, dir)
+        val world = node.worldMatrix()
+        val inv = FloatArray(16)
+        if (!M4.invert(inv, world)) return
+        val lo = M4.transformPoint(inv, origin.x, origin.y, origin.z)
+        val ld = M4.transformDir(inv, dir.x, dir.y, dir.z)
+        val len = sqrt(ld[0] * ld[0] + ld[1] * ld[1] + ld[2] * ld[2])
+        if (len < 1e-8f) return
+        val dx = ld[0] / len
+        val dy = ld[1] / len
+        val dz = ld[2] / len
+        val positions = mesh.positions
+        val indices = mesh.indices
+        var best = Float.MAX_VALUE
+        var i = 0
+        while (i + 2 < indices.size) {
+            val a = indices[i] * 3
+            val b = indices[i + 1] * 3
+            val c = indices[i + 2] * 3
+            val t = Geom.rayTriangle(
+                lo[0], lo[1], lo[2], dx, dy, dz,
+                positions[a], positions[a + 1], positions[a + 2],
+                positions[b], positions[b + 1], positions[b + 2],
+                positions[c], positions[c + 1], positions[c + 2]
+            )
+            if (t >= 0f && t < best) best = t
+            i += 3
+        }
+        if (best == Float.MAX_VALUE) return
+        val local = floatArrayOf(lo[0] + dx * best, lo[1] + dy * best, lo[2] + dz * best)
+        val hit = M4.transformPoint(world, local[0], local[1], local[2])
+        onSculpt?.invoke(hit)
     }
 
     // ------------------------------------------------------------------ gizmo

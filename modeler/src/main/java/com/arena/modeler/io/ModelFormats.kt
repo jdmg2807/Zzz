@@ -64,7 +64,45 @@ object ModelFormats {
         "application/octet-stream", "application/x-tgif", "text/plain", "*/*"
     )
 
+    /**
+     * Exportación con **verificación**: genera el archivo, lo vuelve a leer y comprueba que la
+     * geometría está ahí. Solo devuelve el resultado si la comprobación pasa; si no, lanza con el
+     * motivo. Es la única forma honesta de decir "exportado" en la interfaz.
+     */
     fun export(doc: SceneDocument, format: ExportFormat): ExportResult {
+        val result = build(doc, format)
+        val check = verify(result.bytes, result.fileName, doc)
+        if (!check.ok) throw ExportVerificationException(check.message)
+        return result
+    }
+
+    class ExportVerificationException(message: String) : Exception(message)
+
+    /** Relee el archivo generado y compara la geometría con la escena de origen. */
+    fun verify(bytes: ByteArray, fileName: String, source: SceneDocument? = null): FormatInfo {
+        if (bytes.size < 64) return FormatInfo("vacío", false, "El archivo generado está vacío")
+        val reread = try {
+            read(bytes, fileName)
+        } catch (e: Exception) {
+            return FormatInfo("ilegible", false, "El archivo generado no se puede volver a leer: ${e.message}")
+        }
+        val triangles = reread.totalTriangles()
+        if (triangles <= 0) {
+            return FormatInfo("sin geometría", false, "El archivo generado no contiene triángulos")
+        }
+        val expected = source?.totalTriangles() ?: 0
+        if (expected > 0 && triangles < expected / 4) {
+            return FormatInfo(
+                "incompleto",
+                false,
+                "Se exportaron $triangles triángulos de $expected esperados"
+            )
+        }
+        return FormatInfo("verificado", true, "$triangles triángulos, ${bytes.size / 1024} KB")
+    }
+
+    /** Construye el archivo sin verificarlo (usado por [export] y por las pruebas). */
+    fun build(doc: SceneDocument, format: ExportFormat): ExportResult {
         val base = safeName(doc.name)
         return when (format) {
             ExportFormat.GLB -> ExportResult("$base.glb", Gltf.writeGlb(doc))

@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import com.arena.modeler.io.ExportResult
+import com.arena.modeler.settings.SecureStore
 import com.arena.modeler.io.Gltf
 import com.arena.modeler.io.ModelFormats
 import com.arena.modeler.scene.SceneDocument
@@ -29,6 +30,12 @@ object ObjectStore {
 
     fun init(context: Context) {
         appContext = context.applicationContext
+        SecureStore.init(context)
+    }
+
+    /** Directorio de archivos de la app, expuesto a los módulos que no conocen Android. */
+    fun files(): com.arena.modeler.core.ObjectStoreFiles = object : com.arena.modeler.core.ObjectStoreFiles {
+        override fun dir(): File = appContext.filesDir
     }
 
     // ------------------------------------------------------------------ settings
@@ -39,8 +46,9 @@ object ObjectStore {
         var openRouterKey: String = "",
         var googleKey: String = "",
         /** Model id per provider, so switching provider remembers both choices. */
-        var openRouterModel: String = AiCatalog.openRouterModels.first().id,
-        var googleModel: String = AiCatalog.googleModels.first().id,
+        /** Vacío hasta que el catálogo descargado dé una lista real de modelos. */
+        var openRouterModel: String = "",
+        var googleModel: String = "",
         var showGrid: Boolean = true,
         var showWireframe: Boolean = false,
         var autoRotate: Boolean = false,
@@ -72,8 +80,8 @@ object ObjectStore {
 
         fun toJson(): JSONObject = JSONObject().apply {
             put("provider", provider)
-            put("openRouterKey", openRouterKey)
-            put("googleKey", googleKey)
+            // Las claves NO se escriben aquí: van cifradas con el Android Keystore.
+            put("keysStored", true)
             put("openRouterModel", openRouterModel)
             put("googleModel", googleModel)
             put("showGrid", showGrid)
@@ -85,8 +93,14 @@ object ObjectStore {
 
         fun load(json: JSONObject) {
             provider = json.optString("provider", provider)
-            openRouterKey = json.optString("openRouterKey", openRouterKey)
-            googleKey = json.optString("googleKey", googleKey)
+            // Compatibilidad: si una versión anterior dejó la clave en el JSON, se migra al
+            // almacén cifrado y se borra del archivo.
+            val legacyOpenRouter = json.optString("openRouterKey", "")
+            val legacyGoogle = json.optString("googleKey", "")
+            openRouterKey = SecureStore.get("key_openrouter") ?: legacyOpenRouter
+            googleKey = SecureStore.get("key_google") ?: legacyGoogle
+            if (legacyOpenRouter.isNotBlank()) SecureStore.put("key_openrouter", legacyOpenRouter)
+            if (legacyGoogle.isNotBlank()) SecureStore.put("key_google", legacyGoogle)
             openRouterModel = json.optString("openRouterModel", openRouterModel)
             googleModel = json.optString("googleModel", googleModel)
             showGrid = json.optBoolean("showGrid", showGrid)
@@ -110,12 +124,11 @@ object ObjectStore {
         return s
     }
 
-    /** Where the downloaded model catalogue of a provider is cached. */
-    fun modelCacheFile(provider: AiProvider): File =
-        File(appContext.filesDir, "modelos_${provider.id}.json")
-
     fun saveSettings() {
         val s = cached ?: return
+        // Las claves van al Keystore; el JSON solo guarda el resto de ajustes.
+        SecureStore.put("key_openrouter", s.openRouterKey)
+        SecureStore.put("key_google", s.googleKey)
         runCatching { File(appContext.filesDir, SETTINGS).writeText(s.toJson().toString(2)) }
     }
 

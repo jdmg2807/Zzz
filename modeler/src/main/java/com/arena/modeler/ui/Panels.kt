@@ -27,16 +27,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.arena.modeler.ai.AiCatalog
-import com.arena.modeler.ai.AiProvider
-import com.arena.modeler.ai.ModelRegistry
+import com.arena.modeler.geom.MeshOps
 import com.arena.modeler.io.ExportFormat
 import com.arena.modeler.scene.AnimPath
-import com.arena.modeler.scene.AnimationClip
 import com.arena.modeler.scene.Primitives
 import com.arena.modeler.scene.SceneNode
+import java.util.Locale
 
 private val swatches: List<Pair<String, Color>> = listOf(
     "#E7E9EE" to Color(0xFFE7E9EE),
@@ -55,29 +54,18 @@ private val swatches: List<Pair<String, Color>> = listOf(
 
 private fun <T> chunk(items: List<T>, size: Int): List<List<T>> = items.chunked(size)
 
-// ---------------------------------------------------------------------------- objects
+// ---------------------------------------------------------------------------- escena
 
 @Composable
 fun ObjectsPanel(state: AppState) {
     val rev = state.revision
     val doc = state.doc ?: return
-    SectionTitle("Añadir primitiva")
-    for (row in chunk(Primitives.Kind.values().toList(), 3)) {
-        RowWrap {
-            for (kind in row) {
-                ChipButton(kind.label, modifier = Modifier.weight(1f)) { state.addPrimitive(kind) }
-            }
-        }
-    }
-    Divider()
-    SectionTitle("Jerarquía", "${doc.allNodes().size} objetos")
+    SectionTitle("Jerarquía", "${doc.allNodes().count { it.mesh != null }} objetos con malla")
     if (doc.allNodes().isEmpty()) {
-        Hint("La escena está vacía. Añade una primitiva o pide un modelo a la IA.")
-        return
-    }
-    key(rev) {
-        for (node in doc.allNodes()) {
-            NodeRow(state, doc.root, node)
+        Hint("Escena vacía. Crea geometría en la pestaña «Crear» o pídesela al chat de IA.")
+    } else {
+        key(rev) {
+            for (node in doc.allNodes()) NodeRow(state, node)
         }
     }
     Divider()
@@ -87,13 +75,32 @@ fun ObjectsPanel(state: AppState) {
         color = Palette.muted,
         fontSize = 11.sp
     )
+    if (doc.totalTriangles() > 200_000) {
+        Hint("La escena es pesada para un teléfono: reduce polígonos antes de seguir modelando.")
+    }
+    Divider()
+    SectionTitle("Acciones")
+    RowWrap {
+        ActionButton("Duplicar", Modifier.weight(1f), enabled = state.selectedNode() != null) {
+            state.duplicateSelected()
+        }
+        ActionButton("Eliminar", Modifier.weight(1f), enabled = state.selectedNode() != null) {
+            state.deleteSelected()
+        }
+    }
+    RowWrap {
+        ActionButton("Enfocar", Modifier.weight(1f)) { state.frameSelection() }
+        ActionButton("Al suelo", Modifier.weight(1f), enabled = state.selectedNode() != null) {
+            state.dropToFloor()
+        }
+    }
 }
 
 @Composable
-private fun NodeRow(state: AppState, root: SceneNode, node: SceneNode) {
+private fun NodeRow(state: AppState, node: SceneNode) {
     var depth = 0
     var p = node.parent
-    while (p != null && p !== root) {
+    while (p != null && p.parent != null) {
         depth++
         p = p.parent
     }
@@ -120,12 +127,14 @@ private fun NodeRow(state: AppState, root: SceneNode, node: SceneNode) {
             color = if (node.visible) Palette.text else Palette.muted,
             fontSize = 13.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(start = 8.dp).weight(1f)
         )
         Text(
-            if (node.mesh != null) "${node.mesh!!.vertexCount} v" else "grupo",
+            node.mesh?.let { "${it.triangleCount} tri" } ?: "grupo",
             color = Palette.muted,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             modifier = Modifier.padding(end = 8.dp)
         )
         Box(
@@ -139,7 +148,38 @@ private fun NodeRow(state: AppState, root: SceneNode, node: SceneNode) {
     }
 }
 
-// ---------------------------------------------------------------------------- edit
+// ---------------------------------------------------------------------------- crear
+
+@Composable
+fun CreatePanel(state: AppState) {
+    SectionTitle("Primitivas", "se crean ya como mallas editables")
+    for (row in chunk(Primitives.Kind.values().toList(), 3)) {
+        RowWrap {
+            for (kind in row) {
+                ChipButton(kind.label, modifier = Modifier.weight(1f)) { state.addPrimitive(kind) }
+            }
+        }
+    }
+    Divider()
+    SectionTitle("Geometría procedural por chat")
+    Hint(
+        "El chat puede encadenar herramientas para crear formas que no son primitivas: " +
+            "booleanas, biseles, curvas y subdivisiones. Ejemplo: «una taza: cilindro hueco con asa " +
+            "de tubo»."
+    )
+    ActionButton("Ir al chat de IA", Modifier.fillMaxWidth(), primary = true) {
+        state.tab = Tab.CHAT
+        state.panelOpen = true
+    }
+    Divider()
+    SectionTitle("Escena")
+    RowWrap {
+        ActionButton("Nueva escena", Modifier.weight(1f)) { state.newScene() }
+        ActionButton("Importar…", Modifier.weight(1f)) { state.tab = Tab.FILES }
+    }
+}
+
+// ---------------------------------------------------------------------------- editar
 
 @Composable
 fun EditPanel(state: AppState) {
@@ -147,10 +187,7 @@ fun EditPanel(state: AppState) {
     val node = state.selectedNode()
     if (node == null) {
         SectionTitle("Editar")
-        Hint(
-            "Toca un objeto en el visor o elígelo en la pestaña Objetos para moverlo, girarlo y " +
-                "escalarlo."
-        )
+        Hint("Toca un objeto en el visor o elígelo en «Escena».")
         return
     }
     var name by remember(node.id) { mutableStateOf(node.name) }
@@ -185,17 +222,54 @@ fun EditPanel(state: AppState) {
         SliderRow("Z", node.scale.z, 0.05f..5f) { state.setScale(node.scale.x, node.scale.y, it) }
     }
     Divider()
+    SectionTitle("Herramientas de malla", "sobre el objeto seleccionado")
+    key(rev, node.id) {
+        MeshTools(state)
+    }
+    Divider()
+    SculptTools(state)
+}
+
+@Composable
+private fun MeshTools(state: AppState) {
+    var amount by remember { mutableStateOf(0.1f) }
+    SliderRow("Grosor", amount, 0.005f..0.5f) { amount = it }
     RowWrap {
-        ActionButton("Duplicar", Modifier.weight(1f)) { state.duplicateSelected() }
-        ActionButton("Eliminar", Modifier.weight(1f)) { state.deleteSelected() }
+        ActionButton("Extruir", Modifier.weight(1f)) { state.extrude(amount) }
+        ActionButton("Inset", Modifier.weight(1f)) { state.inset(amount) }
+        ActionButton("Bisel", Modifier.weight(1f)) { state.bevel(amount) }
     }
     RowWrap {
-        ActionButton("Enfocar", Modifier.weight(1f)) { state.frameSelection() }
-        ActionButton("Al suelo", Modifier.weight(1f)) { state.dropToFloor() }
+        ActionButton("Subdividir", Modifier.weight(1f)) { state.subdivide(1) }
+        ActionButton("Suavizar", Modifier.weight(1f)) { state.smoothMesh(1, 0.5f) }
+        ActionButton("Espejar", Modifier.weight(1f)) { state.mirror(MeshOps.Axis.X) }
     }
+    RowWrap {
+        ActionButton("Booleana unión", Modifier.weight(1f)) { state.booleanWithSelectedOther("union") }
+        ActionButton("Booleana resta", Modifier.weight(1f)) { state.booleanWithSelectedOther("difference") }
+    }
+    RowWrap {
+        ActionButton("Reducir polígonos", Modifier.weight(1f)) { state.reduceMesh() }
+        ActionButton("Reparar", Modifier.weight(1f)) { state.repairMesh() }
+    }
+    Hint("Las booleanas usan el segundo objeto de la lista. El resultado es reversible con Deshacer.")
+}
+
+@Composable
+private fun SculptTools(state: AppState) {
+    SectionTitle("Esculpido", "arrastra en el visor")
+    RowWrap {
+        for (mode in MeshOps.SculptMode.values()) {
+            ChipButton(mode.label, selected = state.sculptMode == mode, modifier = Modifier.weight(1f)) {
+                state.sculptMode = mode
+            }
+        }
+    }
+    SliderRow("Radio", state.sculptRadius, 0.02f..1f) { state.sculptRadius = it }
+    SliderRow("Fuerza", state.sculptStrength, -0.2f..0.2f) { state.sculptStrength = it }
     Hint(
-        "Un dedo orbita, dos dedos desplazan, pellizcar acerca. Las flechas de colores mueven el " +
-            "objeto en un solo eje."
+        "El pincel se aplica desde la superficie hacia fuera (o hacia dentro con fuerza negativa). " +
+            "Cada pincelada queda en el historial."
     )
 }
 
@@ -211,7 +285,7 @@ fun MaterialPanel(state: AppState) {
         return
     }
     val mat = node.material
-    run {
+    key(rev, node.id) {
         SectionTitle("Color", node.name)
         for (row in chunk(swatches, 6)) {
             RowWrap(4) {
@@ -228,14 +302,18 @@ fun MaterialPanel(state: AppState) {
         SliderRow("Metal", mat?.metallic ?: 0f, 0f..1f) { state.setMaterialProps(metallic = it) }
         SliderRow("Rugos.", mat?.roughness ?: 0.6f, 0.02f..1f) { state.setMaterialProps(roughness = it) }
         ToggleRow(
-            "Emisión (brilla)",
+            "Emisión",
             mat?.emission?.let { it[0] + it[1] + it[2] > 0.01f } == true
         ) { state.setEmission(it) }
-        Hint("Los materiales se exportan a glTF/GLB, FBX y OBJ (.mtl). PLY guarda solo el color.")
+        Hint(
+            "El color y el acabado se exportan a glTF/GLB, FBX y OBJ. Las texturas de imagen se " +
+                "conservan al importar y exportar glTF, pero este visor aún no muestrea imágenes."
+        )
     }
 }
 
 private fun colorHex(c: FloatArray): String = String.format(
+    Locale.US,
     "#%02X%02X%02X",
     (c[0] * 255).toInt().coerceIn(0, 255),
     (c[1] * 255).toInt().coerceIn(0, 255),
@@ -252,46 +330,42 @@ private fun hexToFloat(hex: String): FloatArray {
     )
 }
 
-// ---------------------------------------------------------------------------- animation
+// ---------------------------------------------------------------------------- animar
 
 @Composable
 fun AnimatePanel(state: AppState) {
     val rev = state.revision
     val doc = state.doc ?: return
+    val node = state.selectedNode()
     SectionTitle("Animación", "${doc.animations.size} clips")
-    if (doc.animations.isEmpty()) {
-        ActionButton("Crear giro automático (4 s)", Modifier.fillMaxWidth(), primary = true) {
-            state.createTurntable()
+    if (node != null) {
+        Hint("Objeto seleccionado: ${node.name}")
+    }
+    RowWrap {
+        ActionButton("Nuevo giro", Modifier.weight(1f)) { state.createTurntable() }
+        ActionButton("Borrar clip", Modifier.weight(1f), enabled = state.currentClip() != null) {
+            state.deleteClip()
         }
-        Hint(
-            "El giro usa el objeto seleccionado (o el primero de la escena). Después puedes añadir " +
-                "claves manuales: selecciona un objeto, mueve el tiempo y pulsa «Posición», " +
-                "«Rotación» o «Escala»."
-        )
+    }
+    if (doc.animations.isEmpty()) {
+        Hint("El giro automático crea un clip de 4 s con rotación y rebote, para animar un objeto desde cero.")
         return
     }
+    SectionTitle("Clips")
     key(rev) {
         for (row in chunk(doc.animations, 2)) {
             RowWrap {
                 for (clip in row) {
                     val index = doc.animations.indexOf(clip)
-                    ChipButton(
-                        clip.name,
-                        selected = state.clipIndex == index,
-                        modifier = Modifier.weight(1f)
-                    ) {
+                    ChipButton(clip.name, selected = state.clipIndex == index, modifier = Modifier.weight(1f)) {
                         state.clipIndex = index
                         state.seekAnimation(0f)
-                        state.syncViewport()
                     }
                 }
             }
         }
     }
-    val clip: AnimationClip = state.currentClip() ?: run {
-        Hint("Ese clip ya no existe. Elige otro.")
-        return
-    }
+    val clip = state.currentClip() ?: return
     val duration = clip.duration().coerceAtLeast(0.1f)
     SectionTitle("Reproducir", "duración ${"%.2f".format(duration)} s")
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -315,226 +389,22 @@ fun AnimatePanel(state: AppState) {
             modifier = Modifier.padding(start = 8.dp)
         )
     }
-    SectionTitle("Añadir claves al objeto seleccionado")
+    SectionTitle("Añadir clave")
     RowWrap {
         ActionButton("Posición", Modifier.weight(1f)) { state.keyframe(AnimPath.TRANSLATION) }
         ActionButton("Rotación", Modifier.weight(1f)) { state.keyframe(AnimPath.ROTATION) }
         ActionButton("Escala", Modifier.weight(1f)) { state.keyframe(AnimPath.SCALE) }
     }
-    Divider()
-    RowWrap {
-        ActionButton("Borrar clip") { state.deleteClip() }
-        ActionButton("Nuevo giro") { state.createTurntable() }
-    }
-    Hint(
-        "La animación solo se conserva al exportar a glTF/GLB o FBX ASCII. OBJ, STL y PLY " +
-            "guardan únicamente la malla."
-    )
+    Hint("Las claves se guardan en el clip actual y sobreviven al exportar a GLB, glTF o FBX.")
 }
 
-// ---------------------------------------------------------------------------- AI
-
-@Composable
-fun AiPanel(state: AppState, onOpenKeyPage: (String) -> Unit) {
-    val provider = state.provider
-    // First time the tab is opened, ask the provider for its live catalogue.
-    androidx.compose.runtime.LaunchedEffect(provider) {
-        if (state.modelStatus == null && !state.modelLoading) state.refreshModels(provider, silent = true)
-    }
-    SectionTitle("Proveedor de IA")
-    RowWrap {
-        for (p in AiProvider.all()) {
-            ChipButton(p.label, selected = provider == p, modifier = Modifier.weight(1f)) {
-                state.chooseProvider(p)
-            }
-        }
-    }
-    Hint(provider.keyHelp)
-    val keyValue = if (provider == AiProvider.OPENROUTER) state.openRouterKey else state.googleKey
-    var keyDraft by remember(provider, keyValue) { mutableStateOf(keyValue) }
-    LabeledField(provider.keyTitle, keyDraft, password = true, placeholder = provider.keyHint) {
-        keyDraft = it
-    }
-    RowWrap {
-        ActionButton("Guardar clave", Modifier.weight(1f), primary = keyDraft.isNotBlank()) {
-            state.setKey(keyDraft)
-            state.message = if (keyDraft.isBlank()) "Clave borrada" else "Clave guardada en el teléfono"
-        }
-        ActionButton("Obtener clave", Modifier.weight(1f)) { onOpenKeyPage(provider.keyUrl) }
-    }
-    Divider()
-    ModelPicker(state)
-    Divider()
-    SectionTitle("Describe el modelo")
-    var prompt by remember { mutableStateOf(state.aiPrompt) }
-    TextField(
-        value = prompt,
-        onValueChange = {
-            prompt = it
-            state.aiPrompt = it
-        },
-        minLines = 3,
-        maxLines = 6,
-        textStyle = androidx.compose.ui.text.TextStyle(color = Palette.text, fontSize = 13.sp),
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = Palette.panelHigh,
-            unfocusedContainerColor = Palette.panelHigh,
-            focusedIndicatorColor = Palette.accent,
-            unfocusedIndicatorColor = Palette.stroke,
-            focusedTextColor = Palette.text,
-            unfocusedTextColor = Palette.text
-        ),
-        modifier = Modifier.fillMaxWidth()
-    )
-    SectionTitle("Ideas")
-    for (idea in AiCatalog.ideas) {
-        RowWrap {
-            ChipButton(idea, modifier = Modifier.fillMaxWidth()) {
-                prompt = idea
-                state.aiPrompt = idea
-            }
-        }
-    }
-    Divider()
-    RowWrap {
-        ActionButton("Generar modelo", Modifier.weight(1f), primary = true) {
-            state.runAi(prompt, refine = false)
-        }
-        ActionButton("Modificar el actual", Modifier.weight(1f)) {
-            state.runAi(prompt, refine = true)
-        }
-    }
-    Hint(
-        "La clave se guarda solo en este teléfono. El modelo se envía directamente al proveedor " +
-            "elegido: OpenRouter o Google AI Studio."
-    )
-}
-
-/**
- * Model chooser: every model the provider offers, with a free/paid filter, a search box and a
- * field for typing an id that is not in the list yet.
- */
-@Composable
-fun ModelPicker(state: AppState) {
-    var custom by remember { mutableStateOf("") }
-    val all = state.modelList
-    SectionTitle(
-        "Modelo",
-        "${all.size} disponibles · ${state.freeModelCount()} gratis · ${state.paidModelCount()} de pago"
-    )
-    RowWrap {
-        for (filter in ModelRegistry.PriceFilter.values()) {
-            ChipButton(
-                filter.label,
-                selected = state.modelFilter == filter,
-                modifier = Modifier.weight(1f)
-            ) { state.applyPriceFilter(filter) }
-        }
-    }
-    RowWrap {
-        ActionButton(
-            if (state.modelLoading) "Descargando lista…" else "Actualizar lista",
-            Modifier.weight(1f),
-            enabled = !state.modelLoading,
-            primary = true
-        ) { state.refreshModels() }
-    }
-    if (state.modelStatus != null) {
-        Text(state.modelStatus ?: "", color = Palette.muted, fontSize = 11.sp)
-    }
-    LabeledField("Buscar modelo", state.modelQuery, placeholder = "gemini, claude, llama…") {
-        state.modelQuery = it
-    }
-
-    val visible = state.visibleModels()
-    val shown = visible.take(state.modelsShown)
-    if (shown.isEmpty()) {
-        Hint(
-            if (all.isEmpty()) "Sin lista todavía. Pulsa «Actualizar lista»."
-            else "Ningún modelo coincide con el filtro o la búsqueda."
-        )
-    } else {
-        for (model in shown) {
-            ModelRow(model, selected = state.currentModel() == model.id) { state.setModel(model.id) }
-        }
-        if (visible.size > state.modelsShown) {
-            ActionButton(
-                "Mostrar más (${visible.size - state.modelsShown})",
-                Modifier.fillMaxWidth()
-            ) { state.modelsShown += 24 }
-        }
-    }
-    RowWrap {
-        Box(Modifier.weight(1f)) {
-            LabeledField("Otro modelo (id exacto)", custom, placeholder = "proveedor/modelo") { custom = it }
-        }
-    }
-    ActionButton("Usar ese id", Modifier.fillMaxWidth(), enabled = custom.isNotBlank()) {
-        state.setModel(custom.trim())
-        state.message = "Modelo seleccionado: ${custom.trim()}"
-    }
-    Hint("Modelo actual: ${state.modelLabel(state.provider, state.currentModel())}")
-    Hint(
-        "El filtro «Gratis» usa los precios que publica el proveedor (OpenRouter) o el nivel " +
-            "gratuito de AI Studio (Gemini Flash/Lite y Gemma). Los modelos de pago necesitan " +
-            "saldo en la cuenta; la app nunca cobra nada."
-    )
-}
-
-@Composable
-private fun ModelRow(model: ModelRegistry.ModelEntry, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp)
-            .clip(RoundedCornerShape(9.dp))
-            .background(if (selected) Palette.accentSoft else Palette.panelHigh.copy(alpha = 0.55f))
-            .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                model.label,
-                color = Palette.text,
-                fontSize = 13.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-            )
-            Text(
-                model.id + (if (model.context > 0) " · ${contextLabel(model.context)}" else ""),
-                color = Palette.muted,
-                fontSize = 10.sp
-            )
-        }
-        Box(
-            Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(if (model.free) Palette.good.copy(alpha = 0.18f) else Palette.stroke)
-                .padding(horizontal = 6.dp, vertical = 2.dp)
-        ) {
-            Text(
-                if (model.free) "GRATIS" else "PAGO",
-                color = if (model.free) Palette.good else Palette.muted,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-    }
-}
-
-private fun contextLabel(tokens: Int): String = when {
-    tokens >= 1_000_000 -> "${tokens / 1_000_000}M contexto"
-    tokens >= 1_000 -> "${tokens / 1_000}K contexto"
-    else -> "$tokens contexto"
-}
-
-// ---------------------------------------------------------------------------- files
+// ---------------------------------------------------------------------------- archivo
 
 @Composable
 fun FilesPanel(state: AppState, onImport: () -> Unit) {
     val rev = state.revision
     val doc = state.doc
-    SectionTitle("Exportar", "se guarda en Descargas/VoxelForge")
+    SectionTitle("Exportar", "se verifica antes de dar el visto bueno")
     for (row in chunk(ExportFormat.values().toList(), 2)) {
         RowWrap {
             for (format in row) {
@@ -546,20 +416,24 @@ fun FilesPanel(state: AppState, onImport: () -> Unit) {
         }
     }
     if (doc != null && doc.animations.isNotEmpty()) {
-        Hint("Este modelo tiene ${doc.animations.size} animación(es): usa GLB o FBX para no perderlas.")
+        Hint("Este modelo tiene ${doc.animations.size} animación(es): usa GLB o FBX para conservarlas.")
     }
+    Hint(
+        "Antes de confirmar, el archivo se vuelve a leer y se comprueban los triángulos: si algo " +
+            "falla, la app lo dice y no afirma que se exportó."
+    )
     Divider()
     SectionTitle("Importar")
     ActionButton("Abrir archivo del teléfono", Modifier.fillMaxWidth(), primary = true) { onImport() }
     Hint(
-        "Compatible: glTF/GLB, FBX ASCII, OBJ, STL y PLY. Los FBX binarios, .blend, .dae, .3ds y " +
-            "los formatos empaquetados no se pueden abrir; expórtalos a glTF desde Blender."
+        "glTF/GLB, FBX ASCII, OBJ, STL y PLY. Los FBX binarios, .blend, .dae y .3ds no se abren: " +
+            "conviértelos a glTF."
     )
     Divider()
-    SectionTitle("Proyectos guardados")
+    SectionTitle("Proyectos")
     RowWrap {
         ActionButton("Guardar proyecto", Modifier.weight(1f), primary = true) { state.saveProject() }
-        ActionButton("Nuevo", Modifier.weight(1f)) { state.newScene() }
+        ActionButton("Nueva escena", Modifier.weight(1f)) { state.newScene() }
     }
     val projects = state.projects()
     if (projects.isEmpty()) {
@@ -584,6 +458,38 @@ fun FilesPanel(state: AppState, onImport: () -> Unit) {
                     ActionButton("Abrir") { state.openProject(p) }
                     ActionButton("Borrar") { state.deleteProject(p) }
                 }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------- historial
+
+@Composable
+fun HistoryPanel(state: AppState) {
+    SectionTitle("Historial de cambios", "${state.historyEntries.size} entradas")
+    RowWrap {
+        ActionButton("Deshacer", Modifier.weight(1f), enabled = state.undoDepth > 0) { state.undo() }
+        ActionButton("Rehacer", Modifier.weight(1f), enabled = state.redoDepth > 0) { state.redo() }
+    }
+    Hint("Deshacer guarda hasta 20 estados completos de la escena, incluidos los cambios hechos por la IA.")
+    Divider()
+    if (state.historyEntries.isEmpty()) {
+        Hint("Aún no hay cambios registrados en esta sesión.")
+        return
+    }
+    for (entry in state.historyEntries.take(30)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Palette.panelHigh.copy(alpha = 0.5f))
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+        ) {
+            Text(entry.text, color = Palette.text, fontSize = 12.sp)
+            if (entry.detail.isNotBlank()) {
+                Text(entry.detail, color = Palette.muted, fontSize = 10.sp, maxLines = 2)
             }
         }
     }

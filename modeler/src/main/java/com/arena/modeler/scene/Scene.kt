@@ -146,7 +146,33 @@ class SceneNode(
     var scale = V3(1f, 1f, 1f)
 
     var mesh: MeshData? = null
+        set(value) {
+            field = value
+            editableCache = null
+        }
     var material: Material? = null
+
+    /**
+     * Versión editable (vértices + caras de n lados) de [mesh], para el motor de geometría.
+     * Se construye la primera vez que se pide y se invalida al cambiar la malla.
+     */
+    private var editableCache: com.arena.modeler.geom.EditableMesh? = null
+
+    fun editableMesh(): com.arena.modeler.geom.EditableMesh? {
+        val current = mesh ?: return null
+        editableCache?.let { return it }
+        if (current.indices.isEmpty()) return null
+        val built = com.arena.modeler.geom.EditableMesh.fromMeshData(current)
+        editableCache = built
+        return built
+    }
+
+    /** Reemplaza la malla por una editable, regenerando posiciones/normales/UV para el visor. */
+    fun setEditableMesh(newMesh: com.arena.modeler.geom.EditableMesh, smooth: Boolean = false) {
+        editableCache = newMesh
+        mesh = if (newMesh.faces.isEmpty()) null else newMesh.toMeshData(smooth = smooth)
+        markDirty()
+    }
 
     /** Joints of the skin used by this mesh (bone space matrices). */
     var skin: List<Joint> = emptyList()

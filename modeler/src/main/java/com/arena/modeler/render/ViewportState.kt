@@ -9,6 +9,13 @@ import com.arena.modeler.scene.SceneNode
  * Everything the GL thread needs to know, written by the UI. Kept apart from the view so the
  * Compose layer can drive it without knowing anything about OpenGL.
  */
+enum class ViewMode(val label: String) {
+    SOLID("Sólido"),
+    WIREFRAME("Alámbrico"),
+    MATERIAL("Material"),
+    SHADED("Sin texturas")
+}
+
 class ViewportState {
 
     @Volatile
@@ -35,6 +42,20 @@ class ViewportState {
 
     @Volatile
     var showWireframe: Boolean = false
+
+    /** Modo de visualización del visor. */
+    @Volatile
+    var viewMode: ViewMode = ViewMode.SOLID
+
+    /** Pincel de esculpido activo (radio en metros y signo de la fuerza). */
+    @Volatile
+    var sculpting: Boolean = false
+
+    @Volatile
+    var sculptRadius: Float = 0.25f
+
+    @Volatile
+    var sculptStrength: Float = 0.05f
 
     @Volatile
     var showBones: Boolean = true

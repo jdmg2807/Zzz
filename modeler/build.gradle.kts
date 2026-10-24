@@ -11,8 +11,8 @@ android {
         applicationId = "com.arena.modeler"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     /**
@@ -71,6 +71,7 @@ android {
     packaging {
         resources.excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1", "META-INF/*.kotlin_module")
     }
+
 }
 
 dependencies {
@@ -84,4 +85,10 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     // IA y exportación corren fuera del hilo de UI.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // Pruebas unitarias en la JVM. `org.json` se declara porque en las pruebas el stub de
+    // android.jar no implementa nada: con el jar real, glTF, herramientas y chat se prueban de
+    // verdad.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

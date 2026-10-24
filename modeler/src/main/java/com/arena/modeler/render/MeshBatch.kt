@@ -46,7 +46,14 @@ class MeshBatch {
         uSelected = GLES30.glGetUniformLocation(program, "uSelected")
     }
 
-    fun draw(node: SceneNode, viewProj: FloatArray, camera: V3, selected: Boolean, doubleSided: Boolean) {
+    fun draw(
+        node: SceneNode,
+        viewProj: FloatArray,
+        camera: V3,
+        selected: Boolean,
+        doubleSided: Boolean,
+        uniformColor: FloatArray? = null
+    ) {
         val mesh = node.mesh ?: return
         if (mesh.indices.isEmpty()) return
         ensureProgram()
@@ -62,7 +69,12 @@ class MeshBatch {
         GLES30.glUniform3f(uCam, camera.x, camera.y, camera.z)
         GLES30.glUniform1f(uSelected, if (selected) 1f else 0f)
         val mat = node.material
-        if (mat != null) {
+        if (uniformColor != null) {
+            GLES30.glUniform3f(uColor, uniformColor[0], uniformColor[1], uniformColor[2])
+            GLES30.glUniform1f(uMetallic, 0.05f)
+            GLES30.glUniform1f(uRoughness, 0.55f)
+            GLES30.glUniform3f(uEmission, 0f, 0f, 0f)
+        } else if (mat != null) {
             GLES30.glUniform3f(uColor, mat.baseColor[0], mat.baseColor[1], mat.baseColor[2])
             GLES30.glUniform1f(uMetallic, mat.metallic)
             GLES30.glUniform1f(uRoughness, mat.roughness)

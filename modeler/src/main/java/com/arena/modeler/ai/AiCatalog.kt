@@ -36,46 +36,12 @@ enum class AiProvider(
     }
 }
 
-/** One selectable model: the id sent to the API plus a friendly label. */
-class AiModel(
-    val id: String,
-    val label: String,
-    val note: String = "",
-    /** Whether the model can be used on the free tier (or costs nothing on OpenRouter). */
-    val free: Boolean = false
-)
-
+/**
+ * Textos fijos de la interfaz de IA. **No hay catálogo de modelos escrito a mano**: la lista
+ * siempre se descarga del proveedor (ver [ModelCatalog]) para no ofrecer modelos que ya no
+ * existen ni precios inventados.
+ */
 object AiCatalog {
-
-    /**
-     * Offline fallback. The real list is downloaded from each provider (see [ModelRegistry]);
-     * these ids are only used before the first sync or when the phone has no connection.
-     */
-    val openRouterModels: List<AiModel> = listOf(
-        AiModel("google/gemini-2.5-flash", "Gemini 2.5 Flash", "rápido y económico", free = false),
-        AiModel("openai/gpt-4o-mini", "GPT-4o mini", "buen equilibrio", free = false),
-        AiModel("deepseek/deepseek-chat", "DeepSeek V3", "muy bueno con JSON", free = false),
-        AiModel("google/gemini-2.0-flash-exp:free", "Gemini 2.0 Flash (free)", "sin coste", free = true),
-        AiModel("meta-llama/llama-3.3-70b-instruct", "Llama 3.3 70B", "abierto", free = false),
-        AiModel("qwen/qwen-2.5-72b-instruct", "Qwen 2.5 72B", "abierto", free = false)
-    )
-
-    val googleModels: List<AiModel> = listOf(
-        AiModel("gemini-2.5-flash", "Gemini 2.5 Flash", "recomendado", free = true),
-        AiModel("gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite", "el más rápido", free = true),
-        AiModel("gemini-3.5-flash", "Gemini 3.5 Flash", "nuevo", free = true),
-        AiModel("gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite", "nuevo y ligero", free = true),
-        AiModel("gemini-2.5-pro", "Gemini 2.5 Pro", "máxima calidad", free = false)
-    )
-
-    fun models(provider: AiProvider): List<AiModel> = when (provider) {
-        AiProvider.OPENROUTER -> openRouterModels
-        AiProvider.GOOGLE_AI_STUDIO -> googleModels
-    }
-
-    fun defaultModel(provider: AiProvider): String = models(provider).first().id
-
-    fun find(provider: AiProvider, id: String): AiModel? = models(provider).firstOrNull { it.id == id }
 
     /**
      * Ideas shown as chips in the panel so the feature is discoverable without typing anything.

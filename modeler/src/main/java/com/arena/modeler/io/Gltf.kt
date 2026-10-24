@@ -17,7 +17,6 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import android.util.Base64
 
 /**
  * glTF 2.0 reader/writer (GLB binary and .gltf with the buffer embedded in base64).
@@ -178,7 +177,7 @@ object Gltf {
         val buffers = JSONArray()
         val b = JSONObject()
         b.put("byteLength", bin.size)
-        b.put("uri", "data:application/octet-stream;base64," + Base64.encodeToString(bin, Base64.NO_WRAP))
+        b.put("uri", "data:application/octet-stream;base64," + com.arena.modeler.core.Text64.encode(bin))
         buffers.put(b)
         root.put("buffers", buffers)
         return root.toString(1).toByteArray(Charsets.UTF_8)
@@ -516,7 +515,7 @@ object Gltf {
                     val comma = uri.indexOf(',')
                     if (comma > 0) {
                         try {
-                            buffers.add(Base64.decode(uri.substring(comma + 1), Base64.DEFAULT))
+                            buffers.add(com.arena.modeler.core.Text64.decode(uri.substring(comma + 1)))
                         } catch (t: Throwable) {
                             buffers.add(ByteArray(0))
                         }

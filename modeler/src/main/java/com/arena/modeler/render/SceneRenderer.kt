@@ -86,11 +86,20 @@ class SceneRenderer(private val state: ViewportState) : GLSurfaceView.Renderer {
         if (doc != null) {
             synchronized(doc) {
                 val nodes = doc.allNodes()
-                for (n in nodes) {
-                    if (!n.visible || n.mesh == null) continue
-                    meshes.draw(n, vp, camera, n.id == state.selectedId, false)
+                val mode = state.viewMode
+                val solidGrey = floatArrayOf(0.72f, 0.75f, 0.80f)
+                if (mode != ViewMode.WIREFRAME) {
+                    for (n in nodes) {
+                        if (!n.visible || n.mesh == null) continue
+                        meshes.draw(
+                            n, vp, camera,
+                            selected = n.id == state.selectedId,
+                            doubleSided = false,
+                            uniformColor = if (mode == ViewMode.SOLID) solidGrey else null
+                        )
+                    }
                 }
-                if (state.showWireframe) drawWireframe(doc.allNodes(), vp)
+                if (state.showWireframe || mode == ViewMode.WIREFRAME) drawWireframe(doc.allNodes(), vp)
                 val selected = state.selectedNode()
                 if (selected != null) {
                     drawSelection(selected, vp)

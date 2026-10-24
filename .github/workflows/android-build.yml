@@ -52,6 +52,12 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Pruebas unitarias (JVM)
+        run: |
+          set -o pipefail
+          gradle :modeler:testDebugUnitTest \
+            --no-daemon --stacktrace --console=plain 2>&1 | tee test.log
+
       - name: Compilar APK
         run: |
           set -o pipefail
@@ -67,6 +73,22 @@ jobs:
             echo "- Gradle: ${{ job.status }}"
             if ls modeler/build/outputs/apk/release/*.apk >/dev/null 2>&1; then
               echo "- APK release: $(ls -lh modeler/build/outputs/apk/release/*.apk | awk '{print $5, $9}')"
+            fi
+            if [ -f test.log ]; then
+              echo ""
+              echo "### Pruebas unitarias"
+              echo '```'
+              grep -E "tests completed|FAILED|PASSED|BUILD (SUCCESSFUL|FAILED)" test.log | tail -20 || true
+              echo '```'
+            fi
+            if ls modeler/build/test-results/testDebugUnitTest/*.xml >/dev/null 2>&1; then
+              echo ""
+              echo "### Resumen de pruebas"
+              echo '```'
+              grep -h -o 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' \
+                modeler/build/test-results/testDebugUnitTest/*.xml | awk -F'"' \
+                '{t+=$2; s+=$4; f+=$6; e+=$8} END {printf "tests=%d skipped=%d failures=%d errors=%d\n", t, s, f, e}'
+              echo '```'
             fi
             if [ -f build.log ]; then
               echo ""
