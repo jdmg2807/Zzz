@@ -58,7 +58,7 @@ jobs:
       - name: Compilar APK y mod de ejemplo
         run: |
           set -o pipefail
-          gradle :app:assembleDebug :app:assembleRelease :examplemod:jar \
+          gradle :app:assembleDebug :app:assembleRelease :modeler:assembleDebug :modeler:assembleRelease :examplemod:jar \
             --no-daemon --stacktrace --console=plain 2>&1 | tee build.log
 
       - name: Resumen de la compilación
@@ -69,7 +69,10 @@ jobs:
             echo ""
             echo "- Gradle: ${{ job.status }}"
             if ls app/build/outputs/apk/release/*.apk >/dev/null 2>&1; then
-              echo "- APK release: $(ls -lh app/build/outputs/apk/release/*.apk | awk '{print $5, $9}')"
+              echo "- APK juego: $(ls -lh app/build/outputs/apk/release/*.apk | awk '{print $5, $9}')"
+            fi
+            if ls modeler/build/outputs/apk/release/*.apk >/dev/null 2>&1; then
+              echo "- APK modelador: $(ls -lh modeler/build/outputs/apk/release/*.apk | awk '{print $5, $9}')"
             fi
             if [ -f build.log ]; then
               echo ""
@@ -125,6 +128,12 @@ jobs:
           cp app/build/outputs/apk/release/*.apk "dist/VoxelCraft-${GITHUB_RUN_NUMBER}-release.apk"
           cp app/build/outputs/apk/debug/*.apk "dist/VoxelCraft-${GITHUB_RUN_NUMBER}-debug.apk"
           cp examplemod/build/libs/examplemod.jar dist/examplemod.jar
+          if ls modeler/build/outputs/apk/release/*.apk >/dev/null 2>&1; then
+            cp modeler/build/outputs/apk/release/*.apk "dist/VoxelForge-${GITHUB_RUN_NUMBER}-release.apk"
+          fi
+          if ls modeler/build/outputs/apk/debug/*.apk >/dev/null 2>&1; then
+            cp modeler/build/outputs/apk/debug/*.apk "dist/VoxelForge-${GITHUB_RUN_NUMBER}-debug.apk"
+          fi
           ls -lh dist
 
       - name: Verificar firma y tamaño
@@ -143,7 +152,10 @@ jobs:
             echo "### Certificado de firma"
             echo '```'
             if [ -n "$APKSIGNER" ]; then
-              "$APKSIGNER" verify --print-certs dist/*-release.apk | head -6
+              for APK in dist/*-release.apk; do
+                echo "# $APK"
+                "$APKSIGNER" verify --print-certs "$APK" | head -5
+              done
             else
               echo "apksigner no encontrado"
             fi
@@ -155,7 +167,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: VoxelCraft-APK
+          name: APKs
           path: dist/*
           if-no-files-found: error
 

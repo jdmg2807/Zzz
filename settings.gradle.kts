@@ -19,3 +19,4 @@ rootProject.name = "VoxelCraft"
 include(":app")
 include(":modkit")
 include(":examplemod")
+include(":modeler")
