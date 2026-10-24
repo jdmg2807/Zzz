@@ -575,7 +575,7 @@ object MeshOps {
             val root = find(mesh.faces[fi][0])
             groups.getOrPut(root) { ArrayList() }.add(fi)
         }
-        return groups.values.map { subset(mesh, it).compact() }
+        return groups.values.map { mesh.subset(it).compact() }
     }
 
     // ------------------------------------------------------------------ validación
