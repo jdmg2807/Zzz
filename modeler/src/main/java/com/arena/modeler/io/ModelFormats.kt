@@ -94,7 +94,7 @@ object ModelFormats {
         val ext = fileName.substringAfterLast('.', "").lowercase(Locale.US)
         val head = String(bytes, 0, minOf(bytes.size, 512), Charsets.ISO_8859_1)
         if (head.startsWith("glTF")) {
-            return Gltf.read(bytes, fileName)
+            return guard(fileName) { Gltf.read(bytes, fileName) }
         }
         if (head.startsWith("Kaydara FBX Binary")) {
             throw UnsupportedFormatException(
@@ -103,12 +103,12 @@ object ModelFormats {
             )
         }
         when (ext) {
-            "glb" -> return Gltf.read(bytes, fileName)
-            "gltf" -> return Gltf.read(bytes, fileName)
-            "fbx" -> return Fbx.read(bytes, fileName)
-            "obj" -> return Obj.read(bytes, fileName)
-            "stl" -> return Stl.read(bytes, fileName)
-            "ply" -> return Ply.read(bytes, fileName)
+            "glb" -> return guard(fileName) { Gltf.read(bytes, fileName) }
+            "gltf" -> return guard(fileName) { Gltf.read(bytes, fileName) }
+            "fbx" -> return guard(fileName) { Fbx.read(bytes, fileName) }
+            "obj" -> return guard(fileName) { Obj.read(bytes, fileName) }
+            "stl" -> return guard(fileName) { Stl.read(bytes, fileName) }
+            "ply" -> return guard(fileName) { Ply.read(bytes, fileName) }
             "dae", "xml" -> throw UnsupportedFormatException(
                 "COLLADA (.dae) todavía no está soportado. Exporta el modelo a glTF, FBX ASCII u OBJ."
             )
@@ -125,7 +125,7 @@ object ModelFormats {
         }
         // No (or wrong) extension: sniff the contents.
         val text = String(bytes, 0, minOf(bytes.size, 4096), Charsets.UTF_8)
-        val sniffed = sniff(bytes, text)
+        val sniffed = guard(fileName) { sniff(bytes, text) }
         if (sniffed != null) return sniffed
         throw UnsupportedFormatException("No se reconoce el formato del archivo «$fileName».")
     }
@@ -179,6 +179,21 @@ object ModelFormats {
             ((bytes[82].toInt() and 0xFF) shl 16) or
             ((bytes[83].toInt() and 0xFF) shl 24)
         return triangles >= 0 && 84 + triangles.toLong() * 50L == bytes.size.toLong()
+    }
+
+    /**
+     * Any parser failure becomes a message the UI can show: a corrupt file or an unsupported
+     * variant should never surface as a stack trace.
+     */
+    private inline fun <T> guard(fileName: String, block: () -> T): T = try {
+        block()
+    } catch (e: UnsupportedFormatException) {
+        throw e
+    } catch (e: Throwable) {
+        throw UnsupportedFormatException(
+            "No se pudo leer «$fileName»: ${e.message ?: e.javaClass.simpleName}.\n" +
+                "Si viene de Blender, expórtalo como glTF/GLB."
+        )
     }
 
     /** File-system safe name, used for every exported file. */

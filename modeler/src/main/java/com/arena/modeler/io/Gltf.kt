@@ -521,8 +521,13 @@ object Gltf {
                             buffers.add(ByteArray(0))
                         }
                     }
-                } else {
+                } else if (uri.isNotBlank()) {
                     // External .bin cannot be resolved from a single imported file.
+                    throw IllegalArgumentException(
+                        "Este .gltf apunta a un archivo externo ($uri). " +
+                            "Exporta como .glb o con los buffers incrustados."
+                    )
+                } else {
                     buffers.add(ByteArray(0))
                 }
             }

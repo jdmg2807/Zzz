@@ -1,5 +1,23 @@
 # Changelog
 
+## v3.0.0 — VoxelForge 3D: modelado, animación e IA
+- **App nueva en el mismo repositorio** (módulo `modeler/`, `com.arena.modeler`): se instala y
+  actualiza aparte del juego, con su propio icono y su propia firma (`keystore/modeler.p12`).
+- **Modelado**: cubo, esfera, cilindro, cono, toro, plano e icósfera; jerarquía, duplicar,
+  ocultar, borrar, y edición numérica de posición/rotación/escala.
+- **Visor OpenGL ES 3.0 propio**: órbita con un dedo, paneo con dos, zoom con pellizco,
+  selección por rayo, gizmo de traslación por ejes, cuadrícula, wireframe y huesos.
+- **IA dentro de la app** con **OpenRouter** o **Google AI Studio** (clave del usuario): genera
+  el modelo desde una descripción o modifica el actual, con un esquema JSON propio que admite
+  primitivas, mallas y animaciones.
+- **Formatos**: lectura y escritura de glTF/GLB, FBX ASCII, OBJ+MTL, STL (texto/binario) y PLY
+  (texto/binario). La animación sobrevive en GLB/glTF/FBX; mensajes claros para FBX binario,
+  `.blend`, `.dae`, `.3ds` y paquetes `.3mf/.zip/.usdz`.
+- **Archivos**: exportación a `Descargas/VoxelForge`, proyectos locales en GLB, autoguardado y
+  deshacer (12 pasos).
+- **CI**: el workflow compila `:modeler:assembleDebug/Release` y publica
+  `VoxelForge-<n>-release.apk` y `VoxelForge-<n>-debug.apk` en el artefacto y en el Release.
+
 ## v2.2.1 — Ajustes con el diseño de Bedrock
 - **Pantalla de Ajustes reconstruida**: barra superior con flecha de volver, panel oscuro con
   secciones (controles, interfaz, sonido, contenido, diagnóstico), deslizadores de piedra con

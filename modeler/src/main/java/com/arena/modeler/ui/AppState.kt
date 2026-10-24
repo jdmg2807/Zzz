@@ -95,7 +95,7 @@ class AppState(private val context: Context) {
 
     // ------------------------------------------------------------------ viewport
 
-    fun attach(view: ViewportView) {
+    fun attach(view: ViewportView, frameAllOnAttach: Boolean = true) {
         viewport = view
         view.state.onSelect = { id ->
             selectedId = id
@@ -103,7 +103,8 @@ class AppState(private val context: Context) {
         }
         view.state.onTransform = { revision++ }
         view.state.doc = doc
-        syncViewport(frame = true)
+        syncViewport()
+        if (frameAllOnAttach) view.frameAll()
     }
 
     fun detach() {

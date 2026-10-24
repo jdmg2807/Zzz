@@ -35,9 +35,7 @@ class SceneRenderer(private val state: ViewportState) : GLSurfaceView.Renderer {
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glEnable(GLES30.GL_DEPTH_TEST)
         GLES30.glDepthFunc(GLES30.GL_LEQUAL)
-        GLES30.glEnable(GLES30.GL_CULL_FACE)
-        GLES30.glCullFace(GLES30.GL_BACK)
-        GLES30.glFrontFace(GLES30.GL_CCW)
+        GLES30.glDisable(GLES30.GL_CULL_FACE)
         GLES30.glEnable(GLES30.GL_BLEND)
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
         // A new context means every GL name we had is gone.

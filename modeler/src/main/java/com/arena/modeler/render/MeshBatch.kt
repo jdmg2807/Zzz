@@ -73,8 +73,9 @@ class MeshBatch {
             GLES30.glUniform1f(uRoughness, 0.6f)
             GLES30.glUniform3f(uEmission, 0f, 0f, 0f)
         }
-        if (doubleSided || (mat?.doubleSided == true)) GLES30.glDisable(GLES30.GL_CULL_FACE)
-        else GLES30.glEnable(GLES30.GL_CULL_FACE)
+        // Back-face culling stays off on purpose: an imported mesh with inverted winding would
+        // otherwise look like a hole in the scene.
+        GLES30.glDisable(GLES30.GL_CULL_FACE)
 
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, entry.vbo)
         val stride = 8 * 4

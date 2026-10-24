@@ -12,13 +12,29 @@ GitHub Actions compila el APK automáticamente.
 
 ---
 
+## VoxelForge 3D — el modelador (nueva app)
+
+En el mismo repositorio vive **VoxelForge 3D**, una app de modelado y animación 3D para el
+teléfono (módulo `modeler/`, paquete `com.arena.modeler`, se instala aparte del juego):
+
+- **Modelado**: primitivas, jerarquía, materiales PBR, gizmo de traslación y visor OpenGL ES 3.
+- **IA integrada**: genera o modifica modelos desde una descripción usando **OpenRouter** o
+  **Google AI Studio** con *tu* clave (la clave se queda en el teléfono).
+- **Animación**: claves de posición/rotación/escala, reproducción y giro automático.
+- **Importar/exportar**: glTF, GLB, FBX ASCII, OBJ+MTL, STL y PLY; la animación se conserva en
+  GLB/glTF/FBX.
+
+Guía completa, límites por formato y cómo sacar la clave: **[docs/VOXELFORGE.md](docs/VOXELFORGE.md)**.
+
+---
+
 ## Descargar el APK
 
 Cada push a este repositorio compila el juego:
 
 1. Abre la pestaña **Actions** → workflow **Build Android APK**.
-2. Entra a la ejecución más reciente y descarga el artefacto **VoxelCraft-APK**.
-3. Dentro hay dos APK:
+2. Entra a la ejecución más reciente y descarga el artefacto **APKs**.
+3. Dentro están los APK del juego y los del modelador (`VoxelForge-<n>-release.apk`). Los del juego:
    - `VoxelCraft-<n>-release.apk` → el juego (~57 MB, incluye la banda sonora).
    - `VoxelCraft-<n>-debug.apk` → misma app (`com.arena.voxel`) con la misma clave de firma, así
      que **se instala como actualización** de la versión anterior, sin duplicar el icono.
